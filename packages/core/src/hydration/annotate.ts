@@ -8,6 +8,16 @@
 
 import {ApplicationRef} from '../application/application_ref';
 import {APP_ID} from '../application/application_tokens';
+import {
+  DEFER_BLOCK_STATE as CURRENT_DEFER_BLOCK_STATE,
+  TDeferBlockDetails,
+} from '../defer/interfaces';
+import {
+  getDeferBlockDataIndex,
+  getLDeferBlockDetails,
+  getTDeferBlockDetails,
+  isTDeferBlockDetails,
+} from '../defer/utils';
 import {isDetachedByI18n} from '../i18n/utils';
 import {ViewEncapsulation} from '../metadata';
 import {Renderer2} from '../render';
@@ -24,9 +34,11 @@ import {
   isRootView,
 } from '../render3/interfaces/type_checks';
 import {
+  CLEANUP,
   CONTEXT,
   HEADER_OFFSET,
   HOST,
+  ID,
   LView,
   PARENT,
   RENDERER,
@@ -51,6 +63,8 @@ import {
 } from './i18n';
 import {
   CONTAINERS,
+  DEFER_BLOCK_ID,
+  DEFER_BLOCK_STATE,
   DISCONNECTED_NODES,
   ELEMENT_CONTAINERS,
   I18N_DATA,
@@ -69,6 +83,7 @@ import {
   getLNodeForHydration,
   NGH_ATTR_NAME,
   NGH_DATA_KEY,
+  NGH_DEFER_BLOCKS_KEY,
   processTextNodeBeforeSerialization,
   TextNodeMarker,
 } from './utils';
@@ -120,6 +135,11 @@ function getSsrId(tView: TView): string {
   return tView.ssrId;
 }
 
+// TODO: if there is just one field, we can avoid an object here.
+interface DeferBlockInfo {
+  parentDeferBlockId: string | null;
+}
+
 /**
  * Describes a context available during the serialization
  * process. The context is used to share and collect information
@@ -132,6 +152,8 @@ export interface HydrationContext {
   i18nChildren: Map<TView, Set<number> | null>;
   eventTypesToReplay: {regular: Set<string>; capture: Set<string>};
   shouldReplayEvents: boolean;
+  appId: string; // the value of `APP_ID`
+  deferBlocks: Map<string /* defer block id, e.g. `d0` */, DeferBlockInfo>;
 }
 
 /**
@@ -165,7 +187,7 @@ function annotateComponentLViewForHydration(
   // Root elements might also be annotated with the `ngSkipHydration` attribute,
   // check if it's present before starting the serialization process.
   if (hostElement && !(hostElement as HTMLElement).hasAttribute(SKIP_HYDRATION_ATTR_NAME)) {
-    return annotateHostElementForHydration(hostElement as HTMLElement, lView, context);
+    return annotateHostElementForHydration(hostElement as HTMLElement, lView, null, context);
   }
   return null;
 }
@@ -186,7 +208,7 @@ function annotateLContainerForHydration(lContainer: LContainer, context: Hydrati
 
   // Serialize all views within this view container.
   const rootLView = lContainer[PARENT];
-  const rootLViewNghIndex = annotateHostElementForHydration(hostElement, rootLView, context);
+  const rootLViewNghIndex = annotateHostElementForHydration(hostElement, rootLView, null, context);
 
   const renderer = componentLView[RENDERER] as Renderer2;
 
@@ -223,6 +245,8 @@ export function annotateForHydration(appRef: ApplicationRef, doc: Document) {
     regular: new Set<string>(),
     capture: new Set<string>(),
   };
+  const deferBlocks = new Map<string, DeferBlockInfo>();
+  const appId = appRef.injector.get(APP_ID);
   for (const viewRef of viewRefs) {
     const lNode = getLNodeForHydration(viewRef);
 
@@ -236,6 +260,8 @@ export function annotateForHydration(appRef: ApplicationRef, doc: Document) {
         i18nChildren: new Map(),
         eventTypesToReplay,
         shouldReplayEvents,
+        appId,
+        deferBlocks,
       };
       if (isLContainer(lNode)) {
         annotateLContainerForHydration(lNode, context);
@@ -254,7 +280,32 @@ export function annotateForHydration(appRef: ApplicationRef, doc: Document) {
   const serializedViews = serializedViewCollection.getAll();
   const transferState = injector.get(TransferState);
   transferState.set(NGH_DATA_KEY, serializedViews);
+
+  if (deferBlocks.size > 0) {
+    const blocks: {[key: string]: string | null} = {};
+    // TODO: we should probably have an object here instead of a Map?
+    for (const [id, info] of deferBlocks.entries()) {
+      blocks[id] = info.parentDeferBlockId;
+    }
+    transferState.set(NGH_DEFER_BLOCKS_KEY, blocks);
+  }
+
   return eventTypesToReplay;
+}
+
+/**
+ * Whether a given TNode represents a defer block.
+ */
+function isDeferBlock(tView: TView, tNode: TNode): boolean {
+  let tDetails: TDeferBlockDetails | null = null;
+  const slotIndex = getDeferBlockDataIndex(tNode.index);
+  // Check if a slot index is in the reasonable range.
+  // Note: we do `-1` on the right border, since defer block details are stored
+  // in the `n+1` slot, see `getDeferBlockDataIndex` for more info.
+  if (HEADER_OFFSET < slotIndex && slotIndex < tView.bindingStartIndex) {
+    tDetails = getTDeferBlockDetails(tView, tNode);
+  }
+  return !!tDetails && isTDeferBlockDetails(tDetails);
 }
 
 /**
@@ -262,11 +313,17 @@ export function annotateForHydration(appRef: ApplicationRef, doc: Document) {
  * that represent views within this lContainer.
  *
  * @param lContainer the lContainer we are serializing
+ * @param tNode the TNode that contains info about this LContainer
+ * @param lView that hosts this LContainer
+ * @param parentDeferBlockId the defer block id of the parent if it exists
  * @param context the hydration context
  * @returns an array of the `SerializedView` objects
  */
 function serializeLContainer(
   lContainer: LContainer,
+  tNode: TNode,
+  lView: LView,
+  parentDeferBlockId: string | null,
   context: HydrationContext,
 ): SerializedContainerView[] {
   const views: SerializedContainerView[] = [];
@@ -323,7 +380,33 @@ function serializeLContainer(
       serializedView = {
         [TEMPLATE_ID]: template,
         [NUM_ROOT_NODES]: numRootNodes,
-        ...serializeLView(lContainer[i] as LView, context),
+      };
+
+      // If this is a defer block, serialize extra info.
+      if (isDeferBlock(lView[TVIEW], tNode)) {
+        // Add defer block into info context.deferBlocks
+        const deferBlockInfo: DeferBlockInfo = {
+          parentDeferBlockId,
+        };
+        const deferBlockId = `d${context.deferBlocks.size}`;
+        context.deferBlocks.set(deferBlockId, deferBlockInfo);
+
+        // Use current block id as parent for nested routes.
+        parentDeferBlockId = deferBlockId;
+
+        const lDetails = getLDeferBlockDetails(lView, tNode);
+
+        // Serialize extra info into the view object.
+        // TODO: this should be serialized and included at a different level
+        // (not at the view level).
+        serializedView[DEFER_BLOCK_ID] = deferBlockId;
+        serializedView[DEFER_BLOCK_STATE] = lDetails[CURRENT_DEFER_BLOCK_STATE];
+      }
+
+      // TODO: avoid copying of an object here
+      serializedView = {
+        ...serializedView,
+        ...serializeLView(lContainer[i] as LView, parentDeferBlockId, context),
       };
     }
 
@@ -382,7 +465,11 @@ function appendDisconnectedNodeIndex(ngh: SerializedView, tNode: TNode) {
  * @param context the hydration context
  * @returns the `SerializedView` object containing the data to be added to the host node
  */
-function serializeLView(lView: LView, context: HydrationContext): SerializedView {
+function serializeLView(
+  lView: LView,
+  parentDeferBlockId: string | null = null,
+  context: HydrationContext,
+): SerializedView {
   const ngh: SerializedView = {};
   const tView = lView[TVIEW];
   const i18nChildren = getOrComputeI18nChildren(tView, context);
@@ -393,6 +480,10 @@ function serializeLView(lView: LView, context: HydrationContext): SerializedView
   for (let i = HEADER_OFFSET; i < tView.bindingStartIndex; i++) {
     const tNode = tView.data[i] as TNode;
     const noOffsetIndex = i - HEADER_OFFSET;
+
+    if (nativeElementsToEventTypes) {
+      setJSActionAttribute(tNode, lView[i], nativeElementsToEventTypes, parentDeferBlockId);
+    }
 
     // Attempt to serialize any i18n data for the given slot. We do this first, as i18n
     // has its own process for serialization.
@@ -435,7 +526,7 @@ function serializeLView(lView: LView, context: HydrationContext): SerializedView
     if (nativeElementsToEventTypes) {
       // Attach `jsaction` attribute to elements that have registered listeners,
       // thus potentially having a need to do an event replay.
-      setJSActionAttribute(tNode, lView[i], nativeElementsToEventTypes);
+      setJSActionAttribute(tNode, lView[i], nativeElementsToEventTypes, parentDeferBlockId);
     }
 
     if (Array.isArray(tNode.projection)) {
@@ -497,17 +588,33 @@ function serializeLView(lView: LView, context: HydrationContext): SerializedView
         // This is a component, serialize info about it.
         const targetNode = unwrapRNode(hostNode as LView) as RElement;
         if (!(targetNode as HTMLElement).hasAttribute(SKIP_HYDRATION_ATTR_NAME)) {
-          annotateHostElementForHydration(targetNode, hostNode as LView, context);
+          annotateHostElementForHydration(
+            targetNode,
+            hostNode as LView,
+            parentDeferBlockId,
+            context,
+          );
         }
       }
 
       ngh[CONTAINERS] ??= {};
-      ngh[CONTAINERS][noOffsetIndex] = serializeLContainer(lView[i], context);
+      ngh[CONTAINERS][noOffsetIndex] = serializeLContainer(
+        lView[i],
+        tNode,
+        lView,
+        parentDeferBlockId,
+        context,
+      );
     } else if (Array.isArray(lView[i])) {
       // This is a component, annotate the host node with an `ngh` attribute.
       const targetNode = unwrapRNode(lView[i][HOST]!);
       if (!(targetNode as HTMLElement).hasAttribute(SKIP_HYDRATION_ATTR_NAME)) {
-        annotateHostElementForHydration(targetNode as RElement, lView[i], context);
+        annotateHostElementForHydration(
+          targetNode as RElement,
+          lView[i],
+          parentDeferBlockId,
+          context,
+        );
       }
     } else {
       // <ng-container> case
@@ -609,6 +716,7 @@ function componentUsesShadowDomEncapsulation(lView: LView): boolean {
 function annotateHostElementForHydration(
   element: RElement,
   lView: LView,
+  parentDeferBlockId: string | null,
   context: HydrationContext,
 ): number | null {
   const renderer = lView[RENDERER];
@@ -624,7 +732,7 @@ function annotateHostElementForHydration(
     renderer.setAttribute(element, SKIP_HYDRATION_ATTR_NAME, '');
     return null;
   } else {
-    const ngh = serializeLView(lView, context);
+    const ngh = serializeLView(lView, parentDeferBlockId, context);
     const index = context.serializedViewCollection.add(ngh);
     renderer.setAttribute(element, NGH_ATTR_NAME, index.toString());
     return index;
