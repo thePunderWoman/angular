@@ -7369,10 +7369,10 @@ describe('platform-server hydration integration', () => {
         // <main> uses "eager" `custom-app-id` namespace.
         expect(ssrContents).toContain('<main jsaction="click:');
         // <div>s inside a defer block have `d0` as a namespace.
-        expect(ssrContents).toContain('<article jsaction="click:d0');
-        expect(ssrContents).toContain('<aside id="outer-trigger" jsaction="mouseover:d0');
+        expect(ssrContents).toContain('<article jsaction="click:" ngb="d0');
+        expect(ssrContents).toContain('<aside id="outer-trigger" jsaction="mouseover:" ngb="d0');
         // <p> is inside a nested defer block -> different namespace.
-        expect(ssrContents).toContain('<p jsaction="click:d1');
+        expect(ssrContents).toContain('<p jsaction="click:" ngb="d1');
         // There is an extra annotation in the TransferState data.
         expect(ssrContents).toContain('"__nghDeferBlocks__":{"d0":null,"d1":"d0"}');
         // Outer defer block is rendered.
@@ -7402,9 +7402,11 @@ describe('platform-server hydration integration', () => {
 
         // Elements from @defer blocks still have `jsaction` annotations,
         // since they were not triggered yet.
-        expect(appHostNode.outerHTML).toContain('<article jsaction="click:d0');
-        expect(appHostNode.outerHTML).toContain('<aside id="outer-trigger" jsaction="mouseover:d0');
-        expect(appHostNode.outerHTML).toContain('<p jsaction="click:d1');
+        expect(appHostNode.outerHTML).toContain('<article jsaction="click:" ngb="d0');
+        expect(appHostNode.outerHTML).toContain(
+          '<aside id="outer-trigger" jsaction="mouseover:" ngb="d0',
+        );
+        expect(appHostNode.outerHTML).toContain('<p jsaction="click:" ngb="d1');
 
         // Emit an event inside of a defer block, which should result
         // in triggering the defer block (start loading deps, etc) and
@@ -7422,13 +7424,13 @@ describe('platform-server hydration integration', () => {
         expect(appHostNode.outerHTML).toContain('Defer events work');
 
         // All outer defer block elements no longer have `jsaction` annotations.
-        expect(appHostNode.outerHTML).not.toContain('<div jsaction="click:d0');
+        expect(appHostNode.outerHTML).not.toContain('<div jsaction="click:" ngb="d0');
         expect(appHostNode.outerHTML).not.toContain(
-          '<div id="outer-trigger" jsaction="mouseover:d0',
+          '<div id="outer-trigger" jsaction="mouseover:" ngb="d0',
         );
 
         // Inner defer block was not triggered, thus it retains `jsaction` attributes.
-        expect(appHostNode.outerHTML).toContain('<p jsaction="click:d1');
+        expect(appHostNode.outerHTML).toContain('<p jsaction="click:" ngb="d1');
       }, 100_000);
 
       it('should SSR and hydrate nested `@defer` blocks', async () => {
@@ -7481,10 +7483,10 @@ describe('platform-server hydration integration', () => {
         // <main> uses "eager" `custom-app-id` namespace.
         expect(ssrContents).toContain('<main jsaction="click:');
         // <div>s inside a defer block have `d0` as a namespace.
-        expect(ssrContents).toContain('<div jsaction="click:d0');
-        expect(ssrContents).toContain('<div id="outer-trigger" jsaction="mouseover:d0');
+        expect(ssrContents).toContain('<div jsaction="click:" ngb="d0"');
+        expect(ssrContents).toContain('<div id="outer-trigger" jsaction="mouseover:" ngb="d0"');
         // <p> is inside a nested defer block -> different namespace.
-        expect(ssrContents).toContain('<p jsaction="click:d1');
+        expect(ssrContents).toContain('<p jsaction="click:" ngb="d1');
         // There is an extra annotation in the TransferState data.
         expect(ssrContents).toContain('"__nghDeferBlocks__":{"d0":null,"d1":"d0"}');
         // Outer defer block is rendered.
@@ -7515,9 +7517,11 @@ describe('platform-server hydration integration', () => {
 
         // Elements from @defer blocks still have `jsaction` annotations,
         // since they were not triggered yet.
-        expect(appHostNode.outerHTML).toContain('<div jsaction="click:d0');
-        expect(appHostNode.outerHTML).toContain('<div id="outer-trigger" jsaction="mouseover:d0');
-        expect(appHostNode.outerHTML).toContain('<p jsaction="click:d1');
+        expect(appHostNode.outerHTML).toContain('<div jsaction="click:" ngb="d0"');
+        expect(appHostNode.outerHTML).toContain(
+          '<div id="outer-trigger" jsaction="mouseover:" ngb="d0',
+        );
+        expect(appHostNode.outerHTML).toContain('<p jsaction="click:" ngb="d1"');
 
         // Emit an event inside of a defer block, which should result
         // in triggering the defer block (start loading deps, etc) and
@@ -7607,8 +7611,8 @@ describe('platform-server hydration integration', () => {
 
       expect(ssrContents).toContain('<main jsaction="click:">');
       // Buttons inside nested components inherit parent defer block namespace.
-      expect(ssrContents).toContain('<button jsaction="click:d1">Click A</button>');
-      expect(ssrContents).toContain('<button jsaction="click:d1">Click B</button>');
+      expect(ssrContents).toContain('<button jsaction="click:" ngb="d1">Click A</button>');
+      expect(ssrContents).toContain('<button jsaction="click:" ngb="d1">Click B</button>');
     }, 100_000);
   });
 });

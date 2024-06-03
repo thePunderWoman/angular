@@ -48,6 +48,7 @@ function getJsactionData(container: EarlyJsactionDataContainer) {
 }
 
 const JSACTION_ATTRIBUTE = 'jsaction';
+const BLOCKNAME_ATTRIBUTE = 'ngb';
 
 /**
  * A map of DOM elements with `jsaction` attributes grouped by action names.
@@ -68,30 +69,24 @@ export function withEventReplay(): Provider[] {
       provide: ENVIRONMENT_INITIALIZER,
       useValue: () => {
         setDisableEventReplayImpl((rEl: RElement, eventName: string, listenerFn: VoidFunction) => {
-          if (rEl.hasAttribute(JSACTION_ATTRIBUTE)) {
-            const el = rEl as unknown as Element;
-            const attr = rEl.getAttribute(JSACTION_ATTRIBUTE)!;
-            let blockName = '';
-            const result = new RegExp('(\\w+)+:(d\\d+)+;?', 'g').exec(attr);
-            if (result !== null) {
-              // this attribute applies to a defer block
-              // it will be the same across the list of events in one attribute
-              blockName = result[2];
-            }
-            // We don't immediately remove the attribute here because
-            // we need it for replay that happens after hydration.
-            const blockSet = jsactionMap.get(blockName) ?? new Set<Element>();
-            if (!blockSet.has(el)) {
-              el.__jsaction_fns = new Map();
-              blockSet.add(el);
-            }
-            const eventMap = el.__jsaction_fns!;
-            if (!eventMap.has(eventName)) {
-              eventMap.set(eventName, []);
-            }
-            eventMap.get(eventName)!.push(listenerFn);
-            jsactionMap.set(blockName, blockSet);
+          let blockName = '';
+          const el = rEl as unknown as Element;
+          if (rEl.hasAttribute(BLOCKNAME_ATTRIBUTE)) {
+            blockName = rEl.getAttribute(BLOCKNAME_ATTRIBUTE)!;
           }
+          // We don't immediately remove the attribute here because
+          // we need it for replay that happens after hydration.
+          const blockSet = jsactionMap.get(blockName) ?? new Set<Element>();
+          if (!blockSet.has(el)) {
+            el.__jsaction_fns = new Map();
+            blockSet.add(el);
+          }
+          const eventMap = el.__jsaction_fns!;
+          if (!eventMap.has(eventName)) {
+            eventMap.set(eventName, []);
+          }
+          eventMap.get(eventName)!.push(listenerFn);
+          jsactionMap.set(blockName, blockSet);
         });
       },
       multi: true,
@@ -124,8 +119,8 @@ export function withEventReplay(): Provider[] {
                   eventContract.addEvent(et);
                 }
                 eventContract.replayEarlyEvents(container);
-                const dispatcher = new EventDispatcher((event: Event, actionName: string) => {
-                  handleEvent(appRef, event, actionName);
+                const dispatcher = new EventDispatcher((event: Event) => {
+                  handleEvent(appRef, event);
                 });
 
                 registerDispatcher(eventContract, dispatcher);
@@ -199,27 +194,26 @@ export function setJSActionAttribute(
   if (tNode.type & TNodeType.Element) {
     const nativeElement = unwrapRNode(rNode) as Element;
     const events = nativeElementToEvents.get(nativeElement) ?? [];
-    const namespace = parentDeferBlockId ?? '';
-    const parts = events.map((event) => `${event}:${namespace}`);
+    const parts = events.map((event) => `${event}:`);
     if (parts.length > 0) {
       nativeElement.setAttribute(JSACTION_ATTRIBUTE, parts.join(';'));
+    }
+    const blockName = parentDeferBlockId ?? '';
+    if (blockName !== '' && parts.length > 0) {
+      nativeElement.setAttribute(BLOCKNAME_ATTRIBUTE, blockName);
     }
   }
 }
 
-async function handleEvent(
-  appRef: ApplicationRef,
-  event: Event,
-  blockName: string = '',
-  hydratedBlocks?: Set<string>,
-) {
+async function handleEvent(appRef: ApplicationRef, event: Event, hydratedBlocks?: Set<string>) {
+  const el = (event.currentTarget as Element) || (event.target as Element);
+  const blockName =
+    el && el.hasAttribute(BLOCKNAME_ATTRIBUTE) ? el.getAttribute(BLOCKNAME_ATTRIBUTE)! : '';
   if (
     event.eventPhase === EventPhase.REPLAY ||
     (blockName !== '' && hydratedBlocks && hydratedBlocks.has(blockName))
   ) {
-    const handlerFns = (
-      (event.currentTarget as Element) || (event.target as Element)
-    )?.__jsaction_fns?.get(event.type);
+    const handlerFns = el?.__jsaction_fns?.get(event.type);
     if (!handlerFns) {
       return;
     }
@@ -237,7 +231,7 @@ async function handleEvent(
 async function triggerBlockHydration(appRef: ApplicationRef, event: Event, blockName: string) {
   const hydratedBlocks = await hydrateFromBlockName(appRef, blockName);
   hydratedBlocks.add(blockName);
-  handleEvent(appRef, event, blockName, hydratedBlocks);
+  handleEvent(appRef, event, hydratedBlocks);
 }
 
 function removeReplayedJsActionAttributes(blockNames: string[]) {
