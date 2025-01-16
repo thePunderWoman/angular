@@ -7026,14 +7026,26 @@ describe('platform-server full application hydration integration', () => {
     });
 
     describe('@if', () => {
-      it('should work with `if`s that have different value on the client and on the server', async () => {
+      fit('should work with `if`s that have different value on the client and on the server', async () => {
         @Component({
           standalone: true,
           selector: 'app',
+          imports: [NgIf],
           template: `
+
+<ng-container *ngIf="isServer; else elseBlock">
+  <b>This is a SERVER-ONLY content</b>
+</ng-container>
+<ng-template #elseBlock>
+  <i>This is a CLIENT-ONLY content</i>
+</ng-template>
+
+
+          <!--
               @if (isServer) { <b>This is a SERVER-ONLY content</b> }
-              @if (!isServer) { <i>This is a CLIENT-ONLY content</i> }
+              @else { <i>This is a CLIENT-ONLY content</i> }
               @if (alwaysTrue) { <p>CLIENT and SERVER content</p> }
+        -->
             `,
         })
         class SimpleComponent {
@@ -7043,6 +7055,9 @@ describe('platform-server full application hydration integration', () => {
           // and the server: we use it to test the logic to cleanup
           // dehydrated views.
           isServer = isPlatformServer(inject(PLATFORM_ID));
+          ngOnInit() {
+            setTimeout(() => {}, 100);
+          }
         }
 
         const html = await ssr(SimpleComponent);
@@ -7067,7 +7082,9 @@ describe('platform-server full application hydration integration', () => {
 
         const clientRootNode = compRef.location.nativeElement;
 
-        await appRef.whenStable();
+        debugger;
+        // We should observe both branches of the if condition present in the dom
+        await appRef.whenStable(); // post-hydration cleanup happens here
 
         const clientContents = stripExcessiveSpaces(
           stripUtilAttributes(clientRootNode.outerHTML, false),
