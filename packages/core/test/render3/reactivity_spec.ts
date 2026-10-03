@@ -10,6 +10,10 @@
 import type {} from 'zone.js';
 
 import {AsyncPipe} from '@angular/common';
+import {bootstrapApplication} from '@angular/platform-browser';
+import {withBody} from '@angular/private/testing';
+import {SIGNAL} from '../../primitives/signals';
+import {toObservable} from '../../rxjs-interop';
 import {
   AfterViewInit,
   ApplicationRef,
@@ -39,12 +43,8 @@ import {
   ViewChild,
   ViewContainerRef,
 } from '../../src/core';
-import {SIGNAL} from '../../primitives/signals';
-import {toObservable} from '../../rxjs-interop';
 import {EffectNode} from '../../src/render3/reactivity/effect';
-import {TestBed} from '../../testing';
-import {bootstrapApplication} from '@angular/platform-browser';
-import {withBody} from '@angular/private/testing';
+import {type ComponentFixture, TestBed} from '../../testing';
 
 describe('reactivity', () => {
   describe('effects', () => {
@@ -91,6 +91,7 @@ describe('reactivity', () => {
       expect(isStable).toEqual([true, false]);
 
       appRef.tick();
+      await appRef.whenStable();
 
       expect(isStable).toEqual([true, false, true]);
     });
@@ -266,7 +267,6 @@ describe('reactivity', () => {
     });
 
     it('should create root effects when outside of a component, using injection context', () => {
-      TestBed.configureTestingModule({});
       const counter = signal(0);
       const log: number[] = [];
       TestBed.runInInjectionContext(() => effect(() => log.push(counter())));
@@ -280,7 +280,6 @@ describe('reactivity', () => {
     });
 
     it('should create root effects when outside of a component, using an injector', () => {
-      TestBed.configureTestingModule({});
       const counter = signal(0);
       const log: number[] = [];
       effect(() => log.push(counter()), {injector: TestBed.inject(Injector)});
@@ -294,7 +293,6 @@ describe('reactivity', () => {
     });
 
     it('should cleanup effect when manualCleanup is enabled and an injector is provided', () => {
-      TestBed.configureTestingModule({});
       const counter = signal(0);
       const log: number[] = [];
       // It needs the injector to be able to inject the other deps (and not just the DestroyRef).
@@ -351,7 +349,6 @@ describe('reactivity', () => {
 
       const source = signal('');
       @Component({
-        changeDetection: ChangeDetectionStrategy.OnPush,
         template: '{{ data }}',
       })
       class TestCmp {
@@ -394,7 +391,6 @@ describe('reactivity', () => {
       }
 
       @Component({
-        changeDetection: ChangeDetectionStrategy.OnPush,
         providers: [Service],
         template: '{{ service.data }}',
       })
@@ -440,8 +436,7 @@ describe('reactivity', () => {
 
       @Component({
         imports: [Dir],
-        template: `<ng-template dir let-data>{{data}}</ng-template>`,
-        changeDetection: ChangeDetectionStrategy.OnPush,
+        template: `<ng-template dir let-data>{{ data }}</ng-template>`,
       })
       class TestCmp {}
 
@@ -487,6 +482,87 @@ describe('reactivity', () => {
 
         fix.destroy();
         expect(destroyed).toBeTrue();
+      });
+
+      it("should stop running a view's remaining effects once an earlier one destroys the view", async () => {
+        const recorder: string[] = [];
+        let fixture: ComponentFixture<TestCmp>;
+
+        @Component({})
+        class TestCmp {
+          readonly counter = signal(0);
+
+          constructor() {
+            // Added first, so it's visited first when the view's effects are flushed.
+            effect(() => {
+              recorder.push(`a: ${this.counter()}`);
+              if (this.counter() === 1) {
+                fixture.destroy();
+              }
+            });
+
+            // Added second. Also dirty in the same flush pass as "a" above, so it must not
+            // run once "a" has destroyed the view partway through that pass.
+            effect(() => {
+              recorder.push(`b: ${this.counter()}`);
+            });
+          }
+        }
+
+        fixture = TestBed.createComponent(TestCmp);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(recorder).toEqual(['a: 0', 'b: 0']);
+
+        fixture.componentInstance.counter.set(1);
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        expect(recorder).toEqual(['a: 0', 'b: 0', 'a: 1']);
+      });
+
+      it('should not restart the flush loop once an effect dirties a sibling and destroys the view in the same run', async () => {
+        const recorder: string[] = [];
+        const trigger = signal(0);
+        let fixture: ComponentFixture<TestCmp>;
+
+        @Component({})
+        class TestCmp {
+          readonly counter = signal(0);
+
+          constructor() {
+            // Added first, so it's already had its turn (and was not dirty) earlier in the
+            // same flush pass by the time "a" below dirties it.
+            effect(() => {
+              trigger();
+              recorder.push('b');
+            });
+
+            // Added second. On its second run, dirties "b" above (which sets
+            // HasChildViewsToRefresh on this view) and destroys the view in the same call.
+            // That combination makes the outer while loop want to restart even though the
+            // view is already gone.
+            effect(() => {
+              const value = this.counter();
+              recorder.push(`a: ${value}`);
+              if (value === 1) {
+                trigger.update((v) => v + 1);
+                fixture.destroy();
+              }
+            });
+          }
+        }
+
+        fixture = TestBed.createComponent(TestCmp);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(recorder).toEqual(['b', 'a: 0']);
+
+        fixture.componentInstance.counter.set(1);
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        expect(recorder).toEqual(['b', 'a: 0', 'a: 1']);
       });
 
       it('should destroy effects when their DestroyRef is separately destroyed', () => {
@@ -637,7 +713,7 @@ describe('reactivity', () => {
         imports: [WithInputSetter],
         template: `
           <with-input-setter [testInput]="'binding'" />|<with-input-setter testInput="static" />
-      `,
+        `,
       })
       class Cmp {}
 
@@ -817,6 +893,7 @@ describe('reactivity', () => {
         @Component({
           selector: 'test-cmp',
           template: '',
+          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class TestCmp {
           ngOnInitRan = false;
@@ -833,10 +910,11 @@ describe('reactivity', () => {
           selector: 'driver-cmp',
           imports: [TestCmp],
           template: `
-          @if (cond) {
-            <test-cmp />
-          }
-        `,
+            @if (cond) {
+              <test-cmp />
+            }
+          `,
+          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class DriverCmp {
           cond = false;
@@ -1008,6 +1086,39 @@ describe('reactivity', () => {
           /effect\(\) cannot be called from within a reactive context./,
         );
       });
+    });
+  });
+
+  describe('graph', () => {
+    it('should keep links alive in a dynamic graph', () => {
+      const source = signal('initial');
+
+      @Component({
+        selector: 'test-cmp',
+        template: `{{ dynamic() }}{{ source() }}`,
+      })
+      class TestCmp {
+        @Input()
+        nonreactive: unknown;
+
+        get dynamic() {
+          return signal('');
+        }
+
+        source = source;
+      }
+
+      const fixture = TestBed.createComponent(TestCmp);
+      fixture.detectChanges();
+
+      fixture.componentRef.setInput('nonreactive', 'force_check');
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent.trim()).toBe('initial');
+
+      source.set('updated');
+
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent.trim()).toBe('updated');
     });
   });
 });

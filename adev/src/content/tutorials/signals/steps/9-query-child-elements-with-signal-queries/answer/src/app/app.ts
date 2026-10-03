@@ -1,4 +1,4 @@
-import {Component, signal, computed, viewChild, ChangeDetectionStrategy} from '@angular/core';
+import {Component, computed, signal, viewChild} from '@angular/core';
 import {CartSummary} from './cart-summary';
 import {ProductCard} from './product-card';
 
@@ -21,15 +21,12 @@ import {ProductCard} from './product-card';
           [description]="'High-performance laptop'"
           [available]="true"
           [productId]="'LAP001'"
-          [category]="'Electronics'">
-        </product-card>
+          [category]="'Electronics'"
+        />
       </div>
 
       <div class="cart-section">
-        <cart-summary
-          [itemCount]="cartQuantity()"
-          [total]="totalPrice()">
-        </cart-summary>
+        <cart-summary [itemCount]="cartQuantity()" [total]="totalPrice()" />
 
         <div class="cart-controls">
           <label>Quantity:</label>
@@ -41,7 +38,6 @@ import {ProductCard} from './product-card';
     </div>
   `,
   styleUrl: './app.css',
-  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class App {
   cartQuantity = signal(2);

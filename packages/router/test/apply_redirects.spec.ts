@@ -8,8 +8,6 @@
 
 import {EnvironmentInjector, inject, Injectable, Type} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {firstValueFrom, interval, Observable, of} from 'rxjs';
-import {map, switchMap, tap} from 'rxjs/operators';
 
 import {Route, Routes} from '../src/models';
 import {recognize} from '../src/recognize';
@@ -24,7 +22,7 @@ import {
   UrlTree,
 } from '../src/url_tree';
 import {getLoadedRoutes, getProvidersInjector} from '../src/utils/config';
-import {useAutoTick} from './helpers';
+import {useAutoTick} from '@angular/private/testing';
 
 describe('redirects', () => {
   useAutoTick();
@@ -351,7 +349,7 @@ describe('redirects', () => {
       const loader: Pick<RouterConfigLoader, 'loadChildren'> = {
         loadChildren: (injector: any, p: any) => {
           if (injector !== TestBed.inject(EnvironmentInjector)) throw 'Invalid Injector';
-          return of(loadedConfig);
+          return Promise.resolve(loadedConfig);
         },
       };
       const config: Routes = [
@@ -374,7 +372,7 @@ describe('redirects', () => {
 
     it('should handle the case when the loader errors', async () => {
       const loader: Pick<RouterConfigLoader, 'loadChildren'> = {
-        loadChildren: (p: any) => new Observable((obs) => obs.error(new Error('Loading Error'))),
+        loadChildren: (p: any) => Promise.reject(new Error('Loading Error')),
       };
       const config = [
         {path: 'a', component: ComponentA, loadChildren: jasmine.createSpy('children')},
@@ -403,7 +401,7 @@ describe('redirects', () => {
         injector: TestBed.inject(EnvironmentInjector),
       };
       const loader: Pick<RouterConfigLoader, 'loadChildren'> = {
-        loadChildren: (injector: any, p: any) => of(loadedConfig),
+        loadChildren: (injector: any, p: any) => Promise.resolve(loadedConfig),
       };
 
       const config = [
@@ -434,7 +432,7 @@ describe('redirects', () => {
         injector: TestBed.inject(EnvironmentInjector),
       };
       const loader: Pick<RouterConfigLoader, 'loadChildren'> = {
-        loadChildren: (injector: any, p: any) => of(loadedConfig),
+        loadChildren: (injector: any, p: any) => Promise.resolve(loadedConfig),
       };
 
       const config = [
@@ -471,7 +469,7 @@ describe('redirects', () => {
         injector: TestBed.inject(EnvironmentInjector),
       };
       const loader: Pick<RouterConfigLoader, 'loadChildren'> = {
-        loadChildren: (injector: any, p: any) => of(loadedConfig),
+        loadChildren: (injector: any, p: any) => Promise.resolve(loadedConfig),
       };
 
       const config = [
@@ -506,7 +504,7 @@ describe('redirects', () => {
         injector: TestBed.inject(EnvironmentInjector),
       };
       const loader: Pick<RouterConfigLoader, 'loadChildren'> = {
-        loadChildren: (injector: any, p: any) => of(loadedConfig),
+        loadChildren: (injector: any, p: any) => Promise.resolve(loadedConfig),
       };
 
       const config = [
@@ -537,7 +535,7 @@ describe('redirects', () => {
         injector: TestBed.inject(EnvironmentInjector),
       };
       const loader: Pick<RouterConfigLoader, 'loadChildren'> = {
-        loadChildren: (injector: any, p: any) => of(loadedConfig),
+        loadChildren: (injector: any, p: any) => Promise.resolve(loadedConfig),
       };
 
       let passedUrlSegments: UrlSegment[];
@@ -578,7 +576,7 @@ describe('redirects', () => {
         injector: TestBed.inject(EnvironmentInjector),
       };
       const loader: Pick<RouterConfigLoader, 'loadChildren'> = {
-        loadChildren: (injector: any, p: any) => of(loadedConfig),
+        loadChildren: (injector: any, p: any) => Promise.resolve(loadedConfig),
       };
 
       let passedUrlSegments: UrlSegment[];
@@ -620,7 +618,7 @@ describe('redirects', () => {
       };
 
       const loader: Pick<RouterConfigLoader, 'loadChildren'> = {
-        loadChildren: (injector: any, p: any) => of(loadedConfig),
+        loadChildren: (injector: any, p: any) => Promise.resolve(loadedConfig),
       };
 
       const config: Routes = [
@@ -653,7 +651,7 @@ describe('redirects', () => {
         loadChildren: (injector: any, p: any) => {
           if (called) throw new Error('Should not be called twice');
           called = true;
-          return of(loadedConfig);
+          return Promise.resolve(loadedConfig);
         },
       };
 
@@ -691,7 +689,7 @@ describe('redirects', () => {
       };
 
       const loader: Pick<RouterConfigLoader, 'loadChildren'> = {
-        loadChildren: (injector: any, p: any) => of(loadedConfig),
+        loadChildren: (injector: any, p: any) => Promise.resolve(loadedConfig),
       };
 
       const config: Routes = [{path: '**', loadChildren: jasmine.createSpy('children')}];
@@ -720,7 +718,7 @@ describe('redirects', () => {
         ['loadChildren'],
       );
       loader.loadChildren.and.returnValue(
-        of(loadedConfig).pipe(switchMap((v) => new Promise((r) => setTimeout(r, 0)).then(() => v))),
+        new Promise((r) => setTimeout(r, 0)).then(() => loadedConfig),
       );
 
       const config: Routes = [
@@ -753,7 +751,7 @@ describe('redirects', () => {
       };
 
       const loader: Pick<RouterConfigLoader, 'loadChildren'> = {
-        loadChildren: (injector: any, p: any) => of(loadedConfig),
+        loadChildren: (injector: any, p: any) => Promise.resolve(loadedConfig),
       };
 
       const config: Routes = [
@@ -781,7 +779,7 @@ describe('redirects', () => {
       };
 
       const loader: Pick<RouterConfigLoader, 'loadChildren'> = {
-        loadChildren: (injector: any, p: any) => of(loadedConfig),
+        loadChildren: (injector: any, p: any) => Promise.resolve(loadedConfig),
       };
 
       const config: Routes = [
@@ -812,10 +810,10 @@ describe('redirects', () => {
       const loader: Pick<RouterConfigLoader, 'loadChildren'> = {
         loadChildren: (injector: any, p: Route) => {
           loadCalls++;
-          return of(loadedConfig).pipe(
-            switchMap((v) => new Promise((r) => setTimeout(r, 10 * loadCalls)).then(() => v)),
-            tap(() => loaded.push((p.loadChildren as jasmine.Spy).and.identity)),
-          );
+          return new Promise((r) => setTimeout(r, 10 * loadCalls)).then(() => {
+            loaded.push((p.loadChildren as jasmine.Spy).and.identity);
+            return loadedConfig;
+          });
         },
       };
 
@@ -848,10 +846,10 @@ describe('redirects', () => {
       const loader: Pick<RouterConfigLoader, 'loadChildren'> = {
         loadChildren: (injector: any, p: Route) => {
           loadCalls++;
-          return of(loadedConfig).pipe(
-            switchMap((v) => new Promise((r) => setTimeout(r, 10 * loadCalls)).then(() => v)),
-            tap(() => loaded.push((p.loadChildren as jasmine.Spy).and.identity)),
-          );
+          return new Promise((r) => setTimeout(r, 10 * loadCalls)).then(() => {
+            loaded.push((p.loadChildren as jasmine.Spy).and.identity);
+            return loadedConfig;
+          });
         },
       };
 
@@ -903,9 +901,8 @@ describe('redirects', () => {
       const loader: Pick<RouterConfigLoader, 'loadChildren'> = {
         loadChildren: (injector: any, p: Route) => {
           loadCalls++;
-          return of(loadedConfig).pipe(
-            tap(() => loaded.push((p.loadChildren as jasmine.Spy).and.identity)),
-          );
+          loaded.push((p.loadChildren as jasmine.Spy).and.identity);
+          return Promise.resolve(loadedConfig);
         },
       };
 
@@ -940,10 +937,10 @@ describe('redirects', () => {
         loadChildren: (injector: any, p: Route) => {
           const delayMs =
             (p.loadChildren! as jasmine.Spy).and.identity === 'aux' ? auxDelay : rootDelay;
-          return of(loadedConfig).pipe(
-            switchMap((v) => new Promise((r) => setTimeout(r, delayMs)).then(() => v)),
-            tap(() => loaded.push((p.loadChildren as jasmine.Spy).and.identity)),
-          );
+          return new Promise((r) => setTimeout(r, delayMs)).then(() => {
+            loaded.push((p.loadChildren as jasmine.Spy).and.identity);
+            return loadedConfig;
+          });
         },
       };
 
@@ -1625,7 +1622,10 @@ describe('redirects', () => {
     it('with a function using inject and returning a UrlTree', async () => {
       await checkRedirect(
         [
-          {path: 'a/b', redirectTo: () => of(TestBed.inject(Router).parseUrl('/c/d/e'))},
+          {
+            path: 'a/b',
+            redirectTo: () => Promise.resolve(TestBed.inject(Router).parseUrl('/c/d/e')),
+          },
           {path: '**', component: ComponentC},
         ],
         '/a/b',
@@ -1651,6 +1651,26 @@ describe('redirects', () => {
         '/a/b?hl=en&q=hello',
         (t: UrlTree) => {
           expectTreeToBe(t, 'other?hl=en&q=hello');
+        },
+      );
+    });
+
+    it('can access queryParamMap and paramMap and redirect using them', async () => {
+      await checkRedirect(
+        [
+          {
+            path: 'a/b',
+            redirectTo: ({queryParamMap, paramMap}) => {
+              const tree = TestBed.inject(Router).parseUrl(`other;id=${paramMap.get('id')}`);
+              tree.queryParams = {hl: queryParamMap.get('hl')};
+              return Promise.resolve(tree);
+            },
+          },
+          {path: '**', component: ComponentC},
+        ],
+        '/a/b;id=123?hl=en&q=hello',
+        (t: UrlTree) => {
+          expectTreeToBe(t, 'other;id=123?hl=en');
         },
       );
     });
@@ -1736,7 +1756,7 @@ describe('redirects', () => {
       );
     });
 
-    it('does not receive data from the parent route with component (default paramsInheritanceStrategy is emptyOnly)', async () => {
+    it('receives data from the parent route with component by default (paramsInheritanceStrategy is always)', async () => {
       await checkRedirect(
         [
           {
@@ -1747,8 +1767,8 @@ describe('redirects', () => {
               {
                 path: 'c',
                 redirectTo: ({data}) => {
-                  expect(data['data1']).toBeUndefined();
-                  expect(data['data2']).toBeUndefined();
+                  expect(data['data1']).toBe('hello');
+                  expect(data['data2']).toBe('world');
                   return `/redirect`;
                 },
               },
@@ -1828,7 +1848,7 @@ describe('redirects', () => {
             children: [
               {
                 path: 'b',
-                redirectTo: () => interval(100).pipe(map(() => '/redirected')),
+                redirectTo: () => new Promise((res) => setTimeout(() => res('/redirected'), 100)),
               },
             ],
           },
@@ -1867,7 +1887,7 @@ async function checkRedirect(
   config: Routes,
   url: string,
   callback: (t: UrlTree, state: RouterStateSnapshot) => void,
-  paramsInheritanceStrategy: ParamsInheritanceStrategy = 'emptyOnly',
+  paramsInheritanceStrategy: ParamsInheritanceStrategy = 'always',
   errorCallback?: (e: unknown) => void,
 ): Promise<void> {
   try {

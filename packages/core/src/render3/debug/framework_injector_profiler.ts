@@ -8,19 +8,20 @@
 
 import {Injector} from '../../di/injector';
 import {EnvironmentInjector} from '../../di/r3_injector';
-import {Type} from '../../interface/type';
+import {AbstractType, Type} from '../../interface/type';
 import {assertDefined, throwError} from '../../util/assert';
 import {assertTNodeForLView} from '../assert';
 import {getComponentDef} from '../def_getters';
 import {getNodeInjectorLView, getNodeInjectorTNode, NodeInjector} from '../di';
 import {TNode} from '../interfaces/node';
 import {LView} from '../interfaces/view';
-import {EffectRef} from '../reactivity/effect';
+import {AfterRenderPhaseEffectNode} from '../reactivity/after_render_effect';
+import {EffectRefImpl} from '../reactivity/effect';
+import {SIGNAL} from '../../../primitives/signals';
 
 import {
   InjectedService,
   InjectorCreatedInstance,
-  InjectorProfiler,
   InjectorProfilerContext,
   InjectorProfilerEvent,
   InjectorProfilerEventType,
@@ -66,16 +67,19 @@ import {
 class DIDebugData {
   resolverToTokenToDependencies = new WeakMap<
     Injector | LView,
-    WeakMap<Type<unknown>, InjectedService[]>
+    WeakMap<Type<unknown> | AbstractType<unknown>, InjectedService[]>
   >();
   resolverToProviders = new WeakMap<Injector | TNode, ProviderRecord[]>();
-  resolverToEffects = new WeakMap<Injector | LView, EffectRef[]>();
+  resolverToEffects = new WeakMap<
+    Injector | LView,
+    (EffectRefImpl | AfterRenderPhaseEffectNode)[]
+  >();
   standaloneInjectorToComponent = new WeakMap<Injector, Type<unknown>>();
 
   reset() {
     this.resolverToTokenToDependencies = new WeakMap<
       Injector | LView,
-      WeakMap<Type<unknown>, InjectedService[]>
+      WeakMap<Type<unknown> | AbstractType<unknown>, InjectedService[]>
     >();
     this.resolverToProviders = new WeakMap<Injector | TNode, ProviderRecord[]>();
     this.standaloneInjectorToComponent = new WeakMap<Injector, Type<unknown>>();
@@ -116,22 +120,38 @@ function injectorProfilerEventHandler(injectorProfilerEvent: InjectorProfilerEve
     handleProviderConfiguredEvent(context, injectorProfilerEvent.providerRecord);
   } else if (type === InjectorProfilerEventType.EffectCreated) {
     handleEffectCreatedEvent(context, injectorProfilerEvent.effect);
+  } else if (type === InjectorProfilerEventType.AfterRenderEffectPhaseCreated) {
+    handleEffectCreatedEvent(context, injectorProfilerEvent.effectPhase);
   }
 }
 
-function handleEffectCreatedEvent(context: InjectorProfilerContext, effect: EffectRef): void {
+function handleEffectCreatedEvent(
+  context: InjectorProfilerContext,
+  effect: EffectRefImpl | AfterRenderPhaseEffectNode,
+): void {
   const diResolver = getDIResolver(context.injector);
   if (diResolver === null) {
     throwError('An EffectCreated event must be run within an injection context.');
   }
 
   const {resolverToEffects} = frameworkDIDebugData;
+  const cleanupContainer = effect instanceof EffectRefImpl ? effect[SIGNAL] : effect.sequence;
+  let trackedEffects = resolverToEffects.get(diResolver);
 
-  if (!resolverToEffects.has(diResolver)) {
-    resolverToEffects.set(diResolver, []);
+  if (!trackedEffects) {
+    trackedEffects = [];
+    resolverToEffects.set(diResolver, trackedEffects);
   }
 
-  resolverToEffects.get(diResolver)!.push(effect);
+  trackedEffects.push(effect);
+  cleanupContainer.onDestroyFns ??= [];
+  cleanupContainer.onDestroyFns.push(() => {
+    const index = trackedEffects!.indexOf(effect);
+
+    if (index > -1) {
+      trackedEffects!.splice(index, 1);
+    }
+  });
 }
 
 /**

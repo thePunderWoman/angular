@@ -10,7 +10,7 @@ import {ConstantPool} from '@angular/compiler';
 import ts from 'typescript';
 
 import {SourceFileTypeIdentifier} from '../../core/api';
-import {ErrorCode, FatalDiagnosticError} from '../../diagnostics';
+import {ErrorCode, FatalDiagnosticError, ngErrorCode} from '../../diagnostics';
 import {IncrementalBuild} from '../../incremental/api';
 import {SemanticDepGraphUpdater, SemanticSymbol} from '../../incremental/semantic_graph';
 import {IndexingContext} from '../../indexer';
@@ -119,6 +119,7 @@ export class TraitCompiler implements ProgramTypeCheckAdapter {
     private semanticDepGraphUpdater: SemanticDepGraphUpdater | null,
     private sourceFileTypeIdentifier: SourceFileTypeIdentifier,
     private emitDeclarationOnly: boolean,
+    private emitIntermediateTs: boolean,
   ) {
     for (const handler of handlers) {
       this.handlersByName.set(handler.name, handler);
@@ -266,10 +267,6 @@ export class TraitCompiler implements ProgramTypeCheckAdapter {
   private scanClassForTraits(
     clazz: ClassDeclaration,
   ): PendingTrait<unknown, unknown, SemanticSymbol | null, unknown>[] | null {
-    if (!this.compileNonExportedClasses && !this.reflector.isStaticallyExported(clazz)) {
-      return null;
-    }
-
     const decorators = this.reflector.getDecoratorsOfDeclaration(clazz);
 
     return this.detectTraits(clazz, decorators);
@@ -349,7 +346,7 @@ export class TraitCompiler implements ProgramTypeCheckAdapter {
           record.metaDiagnostics = [
             {
               category: ts.DiagnosticCategory.Error,
-              code: Number('-99' + ErrorCode.DECORATOR_COLLISION),
+              code: ngErrorCode(ErrorCode.DECORATOR_COLLISION),
               file: getSourceFile(clazz),
               start: clazz.getStart(undefined, false),
               length: clazz.getWidth(),
@@ -380,7 +377,7 @@ export class TraitCompiler implements ProgramTypeCheckAdapter {
         : 'local compilation';
       record.metaDiagnostics = [...nonNgDecoratorsInLocalMode].map((decorator) => ({
         category: ts.DiagnosticCategory.Error,
-        code: Number('-99' + ErrorCode.DECORATOR_UNEXPECTED),
+        code: ngErrorCode(ErrorCode.DECORATOR_UNEXPECTED),
         file: getSourceFile(clazz),
         start: decorator.node.getStart(),
         length: decorator.node.getWidth(),
@@ -476,10 +473,20 @@ export class TraitCompiler implements ProgramTypeCheckAdapter {
     }
 
     const symbol = this.makeSymbolForTrait(trait.handler, clazz, result.analysis ?? null);
-    if (result.analysis !== undefined && trait.handler.register !== undefined) {
+
+    const isStaticallyExported = this.reflector.isStaticallyExported(clazz);
+    const isStandalone = (result.analysis as any)?.meta?.isStandalone ?? false;
+
+    const shouldSkipResolution =
+      !isStaticallyExported && !this.compileNonExportedClasses && !isStandalone;
+
+    let analysisResult = result.analysis ?? null;
+    if (shouldSkipResolution) {
+      analysisResult = null;
+    } else if (result.analysis !== undefined && trait.handler.register !== undefined) {
       trait.handler.register(clazz, result.analysis);
     }
-    trait = trait.toAnalyzed(result.analysis ?? null, result.diagnostics ?? null, symbol);
+    trait = trait.toAnalyzed(analysisResult, result.diagnostics ?? null, symbol);
   }
 
   resolve(): void {

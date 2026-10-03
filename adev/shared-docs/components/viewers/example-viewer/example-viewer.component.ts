@@ -6,57 +6,51 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
+import {Clipboard} from '@angular/cdk/clipboard';
+import {DOCUMENT, NgComponentOutlet, NgTemplateOutlet} from '@angular/common';
 import {
   afterNextRender,
-  ChangeDetectionStrategy,
-  ChangeDetectorRef,
   Component,
   computed,
-  DestroyRef,
   ElementRef,
   inject,
   Injector,
   input,
   signal,
   Type,
-  viewChild,
 } from '@angular/core';
-import {DOCUMENT, NgTemplateOutlet} from '@angular/common';
-import {MatTabGroup, MatTabsModule} from '@angular/material/tabs';
-import {Clipboard} from '@angular/cdk/clipboard';
-import {CopySourceCodeButton} from '../../copy-source-code-button/copy-source-code-button.component';
-import {IconComponent} from '../../icon/icon.component';
+import {MatTab, MatTabGroup} from '@angular/material/tabs';
+import {MatTooltip} from '@angular/material/tooltip';
 import {ExampleMetadata, Snippet} from '../../../interfaces/index';
 import {EXAMPLE_VIEWER_CONTENT_LOADER} from '../../../providers/index';
-import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
-import {MatTooltipModule} from '@angular/material/tooltip';
+import {CopySourceCodeButton} from '../../copy-source-code-button/copy-source-code-button.component';
+import {IconComponent} from '../../icon/icon.component';
 
-export enum CodeExampleViewMode {
-  SNIPPET = 'snippet',
-  MULTI_FILE = 'multi',
-}
-
-export const CODE_LINE_NUMBER_CLASS_NAME = 'shiki-ln-number';
-export const CODE_LINE_CLASS_NAME = 'line';
-export const GAP_CODE_LINE_CLASS_NAME = 'gap';
-export const HIDDEN_CLASS_NAME = 'hidden';
+const CODE_LINE_NUMBER_CLASS_NAME = 'shiki-ln-number';
+const CODE_LINE_CLASS_NAME = 'line';
+const GAP_CODE_LINE_CLASS_NAME = 'gap';
+const HIDDEN_CLASS_NAME = 'hidden';
 
 @Component({
   selector: 'docs-example-viewer',
-  imports: [CopySourceCodeButton, MatTabsModule, MatTooltipModule, IconComponent, NgTemplateOutlet],
+  imports: [
+    CopySourceCodeButton,
+    MatTabGroup,
+    MatTab,
+    MatTooltip,
+    IconComponent,
+    NgTemplateOutlet,
+    NgComponentOutlet,
+  ],
   templateUrl: './example-viewer.component.html',
   styleUrls: ['./example-viewer.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ExampleViewer {
   readonly exampleMetadata = input<ExampleMetadata | null>(null, {alias: 'metadata'});
   readonly githubUrl = input<string | null>(null);
   readonly stackblitzUrl = input<string | null>(null);
-  readonly matTabGroup = viewChild<MatTabGroup>('codeTabs');
 
-  private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly clipboard = inject(Clipboard);
-  private readonly destroyRef = inject(DestroyRef);
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
   private readonly elementRef = inject(ElementRef<HTMLElement>);
@@ -70,12 +64,12 @@ export class ExampleViewer {
     return new Set(fileExtensions).size !== fileExtensions.length;
   });
 
-  CodeExampleViewMode = CodeExampleViewMode;
   exampleComponent?: Type<unknown>;
 
   readonly expandable = signal<boolean>(false);
   readonly expanded = signal<boolean>(false);
   readonly snippetCode = signal<Snippet | undefined>(undefined);
+  readonly selectedTabIndex = signal<number>(0);
   readonly showCode = signal<boolean>(true);
   readonly tabs = computed(() =>
     this.exampleMetadata()?.files.map((file) => ({
@@ -84,18 +78,12 @@ export class ExampleViewer {
       code: file.sanitizedContent,
     })),
   );
-  readonly view = computed(() =>
-    this.exampleMetadata()?.files.length === 1
-      ? CodeExampleViewMode.SNIPPET
-      : CodeExampleViewMode.MULTI_FILE,
-  );
 
   async renderExample(): Promise<void> {
     // Lazy load live example component
-    if (this.exampleMetadata()?.path && this.exampleMetadata()?.preview) {
-      this.exampleComponent = await this.exampleViewerContentLoader.loadPreview(
-        this.exampleMetadata()?.path!,
-      );
+    const path = this.exampleMetadata()?.path;
+    if (path && this.exampleMetadata()?.preview) {
+      this.exampleComponent = await this.exampleViewerContentLoader.loadPreview(path);
     }
 
     this.snippetCode.set(this.exampleMetadata()?.files[0]);
@@ -114,14 +102,7 @@ export class ExampleViewer {
           `example-${this.exampleMetadata()?.id.toString()!}`,
         );
 
-        this.matTabGroup()?.realignInkBar();
-
-        this.listenToMatTabIndexChange();
-
-        const lines = this.getHiddenCodeLines();
-        const lineNumbers = this.getHiddenCodeLineNumbers();
-
-        this.expandable.set(lines.length > 0 || lineNumbers.length > 0);
+        this.updateExpandable();
       },
       {injector: this.injector},
     );
@@ -131,6 +112,15 @@ export class ExampleViewer {
     this.expanded.update((expanded) => !expanded);
 
     this.setCodeLinesVisibility();
+  }
+
+  toggleCodeVisibility(): void {
+    const showCode = !this.showCode();
+    this.showCode.set(showCode);
+
+    if (showCode) {
+      afterNextRender(() => this.setCodeLinesVisibility(), {injector: this.injector});
+    }
   }
 
   copyLink(): void {
@@ -144,16 +134,26 @@ export class ExampleViewer {
     this.clipboard.copy(fullUrl);
   }
 
-  private listenToMatTabIndexChange(): void {
-    const matTabGroup = this.matTabGroup();
-    matTabGroup?.realignInkBar();
-    matTabGroup?.selectedIndexChange
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((index) => {
-        this.snippetCode.set(this.exampleMetadata()?.files[index]);
-        this.changeDetector.detectChanges();
+  protected onTabIndexChange(index: number): void {
+    this.selectedTabIndex.set(index);
+    this.snippetCode.set(this.exampleMetadata()?.files[index]);
+
+    afterNextRender(
+      () => {
         this.setCodeLinesVisibility();
-      });
+        this.updateExpandable();
+      },
+      {injector: this.injector},
+    );
+  }
+
+  // A file is expandable when its range hides lines. While the block is expanded nothing is
+  // hidden, so trust the presence of a range instead of the rendered state.
+  private updateExpandable(): void {
+    this.expandable.set(
+      !!this.snippetCode()?.visibleLinesRange &&
+        (this.expanded() || this.getHiddenCodeLines().length > 0),
+    );
   }
 
   private getFileExtension(name: string): string {
@@ -210,15 +210,15 @@ export class ExampleViewer {
     const appendGapBefore = [];
 
     for (const [index, line] of lines.entries()) {
-      if (!linesToDisplay.includes(index)) {
+      if (!linesToDisplay.includes(index + 1)) {
         line.classList.add(HIDDEN_CLASS_NAME);
-      } else if (!linesToDisplay.includes(index - 1)) {
+      } else if (!linesToDisplay.includes(index)) {
         appendGapBefore.push(line);
       }
     }
 
     for (const [index, lineNumber] of lineNumbers.entries()) {
-      if (!linesToDisplay.includes(index)) {
+      if (!linesToDisplay.includes(index + 1)) {
         lineNumber.classList.add(HIDDEN_CLASS_NAME);
       }
     }

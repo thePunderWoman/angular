@@ -9,18 +9,16 @@ Run the schematic using the following command:
 ng generate @angular/core:ngstyle-to-style
 ```
 
-
 #### Before
 
 ```html
-<div [ngStyle]="{'background-color': 'red'}">
+<div [ngStyle]="{'background-color': 'red'}"></div>
 ```
-
 
 #### After
 
 ```html
-<div [style]="{'background-color': 'red'}">
+<div [style]="{'background-color': 'red'}"></div>
 ```
 
 ## Configuration options
@@ -30,9 +28,8 @@ The migration supports a few options for fine tuning the migration to your speci
 ### `--best-effort-mode`
 
 By default, the migration avoids migrating object references usages of `NgStyle`
-When the `--best-effort-mode` flag is enabled, `ngStyle` instances binded to object references are also migrated. 
+When the `--best-effort-mode` flag is enabled, `ngStyle` instances binded to object references are also migrated.
 This can be unsafe to migrate, for example if the binded object is mutated.
-
 
 ```html
 <div [ngStyle]="styleObject"></div>

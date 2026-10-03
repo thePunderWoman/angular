@@ -8,23 +8,20 @@
 
 import {
   Component,
-  afterRenderEffect,
-  ElementRef,
   inject,
-  Input,
   input,
   output,
   signal,
   viewChild,
-  ChangeDetectionStrategy,
   computed,
-  linkedSignal,
   DestroyRef,
+  untracked,
+  linkedSignal,
 } from '@angular/core';
 import {
+  CdElementData,
   ComponentExplorerView,
   ComponentExplorerViewQuery,
-  DebugSignalGraphNode,
   DevToolsNode,
   DirectivePosition,
   ElementPosition,
@@ -42,16 +39,13 @@ import {FlatNode} from './directive-forest/component-data-source';
 import {DirectiveForestComponent} from './directive-forest/directive-forest.component';
 import {IndexedNode} from './directive-forest/index-forest';
 import {constructPathOfKeysToPropertyValue} from './property-resolver/directive-property-resolver';
-import {
-  ElementPropertyResolver,
-  FlatNode as PropertyFlatNode,
-} from './property-resolver/element-property-resolver';
-import {PropertyTabComponent} from './property-tab/property-tab.component';
-import {MatSlideToggle} from '@angular/material/slide-toggle';
+import {ElementPropertyResolver} from './property-resolver/element-property-resolver';
+import {FlatNode as PropertyFlatNode} from '../../shared/object-tree-explorer/object-tree-types';
+import {PropertyPaneComponent} from './property-pane/property-pane.component';
 import {FormsModule} from '@angular/forms';
 import {Platform} from '@angular/cdk/platform';
 import {MatSnackBarModule, MatSnackBar} from '@angular/material/snack-bar';
-import {SignalsTabComponent} from './signals-view/signals-tab.component';
+import {SignalGraphPaneComponent} from './signal-graph-pane/signal-graph-pane.component';
 import {
   ResponsiveSplitConfig,
   ResponsiveSplitDirective,
@@ -59,7 +53,9 @@ import {
 import {SplitAreaDirective} from '../../shared/split/splitArea.directive';
 import {SplitComponent} from '../../shared/split/split.component';
 import {Direction} from '../../shared/split/interface';
-import {SignalGraphManager} from './signal-graph/signal-graph-manager';
+import {SignalGraphManager} from './signal-graph-manager/signal-graph-manager';
+import {DevtoolsSignalGraphNode} from '../../shared/signal-graph';
+import {Settings} from '../../application-services/settings';
 
 const FOREST_VER_SPLIT_SIZE = 30;
 const SIGNAL_GRAPH_VER_SPLIT_SIZE = 70;
@@ -73,7 +69,13 @@ const sameDirectives = (a: IndexedNode, b: IndexedNode) => {
   if (a.component && b.component && a.component.id !== b.component.id) {
     return false;
   }
-  const aDirectives = new Set(a.directives.map((d) => d.id));
+  if (!a.directives && !b.directives) {
+    return true;
+  }
+  if (!a.directives || !b.directives) {
+    return false;
+  }
+  const aDirectives = new Set(a.directives.map((d) => d.id) ?? []);
   for (const dir of b.directives) {
     if (!aDirectives.has(dir.id)) {
       return false;
@@ -98,31 +100,22 @@ const sameDirectives = (a: IndexedNode, b: IndexedNode) => {
     SplitAreaDirective,
     DirectiveForestComponent,
     BreadcrumbsComponent,
-    PropertyTabComponent,
-    MatSlideToggle,
+    PropertyPaneComponent,
     FormsModule,
     MatSnackBarModule,
-    SignalsTabComponent,
+    SignalGraphPaneComponent,
     ResponsiveSplitDirective,
   ],
-  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DirectiveExplorerComponent {
   readonly showCommentNodes = input(false);
-  @Input() isHydrationEnabled = false;
   readonly toggleInspector = output<void>();
 
   readonly directiveForest = viewChild.required(DirectiveForestComponent);
-  readonly splitElementRef = viewChild.required(SplitComponent, {read: ElementRef});
-  readonly directiveForestSplitArea = viewChild.required('directiveForestSplitArea', {
-    read: ElementRef,
-  });
 
   readonly currentSelectedElement = signal<IndexedNode | null>(null);
   readonly forest = signal<DevToolsNode[]>([]);
-  readonly splitDirection = signal<'horizontal' | 'vertical'>('horizontal');
   readonly parents = signal<FlatNode[] | null>(null);
-  readonly showHydrationNodeHighlights = signal(false);
 
   readonly signalsOpen = signal(false);
 
@@ -134,48 +127,45 @@ export class DirectiveExplorerComponent {
   private readonly _propResolver = inject(ElementPropertyResolver);
   private readonly _frameManager = inject(FrameManager);
 
+  private readonly settings = inject(Settings);
   private readonly platform = inject(Platform);
   private readonly snackBar = inject(MatSnackBar);
   protected readonly signalGraph = inject(SignalGraphManager);
 
-  protected readonly preselectedSignalNodeId = linkedSignal<IndexedNode | null, string | null>({
-    source: this.currentSelectedElement,
-    computation: () => null,
-  });
+  protected readonly externallySelectedSignalNodeId = signal<{id: string} | null>(null);
 
-  protected readonly responsiveSplitConfig: ResponsiveSplitConfig = {
+  // Responsible for splitting behavior of the explorer and the props pane.
+  protected readonly tabSplitConfig: ResponsiveSplitConfig = {
+    defaultDirection: 'horizontal',
+    widthBreakpoint: '<500px',
+    breakpointDirection: 'vertical',
+  };
+
+  // Responsible for splitting behavior of the forest and the signal graph pane.
+  protected readonly forestSplitConfig: ResponsiveSplitConfig = {
     defaultDirection: 'vertical',
-    aspectRatioBreakpoint: 1.5,
+    aspectRatioBreakpoint: '>=1.5',
     breakpointDirection: 'horizontal',
   };
 
   protected readonly forestSplitSize = signal<number>(FOREST_VER_SPLIT_SIZE);
   protected readonly signalGraphSplitSize = signal<number>(SIGNAL_GRAPH_VER_SPLIT_SIZE);
 
+  protected readonly cdData = linkedSignal<boolean, CdElementData[] | null>({
+    source: this.settings.showCdInExplorer,
+    computation: (showCdInExplorer, prev) => {
+      // We reset the `cdData` if the feature
+      // is disabled from the settings.
+      if (!showCdInExplorer) {
+        return null;
+      }
+      return prev?.value ?? null;
+    },
+  });
+
   private readonly currentElementPos = computed(() => this.currentSelectedElement()?.position);
 
   constructor() {
-    afterRenderEffect((cleanup) => {
-      const splitElement = this.splitElementRef().nativeElement;
-      const directiveForestSplitArea = this.directiveForestSplitArea().nativeElement;
-      const resizeObserver = new ResizeObserver((entries) => {
-        this.refreshHydrationNodeHighlightsIfNeeded();
-
-        const resizedEntry = entries[0];
-        if (resizedEntry.target === splitElement) {
-          this.splitDirection.set(
-            resizedEntry.contentRect.width <= 500 ? 'vertical' : 'horizontal',
-          );
-        }
-      });
-
-      resizeObserver.observe(splitElement);
-      resizeObserver.observe(directiveForestSplitArea);
-      cleanup(() => {
-        resizeObserver.disconnect();
-      });
-    });
-
     this.subscribeToBackendEvents();
     this.refresh();
     this.signalGraph.listen(this.currentElementPos);
@@ -210,6 +200,7 @@ export class DirectiveExplorerComponent {
   subscribeToBackendEvents(): void {
     this._messageBus.on('latestComponentExplorerView', (view: ComponentExplorerView) => {
       this.forest.set(view.forest);
+
       this.currentSelectedElement.set(this._clickedElement);
       if (view.properties && this._clickedElement) {
         this._propResolver.setProperties(this._clickedElement, view.properties);
@@ -217,6 +208,8 @@ export class DirectiveExplorerComponent {
     });
 
     this._messageBus.on('componentTreeDirty', () => this.refresh());
+
+    this._messageBus.on('latestCdData', (cdData) => this.cdData.set(cdData));
   }
 
   refresh(): void {
@@ -234,7 +227,6 @@ export class DirectiveExplorerComponent {
     if (!this._refreshRetryTimeout) {
       this._refreshRetryTimeout = setTimeout(() => this.refresh(), 500);
     }
-    this.refreshHydrationNodeHighlightsIfNeeded();
   }
 
   viewSource(directiveName: string): void {
@@ -242,9 +234,8 @@ export class DirectiveExplorerComponent {
     const selectedEl = this.currentSelectedElement();
     if (!selectedEl) return;
 
-    const directiveIndex = selectedEl.directives.findIndex(
-      (directive) => directive.name === directiveName,
-    );
+    const directiveIndex =
+      selectedEl.directives?.findIndex((directive) => directive.name === directiveName) ?? -1;
 
     const selectedFrame = this._frameManager.selectedFrame();
     if (!this._frameManager.activeFrameHasUniqueUrl()) {
@@ -286,7 +277,7 @@ export class DirectiveExplorerComponent {
   }
 
   highlight(node: FlatNode): void {
-    if (!node.original.component) {
+    if (!node.hasNativeElement) {
       return;
     }
     this._messageBus.emit('createHighlightOverlay', [node.position]);
@@ -354,7 +345,7 @@ export class DirectiveExplorerComponent {
     const selectedFrame = this._frameManager.selectedFrame();
 
     if (!this._frameManager.activeFrameHasUniqueUrl()) {
-      const error = `The currently inspected frame does not have a unique url on this page. Cannot inspect object.`;
+      const error = `The currently inspected frame does not have a unique URL on this page. Cannot inspect object.`;
       this.snackBar.open(error, 'Dismiss', {duration: 5000, horizontalPosition: 'left'});
       this._messageBus.emit('log', [{level: 'warn', message: error}]);
       return;
@@ -369,24 +360,10 @@ export class DirectiveExplorerComponent {
     }
   }
 
-  hightlightHydrationNodes() {
-    this._messageBus.emit('createHydrationOverlay');
-  }
-
-  removeHydrationNodesHightlights() {
-    this._messageBus.emit('removeHydrationOverlay');
-  }
-
-  refreshHydrationNodeHighlightsIfNeeded() {
-    if (this.showHydrationNodeHighlights()) {
-      this.removeHydrationNodesHightlights();
-      this.hightlightHydrationNodes();
-    }
-  }
-
-  showSignalGraph(node: DebugSignalGraphNode | null) {
+  showSignalGraph(node: DevtoolsSignalGraphNode | null) {
     if (node) {
-      this.preselectedSignalNodeId.set(node.id);
+      // We want to trigger an update each time we intercept an update.
+      this.externallySelectedSignalNodeId.set({id: node.id});
     }
     this.signalsOpen.set(true);
   }

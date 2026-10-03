@@ -26,6 +26,8 @@ import {
   Router,
   NavigationStart,
   RoutesRecognized,
+  Route,
+  UrlSegment,
   GuardsCheckStart,
   ChildActivationStart,
   ActivationStart,
@@ -42,6 +44,7 @@ import {
   RunGuardsAndResolvers,
   Data,
   RouterModule,
+  RouterOutlet,
   NavigationCancellationCode,
   RouteConfigLoadStart,
   RouteConfigLoadEnd,
@@ -50,6 +53,7 @@ import {
   CanActivateFn,
   CanActivateChildFn,
   CanDeactivateFn,
+  PartialMatchRouteSnapshot,
 } from '../../src';
 import {wrapIntoObservable} from '../../src/utils/collection';
 import {RouterTestingHarness} from '../../testing';
@@ -70,7 +74,7 @@ import {
   createRoot,
   advance,
 } from './integration_helpers';
-import {timeout} from '../helpers';
+import {timeout} from '@angular/private/testing';
 
 export function guardsIntegrationSuite() {
   describe('guards', () => {
@@ -110,7 +114,7 @@ export function guardsIntegrationSuite() {
           fixture.destroy();
 
           // Wait until the event task is dispatched.
-          await new Promise((resolve) => setTimeout(resolve, 10));
+          await timeout(10);
           window.removeEventListener('unhandledrejection', onUnhandledrejection);
 
           expect(onUnhandledrejection).not.toHaveBeenCalled();
@@ -1184,6 +1188,65 @@ export function guardsIntegrationSuite() {
         expect(log[0].component).toBeInstanceOf(AdminComponent);
       });
 
+      it('should pass correct component to canDeactivate when using named outlets in componentless parent routes', async () => {
+        @Component({
+          selector: 'outer',
+          template: '<router-outlet name="inner"></router-outlet>',
+          standalone: true,
+          imports: [RouterOutlet],
+        })
+        class OuterCmp {}
+
+        @Component({selector: 'inner1', template: '', standalone: true})
+        class Inner1Cmp {}
+
+        @Component({selector: 'inner2', template: '', standalone: true})
+        class Inner2Cmp {}
+
+        const router: Router = TestBed.inject(Router);
+        const fixture = await createRoot(router, RootCmp);
+
+        router.resetConfig([
+          {
+            path: '',
+            component: OuterCmp,
+            children: [
+              {
+                path: 'one',
+                children: [
+                  {
+                    path: '',
+                    outlet: 'inner',
+                    component: Inner1Cmp,
+                    canDeactivate: [recordingDeactivate],
+                  },
+                ],
+              },
+              {
+                path: 'two',
+                children: [
+                  {
+                    path: '',
+                    outlet: 'inner',
+                    component: Inner2Cmp,
+                    canDeactivate: [recordingDeactivate],
+                  },
+                ],
+              },
+            ],
+          },
+        ]);
+
+        router.navigateByUrl('/one');
+        await advance(fixture);
+
+        router.navigateByUrl('/two');
+        await advance(fixture);
+
+        expect(log.length).toBe(1);
+        expect(log[0].component).toBeInstanceOf(Inner1Cmp);
+      });
+
       it('should not create a route state if navigation is canceled', async () => {
         const router: Router = TestBed.inject(Router);
         const location: Location = TestBed.inject(Location);
@@ -2226,6 +2289,61 @@ export function guardsIntegrationSuite() {
         // same time
         expect(delayedGuardSpy.calls.count()).toEqual(1);
       });
+
+      it('receives PreMatchRouteSnapshot as third argument', async () => {
+        const router = TestBed.inject(Router);
+        const fixture = await createRoot(router, RootCmp);
+        let capturedSnapshot: PartialMatchRouteSnapshot | undefined;
+
+        router.resetConfig([
+          {
+            path: 'a/:id',
+            canMatch: [
+              (route: Route, segments: UrlSegment[], snapshot: PartialMatchRouteSnapshot) => {
+                capturedSnapshot = snapshot;
+                return true;
+              },
+            ],
+            component: SimpleCmp,
+          },
+        ]);
+
+        await router.navigateByUrl('/a/1?q=2#f');
+        expect(capturedSnapshot).toBeDefined();
+        expect(capturedSnapshot!.params['id']).toBe('1');
+        expect(capturedSnapshot!.queryParams['q']).toBe('2');
+        expect(capturedSnapshot!.fragment).toBe('f');
+      });
+
+      it('can redirect based on snapshot params', async () => {
+        const router = TestBed.inject(Router);
+        const fixture = await createRoot(router, RootCmp);
+
+        router.resetConfig([
+          {
+            path: 'a/:id',
+            canMatch: [
+              (route: Route, segments: UrlSegment[], snapshot: PartialMatchRouteSnapshot) => {
+                const router = inject(Router);
+                if (snapshot.params['id'] === '1') {
+                  return router.parseUrl('/b');
+                }
+                return true;
+              },
+            ],
+            component: SimpleCmp,
+          },
+          {path: 'b', component: BlankCmp},
+        ]);
+
+        await router.navigateByUrl('/a/1');
+        await advance(fixture);
+        expect(router.url).toEqual('/b');
+
+        await router.navigateByUrl('/a/2');
+        await advance(fixture);
+        expect(router.url).toEqual('/a/2');
+      });
     });
 
     it('should allow guards as functions', async () => {
@@ -2394,6 +2512,97 @@ export function guardsIntegrationSuite() {
       ]);
       await router.navigateByUrl('');
       expect(guardDone).toEqual(['guard1', 'guard2', 'guard3', 'guard4']);
+    });
+
+    it('should run in injection context', async () => {
+      @Injectable({providedIn: 'root'})
+      class MyService {
+        canRun = false;
+      }
+
+      let resolveCount = 0;
+      const routes = [
+        {
+          path: 'a',
+          children: [],
+          resolve: {
+            x: () => ++resolveCount,
+          },
+          runGuardsAndResolvers: () => inject(MyService).canRun,
+        },
+      ];
+      const router = TestBed.inject(Router);
+      router.resetConfig(routes);
+      const service = TestBed.inject(MyService);
+
+      await router.navigateByUrl('/a');
+      expect(router.url).toEqual('/a');
+      // Always run on activation
+      expect(resolveCount).toBe(1);
+
+      service.canRun = false;
+      await router.navigateByUrl('/a?q=1');
+      expect(resolveCount).toBe(1);
+
+      service.canRun = true;
+      await router.navigateByUrl('/a?q=2');
+      expect(resolveCount).toBe(2);
+    });
+
+    describe('throwing redirect', () => {
+      it('should redirect when a guard throws a RedirectCommand', async () => {
+        const router = TestBed.inject(Router);
+        const location = TestBed.inject(Location);
+        const fixture = await createRoot(router, RootCmp);
+
+        router.resetConfig([
+          {
+            path: 'a',
+            canActivate: [
+              () => {
+                throw new RedirectCommand(router.parseUrl('/b'));
+              },
+            ],
+            component: BlankCmp,
+          },
+          {
+            path: 'b',
+            component: BlankCmp,
+          },
+        ]);
+
+        router.navigateByUrl('/a');
+        await advance(fixture);
+
+        expect(location.path()).toEqual('/b');
+      });
+
+      it('should redirect when a resolver throws a RedirectCommand', async () => {
+        const router = TestBed.inject(Router);
+        const location = TestBed.inject(Location);
+        const fixture = await createRoot(router, RootCmp);
+
+        router.resetConfig([
+          {
+            path: 'a',
+            resolve: {
+              data: () => {
+                throw new RedirectCommand(router.parseUrl('/b'));
+              },
+            },
+            component: BlankCmp,
+          },
+          {
+            path: 'b',
+            component: BlankCmp,
+          },
+        ]);
+
+        router.navigateByUrl('/a');
+        await advance(fixture);
+
+        expect(location.path()).toEqual('/b');
+      });
     });
   });
 }

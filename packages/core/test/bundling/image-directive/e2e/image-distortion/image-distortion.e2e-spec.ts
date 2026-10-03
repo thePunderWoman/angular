@@ -6,26 +6,45 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {browser} from 'protractor';
-import {logging} from 'selenium-webdriver';
+import * as webdriver from 'selenium-webdriver';
+import {collectBrowserLogs, createWebDriver, waitForBrowserLogs} from '../browser-logs-util';
 
-import {collectBrowserLogs} from '../browser-logs-util';
+describe('NgOptimizedImage directive (image-distortion)', () => {
+  let driver: webdriver.WebDriver;
+  let baseUrl: string;
 
-describe('NgOptimizedImage directive', () => {
+  beforeAll(async () => {
+    ({driver, baseUrl} = await createWebDriver());
+
+    // Prime the memory cache with `a.png` by visiting the passing component first.
+    // Chromium's native lazy loading defers `display: none` images indefinitely
+    // unless they are already in the memory cache.
+    await driver.get(`${baseUrl}/e2e/image-distortion-passing`);
+    await new Promise((r) => setTimeout(r, 1000));
+  });
+
+  afterAll(async () => {
+    await driver.quit();
+  });
+
   it('should not warn if there is no image distortion', async () => {
-    await browser.get('/e2e/image-distortion-passing');
-    const logs = await collectBrowserLogs(logging.Level.WARNING);
+    await driver.get(`${baseUrl}/e2e/image-distortion-passing`);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const logs = await collectBrowserLogs(driver, webdriver.logging.Level.WARNING);
     expect(logs.length).toEqual(0);
   });
 
   it('should warn if there is image distortion', async () => {
-    await browser.get('/e2e/image-distortion-failing');
-    const logs = await collectBrowserLogs(logging.Level.WARNING);
+    await driver.get(`${baseUrl}/e2e/image-distortion-failing`);
+    const logs = await waitForBrowserLogs(driver, webdriver.logging.Level.WARNING, 8, 15000, (l) =>
+      l.message.includes('NG02952'),
+    );
 
-    expect(logs.length).toEqual(7);
+    expect(logs.length).toEqual(8);
+
     // Image loading order is not guaranteed, so all logs, rather than single entry
     // needs to be checked in order to test whether a given error message is present.
-    const expectErrorMessageInLogs = (logs: logging.Entry[], message: string) => {
+    const expectErrorMessageInLogs = (logs: webdriver.logging.Entry[], message: string) => {
       expect(
         logs.some((log) => {
           return log.message.includes(message);
@@ -51,6 +70,16 @@ describe('NgOptimizedImage directive', () => {
         'the aspect ratio of the image does not match the aspect ratio indicated by the width and height attributes. ' +
         '\\nIntrinsic image size: 250w x 250h (aspect-ratio: 1). ' +
         '\\nSupplied width and height attributes: 24w x 240h (aspect-ratio: 0.10). ' +
+        '\\nTo fix this, update the width and height attributes.',
+    );
+
+    expectErrorMessageInLogs(
+      logs,
+      'The NgOptimizedImage directive (activated on an \\u003Cimg> element ' +
+        'with the `ngSrc=\\"/e2e/a.png\\"`) has detected that ' +
+        'the aspect ratio of the image does not match the aspect ratio indicated by the width and height attributes. ' +
+        '\\nIntrinsic image size: 250w x 250h (aspect-ratio: 1). ' +
+        '\\nSupplied width and height attributes: 222w x 25h (aspect-ratio: 8.88). ' +
         '\\nTo fix this, update the width and height attributes.',
     );
 

@@ -23,12 +23,14 @@ export enum ViewEncapsulation {
   // Historically the 1 value was for `Native` encapsulation which has been removed as of v11.
   None = 2,
   ShadowDom = 3,
-  IsolatedShadowDom = 4,
+  ExperimentalIsolatedShadowDom = 4,
 }
 
 export enum ChangeDetectionStrategy {
   OnPush = 0,
   Default = 1,
+  // tslint:disable-next-line:no-duplicate-enum-values
+  Eager = 1,
 }
 
 export interface Input {
@@ -76,15 +78,6 @@ export interface Type extends Function {
   new (...args: any[]): any;
 }
 export const Type = Function;
-
-export enum SecurityContext {
-  NONE = 0,
-  HTML = 1,
-  STYLE = 2,
-  SCRIPT = 3,
-  URL = 4,
-  RESOURCE_URL = 5,
-}
 
 /**
  * Injection flags for DI.
@@ -328,3 +321,5 @@ export const enum AttributeMarker {
    */
   I18n = 6,
 }
+
+export {SecurityContext} from './schema/dom_security_schema';

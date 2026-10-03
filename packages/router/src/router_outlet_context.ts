@@ -10,7 +10,6 @@ import {ComponentRef, EnvironmentInjector, Injectable} from '@angular/core';
 
 import type {RouterOutletContract} from './directives/router_outlet';
 import {ActivatedRoute} from './router_state';
-import {getClosestRouteInjector} from './utils/config';
 
 /**
  * Store contextual information about a `RouterOutlet`
@@ -23,10 +22,18 @@ export class OutletContext {
   children: ChildrenOutletContexts;
   attachRef: ComponentRef<any> | null = null;
   get injector(): EnvironmentInjector {
-    return getClosestRouteInjector(this.route?.snapshot) ?? this.rootInjector;
+    return this.route?.snapshot._environmentInjector ?? this.rootInjector;
   }
 
   constructor(private readonly rootInjector: EnvironmentInjector) {
+    this.children = new ChildrenOutletContexts(this.rootInjector);
+  }
+
+  /**
+   * Replaces `children` with a fresh instance, keeping the same root injector.
+   * @internal
+   */
+  resetChildren(): void {
     this.children = new ChildrenOutletContexts(this.rootInjector);
   }
 }
@@ -38,8 +45,11 @@ export class OutletContext {
  */
 @Injectable({providedIn: 'root'})
 export class ChildrenOutletContexts {
-  // contexts for child outlets, by name.
-  private contexts = new Map<string, OutletContext>();
+  /**
+   * Contexts for child outlets, keyed by outlet name.
+   * @internal
+   */
+  contexts = new Map<string, OutletContext>();
 
   /** @docs-private */
   constructor(private rootInjector: EnvironmentInjector) {}

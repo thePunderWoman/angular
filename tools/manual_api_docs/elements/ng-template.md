@@ -12,11 +12,11 @@ Angular won't render the middle "Hip!" in the phrase "Hip! Hip! Hooray!" because
 surrounding `<ng-template>`.
 
 ```html
+<p>Hip!</p>
+<ng-template>
   <p>Hip!</p>
-  <ng-template>
-    <p>Hip!</p>
-  </ng-template>
-  <p>Hooray!</p>
+</ng-template>
+<p>Hooray!</p>
 ```
 
 </div>
@@ -43,7 +43,7 @@ method `createEmbeddedView()`.
 ### Template Variables
 
 `<ng-template>` elements can be referenced in templates
-using [standard template variables](guide/templates/variables#template-reference-variables#how-angular-assigns-values-to-template-variables).
+using [standard template variables](guide/templates/variables#assigning-values-to-template-reference-variables).
 
 _This is how `<ng-template>` elements are used as `ngIf` else clauses._
 

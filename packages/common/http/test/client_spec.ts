@@ -6,17 +6,27 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {HttpClient} from '../src/client';
-import {HttpErrorResponse, HttpEventType, HttpResponse, HttpStatusCode} from '../src/response';
-import {HttpClientTestingBackend} from '../testing/src/backend';
+import {ɵprovideFakePlatformNavigation} from '@angular/common/testing';
+import {TestBed} from '@angular/core/testing';
 import {toArray} from 'rxjs/operators';
+import {HttpClient} from '../src/client';
+import {provideHttpClient, withNoXsrfProtection} from '../src/provider';
+import {HttpErrorResponse, HttpEventType, HttpResponse, HttpStatusCode} from '../src/response';
+import {HttpTestingController, provideHttpClientTesting} from '../testing';
 
 describe('HttpClient', () => {
-  let client: HttpClient = null!;
-  let backend: HttpClientTestingBackend = null!;
+  let client: HttpClient;
+  let backend: HttpTestingController;
   beforeEach(() => {
-    backend = new HttpClientTestingBackend();
-    client = new HttpClient(backend);
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withNoXsrfProtection()),
+        provideHttpClientTesting(),
+        ɵprovideFakePlatformNavigation(),
+      ],
+    });
+    client = TestBed.inject(HttpClient);
+    backend = TestBed.inject(HttpTestingController);
   });
   afterEach(() => {
     backend.verify();
@@ -125,6 +135,25 @@ describe('HttpClient', () => {
       expect(req.request.reportProgress).toEqual(true);
       req.flush({});
     });
+    it('with split progress events enabled', (done) => {
+      client
+        .get('/test', {reportUploadProgress: true, reportDownloadProgress: true})
+        .subscribe(() => done());
+      const req = backend.expectOne('/test');
+      expect(req.request.reportUploadProgress).toBe(true);
+      expect(req.request.reportDownloadProgress).toBe(true);
+      req.flush({});
+    });
+
+    it('post with a split progress events enabled', (done) => {
+      client
+        .post('/test', {}, {reportUploadProgress: true, reportDownloadProgress: true})
+        .subscribe(() => done());
+      const req = backend.expectOne('/test');
+      expect(req.request.reportUploadProgress).toBe(true);
+      expect(req.request.reportDownloadProgress).toBe(true);
+      req.flush({});
+    });
   });
   describe('makes a POST request', () => {
     it('with text data', (done) => {
@@ -164,6 +193,7 @@ describe('HttpClient', () => {
             timeout: 1000,
             keepalive: true,
             withCredentials: true,
+            referrerPolicy: 'no-referrer',
           },
         )
         .subscribe(() => {
@@ -176,6 +206,7 @@ describe('HttpClient', () => {
       expect(testReq.request.mode).toBe('cors');
       expect(testReq.request.redirect).toBe('follow');
       expect(testReq.request.referrer).toBe('www.example.com');
+      expect(testReq.request.referrerPolicy).toBe('no-referrer');
       expect(testReq.request.integrity).toBe('sha256-abc');
       expect(testReq.request.timeout).toBe(1000);
       expect(testReq.request.keepalive).toBe(true);

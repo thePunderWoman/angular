@@ -1,14 +1,18 @@
-/**
+/*!
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
- * found in the LICENSE file at https://angular.io/license
+ * found in the LICENSE file at https://angular.dev/license
  */
-import * as vscode from 'vscode';
+import type * as vscode from 'vscode';
 import {DocumentUri, TextDocument} from 'vscode-languageserver-textdocument';
 
-import {isNotTypescriptOrSupportedDecoratorField} from '../embedded_support';
+import {
+  isInsideStringLiteral,
+  isNotTypescriptOrSupportedDecoratorField,
+  isNotTypescriptOrSupportedDecoratorRange,
+} from '../embedded_support';
 
 describe('embedded language support', () => {
   describe('isInsideAngularContext', () => {
@@ -87,8 +91,199 @@ describe('embedded language support', () => {
         false,
       );
     });
+
+    it('inside styles declared before template', () => {
+      test(
+        `const foo = {styles: ['h1 { col¦or: red; }'], template: '<div></div>'}`,
+        isNotTypescriptOrSupportedDecoratorField,
+        true,
+      );
+    });
+
+    it('inside a string of another property after template', () => {
+      test(
+        `const foo = {template: '<div></div>', selector: 'app¦-root'}`,
+        isNotTypescriptOrSupportedDecoratorField,
+        false,
+      );
+    });
+
+    it('inside a string in the class body after a template in the decorator', () => {
+      test(
+        `@Component({template: '<div></div>'})
+        export class AppComponent {
+          private property = 'd¦oe';
+        }`,
+        isNotTypescriptOrSupportedDecoratorField,
+        false,
+      );
+    });
+
+    it('inside a string of a nested host property', () => {
+      test(
+        `const foo = {host: {'[class.foo]': 'is¦Foo'}, selector: 'app-root'}`,
+        isNotTypescriptOrSupportedDecoratorField,
+        true,
+      );
+    });
+
+    it('inside a @HostListener decorator string', () => {
+      test(
+        `@Component({template: '<div></div>'})
+        export class AppComponent {
+          @HostListener('cl¦ick', ['$event']) onClick(event: Event) {}
+        }`,
+        isNotTypescriptOrSupportedDecoratorField,
+        true,
+      );
+    });
+
+    it('inside a @HostBinding decorator string of a directive without template', () => {
+      test(
+        `@Directive({selector: '[foo]'})
+        export class FooDirective {
+          @HostBinding('class.f¦oo') isFoo = true;
+        }`,
+        isNotTypescriptOrSupportedDecoratorField,
+        true,
+      );
+    });
+
+    it('inside a string after a @HostListener decorator', () => {
+      test(
+        `@Component({template: '<div></div>'})
+        export class AppComponent {
+          @HostListener('click', ['$event']) onClick(event: Event) {
+            console.log('cli¦cked');
+          }
+        }`,
+        isNotTypescriptOrSupportedDecoratorField,
+        false,
+      );
+    });
+
+    it('inside a string argument of a plain function call named like a decorator', () => {
+      test(`HostListener('cl¦ick');`, isNotTypescriptOrSupportedDecoratorField, false);
+    });
+
+    it('after a template literal with substitutions', () => {
+      test(
+        `@Component({template: \`\`})
+        export class AppComponent {
+          private property = 'doe';
+          private method(): void {
+            console.log(\`\${this.property}\`);
+            this.¦
+          }
+        }`,
+        isNotTypescriptOrSupportedDecoratorField,
+        false,
+      );
+    });
+
+    it('after a template literal with nested braces in a substitution', () => {
+      test(
+        `@Component({template: \`\`})
+        export class AppComponent {
+          private method(): void {
+            console.log(\`\${{a: 1}.a} and \${[1, 2].map((x) => { return x; })}\`);
+            this.¦
+          }
+        }`,
+        isNotTypescriptOrSupportedDecoratorField,
+        false,
+      );
+    });
+
+    it('inside a template literal template with substitutions', () => {
+      test(
+        `const foo = {template: \`<div>\${value}</d¦iv>\`}`,
+        isNotTypescriptOrSupportedDecoratorField,
+        false,
+      );
+    });
+
+    it('inside a template literal template after a template literal with substitutions', () => {
+      test(
+        `const prefix = \`\${getPrefix()}-\`;
+        const foo = {template: \`<div>¦</div>\`}`,
+        isNotTypescriptOrSupportedDecoratorField,
+        true,
+      );
+    });
+  });
+
+  describe('isInsideStringLiteral', () => {
+    it('inside a string literal', () => {
+      test(`const foo = 'ba¦r';`, isInsideStringLiteral, true);
+    });
+
+    it('outside of a string literal', () => {
+      test(`const foo = 'bar'; const baz = 1¦;`, isInsideStringLiteral, false);
+    });
+
+    it('after a template literal with substitutions', () => {
+      test(`const foo = \`\${bar}\`; const baz = 1¦;`, isInsideStringLiteral, false);
+    });
+
+    it('inside a string literal after a template literal with substitutions', () => {
+      test(`const foo = \`\${bar}\`; const baz = 'qu¦x';`, isInsideStringLiteral, true);
+    });
+  });
+
+  describe('isNotTypescriptOrSupportedDecoratorRange', () => {
+    it('returns true for non-TypeScript documents', () => {
+      const vdoc = TextDocument.create(
+        'test.html' as DocumentUri,
+        'html',
+        0,
+        '<div></div>',
+      ) as {} as vscode.TextDocument;
+      (vdoc as any).fileName = 'test.html';
+      const range = makeRange(vdoc, 0, 5);
+      expect(isNotTypescriptOrSupportedDecoratorRange(vdoc, range)).toBeTrue();
+    });
+
+    it('returns true when range start is in supported decorator field', () => {
+      const source = `const cmp = {template: '<div>foo</div>'};`;
+      const vdoc = TextDocument.create(
+        'test.ts' as DocumentUri,
+        'typescript',
+        0,
+        source,
+      ) as {} as vscode.TextDocument;
+      (vdoc as any).fileName = 'test.ts';
+
+      const start = source.indexOf('foo');
+      const end = source.indexOf('const');
+      const range = makeRange(vdoc, start, end);
+      expect(isNotTypescriptOrSupportedDecoratorRange(vdoc, range)).toBeTrue();
+    });
+
+    it('returns false when both endpoints are outside supported decorator fields', () => {
+      const source = `const cmp = {template: '<div>foo</div>'};\nconst x = 1;`;
+      const vdoc = TextDocument.create(
+        'test.ts' as DocumentUri,
+        'typescript',
+        0,
+        source,
+      ) as {} as vscode.TextDocument;
+      (vdoc as any).fileName = 'test.ts';
+
+      const start = source.indexOf('const x');
+      const end = source.indexOf('= 1') + 3;
+      const range = makeRange(vdoc, start, end);
+      expect(isNotTypescriptOrSupportedDecoratorRange(vdoc, range)).toBeFalse();
+    });
   });
 });
+
+function makeRange(document: vscode.TextDocument, start: number, end: number): vscode.Range {
+  return {
+    start: document.positionAt(start),
+    end: document.positionAt(end),
+  } as vscode.Range;
+}
 
 function test(
   fileWithCursor: string,

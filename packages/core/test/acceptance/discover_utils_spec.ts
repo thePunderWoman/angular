@@ -77,6 +77,8 @@ describe('discovery utils', () => {
     template: '<p></p>',
     providers: [{provide: String, useValue: 'Child'}],
     standalone: false,
+
+    changeDetection: ChangeDetectionStrategy.Eager,
   })
   class Child {
     constructor() {
@@ -100,7 +102,7 @@ describe('discovery utils', () => {
   @Component({
     selector: 'my-app',
     template: `
-      <span (click)="log($event)" *ngIf="spanVisible">{{text}}</span>
+      <span (click)="log($event)" *ngIf="spanVisible">{{ text }}</span>
       <div dirA #div #foo="dirA"></div>
       <child></child>
       <child dirA #child></child>
@@ -109,6 +111,8 @@ describe('discovery utils', () => {
       <b *ngIf="visible">Bold</b>
     `,
     standalone: false,
+
+    changeDetection: ChangeDetectionStrategy.Eager,
   })
   class MyApp {
     text: string = 'INIT';
@@ -392,7 +396,7 @@ describe('discovery utils', () => {
       const metadata = getDirectiveMetadata(myApp)! as AngularComponentDebugMetadata;
       expect(metadata.inputs).toEqual({a: 'b'});
       expect(metadata.outputs).toEqual({c: 'd'});
-      expect(metadata.changeDetection).toBe(ChangeDetectionStrategy.Default);
+      expect(metadata.changeDetection).toBe(ChangeDetectionStrategy.Eager);
       expect(metadata.encapsulation).toBe(ViewEncapsulation.None);
     });
 
@@ -400,6 +404,11 @@ describe('discovery utils', () => {
       const metadata = getDirectiveMetadata(getDirectives(div[0])[0]);
       expect(metadata!.inputs).toEqual({a: 'b'});
       expect(metadata!.outputs).toEqual({c: 'd'});
+    });
+
+    it('should return null when passed null or undefined', () => {
+      expect(getDirectiveMetadata(null)).toBeNull();
+      expect(getDirectiveMetadata(undefined)).toBeNull();
     });
   });
 });
@@ -411,6 +420,8 @@ describe('discovery utils deprecated', () => {
         selector: 'inner-comp',
         template: '<div></div>',
         standalone: false,
+
+        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class InnerComp {}
 
@@ -418,6 +429,8 @@ describe('discovery utils deprecated', () => {
         selector: 'comp',
         template: '<inner-comp></inner-comp>',
         standalone: false,
+
+        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Comp {}
 
@@ -463,6 +476,8 @@ describe('discovery utils deprecated', () => {
           <div my-dir-3></div>
         `,
         standalone: false,
+
+        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Comp {
         @ViewChild(MyDir1) myDir1Instance!: MyDir1;
@@ -503,6 +518,8 @@ describe('discovery utils deprecated', () => {
       @Component({
         template: '',
         standalone: false,
+
+        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Comp {}
 
@@ -516,6 +533,8 @@ describe('discovery utils deprecated', () => {
       @Component({
         template: '',
         standalone: false,
+
+        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Comp {}
 
@@ -544,6 +563,8 @@ describe('discovery utils deprecated', () => {
       @Component({
         template: '<div myDir #elRef #dirRef="myDir"></div>',
         standalone: false,
+
+        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Comp {}
 
@@ -562,6 +583,8 @@ describe('discovery utils deprecated', () => {
       @Component({
         template: '<div #elRef class="fooClass" [style.color]="color"></div>',
         standalone: false,
+
+        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Comp {
         color = 'red';

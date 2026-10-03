@@ -10,10 +10,10 @@ const ANIMATION_PREFIX = '@';
 const DISABLE_ANIMATIONS_FLAG = '@.disabled';
 
 import {
+  ɵAnimationRendererType as AnimationRendererType,
   Renderer2,
   RendererFactory2,
   RendererStyleFlags2,
-  ɵAnimationRendererType as AnimationRendererType,
   type ListenerOptions,
 } from '@angular/core';
 import type {AnimationEngine} from './animation_engine_next';
@@ -23,9 +23,7 @@ type AnimationFactoryWithListenerCallback = RendererFactory2 & {
 };
 
 export class BaseAnimationRenderer implements Renderer2 {
-  // We need to explicitly type this property because of an api-extractor bug
-  // See https://github.com/microsoft/rushstack/issues/4390
-  readonly ɵtype: AnimationRendererType.Regular = AnimationRendererType.Regular;
+  readonly ɵtype = AnimationRendererType.Regular;
 
   constructor(
     protected namespaceId: string,
@@ -89,7 +87,7 @@ export class BaseAnimationRenderer implements Renderer2 {
     // Elements using the new `animate.leave` API require synchronous removal and should
     // skip the rest of the legacy animation behaviors.
     if (requireSynchronousElementRemoval) {
-      this.delegate.removeChild(parent, oldChild, isHostElement);
+      this.delegate.removeChild(parent, oldChild, isHostElement, requireSynchronousElementRemoval);
       return;
     }
     // Prior to the changes in #57203, this method wasn't being called at all by `core` if the child

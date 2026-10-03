@@ -10,8 +10,10 @@ import ts from 'typescript';
 import {
   AstFactory,
   BinaryOperator,
+  BuiltInType,
   LeadingComment,
   ObjectLiteralProperty,
+  Parameter,
   SourceMapRange,
   TemplateLiteral,
   UnaryOperator,
@@ -37,7 +39,7 @@ enum PureAnnotation {
 /**
  * A TypeScript flavoured implementation of the AstFactory.
  */
-export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Expression> {
+export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Expression, ts.TypeNode> {
   private externalSourceFiles = new Map<string, ts.SourceMapSource>();
 
   private readonly UNARY_OPERATORS: Record<UnaryOperator, ts.PrefixUnaryOperator> =
@@ -68,7 +70,6 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
       '||': ts.SyntaxKind.BarBarToken,
       '+': ts.SyntaxKind.PlusToken,
       '??': ts.SyntaxKind.QuestionQuestionToken,
-      'in': ts.SyntaxKind.InKeyword,
       '=': ts.SyntaxKind.EqualsToken,
       '+=': ts.SyntaxKind.PlusEqualsToken,
       '-=': ts.SyntaxKind.MinusEqualsToken,
@@ -79,6 +80,14 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
       '&&=': ts.SyntaxKind.AmpersandAmpersandEqualsToken,
       '||=': ts.SyntaxKind.BarBarEqualsToken,
       '??=': ts.SyntaxKind.QuestionQuestionEqualsToken,
+      '&=': ts.SyntaxKind.AmpersandEqualsToken,
+      '|=': ts.SyntaxKind.BarEqualsToken,
+      '>>=': ts.SyntaxKind.GreaterThanGreaterThanEqualsToken,
+      '>>>=': ts.SyntaxKind.GreaterThanGreaterThanGreaterThanEqualsToken,
+      '<<=': ts.SyntaxKind.LessThanLessThanEqualsToken,
+      '^=': ts.SyntaxKind.CaretEqualsToken,
+      'in': ts.SyntaxKind.InKeyword,
+      'instanceof': ts.SyntaxKind.InstanceOfKeyword,
     }))();
 
   private readonly VAR_TYPES: Record<VariableDeclarationType, ts.NodeFlags> =
@@ -118,17 +127,39 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
     return ts.factory.createBlock(body);
   }
 
+  createCallChain(
+    callee: ts.Expression,
+    args: ts.Expression[],
+    pure: boolean,
+    isOptional: boolean,
+  ): ts.Expression {
+    const call = ts.factory.createCallChain(
+      callee,
+      isOptional ? ts.factory.createToken(ts.SyntaxKind.QuestionDotToken) : undefined,
+      undefined,
+      args,
+    );
+    if (pure) {
+      this.markAsPure(call);
+    }
+    return call;
+  }
+
   createCallExpression(callee: ts.Expression, args: ts.Expression[], pure: boolean): ts.Expression {
     const call = ts.factory.createCallExpression(callee, undefined, args);
     if (pure) {
-      ts.addSyntheticLeadingComment(
-        call,
-        ts.SyntaxKind.MultiLineCommentTrivia,
-        this.annotateForClosureCompiler ? PureAnnotation.CLOSURE : PureAnnotation.TERSER,
-        /* trailing newline */ false,
-      );
+      this.markAsPure(call);
     }
     return call;
+  }
+
+  private markAsPure<T extends ts.Node>(node: T): T {
+    return ts.addSyntheticLeadingComment(
+      node,
+      ts.SyntaxKind.MultiLineCommentTrivia,
+      this.annotateForClosureCompiler ? PureAnnotation.CLOSURE : PureAnnotation.TERSER,
+      /* trailing newline */ false,
+    );
   }
 
   createConditional(
@@ -147,6 +178,18 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
 
   createElementAccess = ts.factory.createElementAccessExpression;
 
+  createElementAccessChain(
+    expression: ts.Expression,
+    element: ts.Expression,
+    isOptional: boolean,
+  ): ts.Expression {
+    return ts.factory.createElementAccessChain(
+      expression,
+      isOptional ? ts.factory.createToken(ts.SyntaxKind.QuestionDotToken) : undefined,
+      element,
+    );
+  }
+
   createExpressionStatement = ts.factory.createExpressionStatement;
 
   createDynamicImport(url: string | ts.Expression) {
@@ -159,8 +202,9 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
 
   createFunctionDeclaration(
     functionName: string,
-    parameters: string[],
+    parameters: Parameter<ts.TypeNode>[],
     body: ts.Statement,
+    returnType: ts.TypeNode | null,
   ): ts.Statement {
     if (!ts.isBlock(body)) {
       throw new Error(`Invalid syntax, expected a block, but got ${ts.SyntaxKind[body.kind]}.`);
@@ -170,16 +214,17 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
       undefined,
       functionName,
       undefined,
-      parameters.map((param) => ts.factory.createParameterDeclaration(undefined, undefined, param)),
-      undefined,
+      parameters.map((param) => this.createParameter(param)),
+      returnType ?? undefined,
       body,
     );
   }
 
   createFunctionExpression(
     functionName: string | null,
-    parameters: string[],
+    parameters: Parameter<ts.TypeNode>[],
     body: ts.Statement,
+    returnType: ts.TypeNode | null,
   ): ts.Expression {
     if (!ts.isBlock(body)) {
       throw new Error(`Invalid syntax, expected a block, but got ${ts.SyntaxKind[body.kind]}.`);
@@ -189,15 +234,16 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
       undefined,
       functionName ?? undefined,
       undefined,
-      parameters.map((param) => ts.factory.createParameterDeclaration(undefined, undefined, param)),
-      undefined,
+      parameters.map((param) => this.createParameter(param)),
+      returnType ?? undefined,
       body,
     );
   }
 
   createArrowFunctionExpression(
-    parameters: string[],
+    parameters: Parameter<ts.TypeNode>[],
     body: ts.Statement | ts.Expression,
+    returnType: ts.TypeNode | null,
   ): ts.Expression {
     if (ts.isStatement(body) && !ts.isBlock(body)) {
       throw new Error(`Invalid syntax, expected a block, but got ${ts.SyntaxKind[body.kind]}.`);
@@ -206,10 +252,20 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
     return ts.factory.createArrowFunction(
       undefined,
       undefined,
-      parameters.map((param) => ts.factory.createParameterDeclaration(undefined, undefined, param)),
-      undefined,
+      parameters.map((param) => this.createParameter(param)),
+      returnType ?? undefined,
       undefined,
       body,
+    );
+  }
+
+  private createParameter(param: Parameter<ts.TypeNode>): ts.ParameterDeclaration {
+    return ts.factory.createParameterDeclaration(
+      undefined,
+      undefined,
+      param.name,
+      undefined,
+      param.type ?? undefined,
     );
   }
 
@@ -243,20 +299,42 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
 
   createObjectLiteral(properties: ObjectLiteralProperty<ts.Expression>[]): ts.Expression {
     return ts.factory.createObjectLiteralExpression(
-      properties.map((prop) =>
-        ts.factory.createPropertyAssignment(
+      properties.map((prop) => {
+        if (prop.kind === 'spread') {
+          return ts.factory.createSpreadAssignment(prop.expression);
+        }
+
+        const propNode = ts.factory.createPropertyAssignment(
           prop.quoted
             ? ts.factory.createStringLiteral(prop.propertyName)
             : ts.factory.createIdentifier(prop.propertyName),
           prop.value,
-        ),
-      ),
+        );
+        if (prop.leadingComments) {
+          attachComments(propNode, prop.leadingComments);
+        }
+        return propNode;
+      }),
     );
   }
 
   createParenthesizedExpression = ts.factory.createParenthesizedExpression;
 
   createPropertyAccess = ts.factory.createPropertyAccessExpression;
+
+  createPropertyAccessChain(
+    expression: ts.Expression,
+    propertyName: string,
+    isOptional: boolean,
+  ): ts.Expression {
+    return ts.factory.createPropertyAccessChain(
+      expression,
+      isOptional ? ts.factory.createToken(ts.SyntaxKind.QuestionDotToken) : undefined,
+      propertyName,
+    );
+  }
+
+  createSpreadElement = ts.factory.createSpreadElement;
 
   createReturnStatement(expression: ts.Expression | null): ts.Statement {
     return ts.factory.createReturnStatement(expression ?? undefined);
@@ -323,7 +401,8 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
   createVariableDeclaration(
     variableName: string,
     initializer: ts.Expression | null,
-    type: VariableDeclarationType,
+    variableType: VariableDeclarationType,
+    type: ts.TypeNode | null,
   ): ts.Statement {
     return ts.factory.createVariableStatement(
       undefined,
@@ -332,11 +411,11 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
           ts.factory.createVariableDeclaration(
             variableName,
             undefined,
-            undefined,
+            type ?? undefined,
             initializer ?? undefined,
           ),
         ],
-        this.VAR_TYPES[type],
+        this.VAR_TYPES[variableType],
       ),
     );
   }
@@ -365,6 +444,63 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
     });
     return node;
   }
+
+  createBuiltInType(type: BuiltInType): ts.TypeNode {
+    switch (type) {
+      case 'any':
+        return ts.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword);
+      case 'boolean':
+        return ts.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
+      case 'number':
+        return ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
+      case 'string':
+        return ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
+      case 'function':
+        return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Function'));
+      case 'never':
+        return ts.factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword);
+      case 'unknown':
+        return ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
+    }
+  }
+
+  createExpressionType(expression: ts.Expression, typeParams: ts.TypeNode[] | null): ts.TypeNode {
+    const typeName = getEntityTypeFromExpression(expression);
+    return ts.factory.createTypeReferenceNode(typeName, typeParams ?? undefined);
+  }
+
+  createArrayType(elementType: ts.TypeNode): ts.TypeNode {
+    return ts.factory.createArrayTypeNode(elementType);
+  }
+
+  createMapType(valueType: ts.TypeNode): ts.TypeNode {
+    return ts.factory.createTypeLiteralNode([
+      ts.factory.createIndexSignature(
+        undefined,
+        [
+          ts.factory.createParameterDeclaration(
+            undefined,
+            undefined,
+            'key',
+            undefined,
+            ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+          ),
+        ],
+        valueType,
+      ),
+    ]);
+  }
+
+  transplantType(type: ts.TypeNode): ts.TypeNode {
+    if (
+      typeof type.kind === 'number' &&
+      typeof type.getSourceFile === 'function' &&
+      ts.isTypeNode(type)
+    ) {
+      return type;
+    }
+    throw new Error('Attempting to transplant a type node from a non-TypeScript AST: ' + type);
+  }
 }
 
 // HACK: Use this in place of `ts.createTemplateMiddle()`.
@@ -390,7 +526,7 @@ export function createTemplateTail(cooked: string, raw: string): ts.TemplateTail
  * @param leadingComments The comments to attach to the statement.
  */
 export function attachComments(
-  statement: ts.Statement | ts.Expression,
+  statement: ts.Statement | ts.Expression | ts.ObjectLiteralElementLike,
   leadingComments: LeadingComment[],
 ): void {
   for (const comment of leadingComments) {
@@ -410,4 +546,18 @@ export function attachComments(
       }
     }
   }
+}
+
+function getEntityTypeFromExpression(expression: ts.Expression): ts.EntityName {
+  if (ts.isIdentifier(expression)) {
+    return expression;
+  }
+  if (ts.isPropertyAccessExpression(expression)) {
+    const left = getEntityTypeFromExpression(expression.expression);
+    if (!ts.isIdentifier(expression.name)) {
+      throw new Error(`Unsupported property access for type reference: ${expression.name.text}`);
+    }
+    return ts.factory.createQualifiedName(left, expression.name);
+  }
+  throw new Error(`Unsupported expression for type reference: ${ts.SyntaxKind[expression.kind]}`);
 }

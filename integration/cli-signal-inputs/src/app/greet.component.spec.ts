@@ -1,4 +1,4 @@
-import {Component} from '@angular/core';
+import {ChangeDetectionStrategy, Component} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 
 import {GreetComponent} from './greet.component';
@@ -30,12 +30,15 @@ describe('greet component', () => {
 });
 
 @Component({
-  standalone: true,
   template: `
-    <greet [firstName]="firstName" (clickFromInside)="clickCount = clickCount + 1"
-           (clickFromInside2)="clickCount2 = clickCount2 + 1"/>
+    <greet
+      [firstName]="firstName"
+      (clickFromInside)="clickCount = clickCount + 1"
+      (clickFromInside2)="clickCount2 = clickCount2 + 1"
+    />
   `,
   imports: [GreetComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
 })
 class TestCmp {
   clickCount = 0;

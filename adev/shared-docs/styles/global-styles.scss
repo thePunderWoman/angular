@@ -29,6 +29,7 @@
 @use 'docs/pill';
 @use 'docs/steps';
 @use 'docs/table';
+@use 'docs/tutorial-mascot';
 @use 'docs/video';
 @use 'docs/mermaid';
 
@@ -41,6 +42,7 @@
 @include api-item-label.api-item-label();
 @include faceted-list.faceted-list();
 
+@include mq.breakpoints-vars();
 @include mq.for-phone-only();
 @include mq.for-tablet-portrait-up();
 @include mq.for-tablet-landscape-up();
@@ -80,6 +82,7 @@ $theme: mat.m2-define-light-theme(
 @include pill.docs-pill();
 @include steps.docs-steps();
 @include table.docs-table();
+@include tutorial-mascot.docs-tutorial-mascot();
 @include video.docs-video();
 
 // Include custom angular.dev styles

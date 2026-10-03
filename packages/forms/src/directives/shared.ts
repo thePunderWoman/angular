@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {InjectionToken, ɵRuntimeError as RuntimeError} from '@angular/core';
+import {InjectionToken, ɵRuntimeError as RuntimeError, type Signal} from '@angular/core';
 
 import {RuntimeErrorCode} from '../errors';
 import type {AbstractControl} from '../model/abstract_model';
@@ -25,16 +25,29 @@ import type {FormArrayName} from './reactive_directives/form_group_name';
 import {ngModelWarning} from './reactive_errors';
 import {AsyncValidatorFn, Validator, ValidatorFn} from './validators';
 
+export interface ɵFormControlIntegration {
+  readonly setParseErrors: (
+    value: Signal<ReadonlyArray<{readonly kind: string}>> | undefined,
+  ) => void;
+  onReset?: (value?: any) => void;
+}
+
+/**
+ * DI token that provides the ɵFormControlIntegration context for FVC/UI controls.
+ */
+export const ɵFORM_CONTROL_INTEGRATION = new InjectionToken<ɵFormControlIntegration>(
+  typeof ngDevMode !== 'undefined' && ngDevMode ? 'FORM_CONTROL_INTEGRATION' : '',
+);
+
 /**
  * Token to provide to allow SetDisabledState to always be called when a CVA is added, regardless of
  * whether the control is disabled or enabled.
  *
- * @see {@link FormsModule#withconfig}
+ * @see {@link FormsModule#withConfig}
  */
 export const CALL_SET_DISABLED_STATE = new InjectionToken(
   typeof ngDevMode === 'undefined' || ngDevMode ? 'CallSetDisabledState' : '',
   {
-    providedIn: 'root',
     factory: () => setDisabledStateDefault,
   },
 );
@@ -45,14 +58,15 @@ export const CALL_SET_DISABLED_STATE = new InjectionToken(
  * called when disabled, which is the legacy behavior for compatibility.
  *
  * @publicApi
- * @see {@link FormsModule#withconfig}
+ * @see {@link FormsModule#withConfig}
  */
 export type SetDisabledStateOption = 'whenDisabledForLegacyCode' | 'always';
 
 /**
  * Whether to use the fixed setDisabledState behavior by default.
  */
-export const setDisabledStateDefault: SetDisabledStateOption = 'always';
+// g3-only export const setDisabledStateDefault: SetDisabledStateOption = 'whenDisabledForLegacyCode';
+export const setDisabledStateDefault: SetDisabledStateOption = 'always'; // 3p-only
 
 export function controlPath(name: string | null, parent: ControlContainer): string[] {
   return [...parent.path!, name!];
@@ -65,7 +79,7 @@ export function controlPath(name: string | null, parent: ControlContainer): stri
  * @param control Form control instance that should be linked.
  * @param dir Directive that should be linked with a given control.
  */
-export function setUpControl(
+export function setUpControlValueAccessor(
   control: FormControl,
   dir: NgControl,
   callSetDisabledState: SetDisabledStateOption = setDisabledStateDefault,
@@ -121,10 +135,9 @@ export function cleanUpControl(
   // case. We still check the presence of `valueAccessor` before invoking its methods to make sure
   // that cleanup works correctly if app code or tests are setup to ignore the error thrown from
   // `selectValueAccessor`. See https://github.com/angular/angular/issues/40521.
-  if (dir.valueAccessor) {
-    dir.valueAccessor.registerOnChange(noop);
-    dir.valueAccessor.registerOnTouched(noop);
-  }
+
+  dir?.valueAccessor?.registerOnChange(noop);
+  dir?.valueAccessor?.registerOnTouched(noop);
 
   cleanUpValidators(control, dir);
 
@@ -357,7 +370,7 @@ function _throwInvalidValueAccessorError(dir: AbstractControlDirective) {
 }
 
 export function isPropertyUpdated(changes: {[key: string]: any}, viewModel: any): boolean {
-  if (!changes.hasOwnProperty('model')) return false;
+  if (!Object.hasOwn(changes, 'model')) return false;
   const change = changes['model'];
 
   if (change.isFirstChange()) return true;
@@ -387,7 +400,7 @@ export function syncPendingControls(
 // TODO: vsavkin remove it once https://github.com/angular/angular/issues/3011 is implemented
 export function selectValueAccessor(
   dir: NgControl,
-  valueAccessors: ControlValueAccessor[],
+  valueAccessors: readonly ControlValueAccessor[] | null | undefined,
 ): ControlValueAccessor | null {
   if (!valueAccessors) return null;
 

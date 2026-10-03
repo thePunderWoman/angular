@@ -273,7 +273,7 @@ describe('Format date', () => {
         );
       });
 
-      const nightTime = new Date(2015, 5, 15, 2, 3, 1, 550);
+      const nightTime = new Date(2015, 5, 15, 22, 3, 1, 550);
       Object.keys(midnightCrossingPeriods).forEach((pattern) => {
         expectDateFormatAs(nightTime, pattern, midnightCrossingPeriods[pattern]);
       });
@@ -336,19 +336,38 @@ describe('Format date', () => {
         mediumDate: 'Jun 15, 2015',
         longDate: 'June 15, 2015',
         fullDate: 'Monday, June 15, 2015',
-        short: '6/15/15, 9:03 AM',
-        medium: 'Jun 15, 2015, 9:03:01 AM',
-        long: /June 15, 2015 at 9:03:01 AM GMT(\+|-)\d/,
-        full: /Monday, June 15, 2015 at 9:03:01 AM GMT(\+|-)\d{2}:\d{2}/,
-        shortTime: '9:03 AM',
-        mediumTime: '9:03:01 AM',
-        longTime: /9:03:01 AM GMT(\+|-)\d/,
-        fullTime: /9:03:01 AM GMT(\+|-)\d{2}:\d{2}/,
+        short: '6/15/15, 9:03 AM',
+        medium: 'Jun 15, 2015, 9:03:01 AM',
+        long: /June 15, 2015, 9:03:01 AM GMT(\+|-)\d/,
+        full: /Monday, June 15, 2015, 9:03:01 AM GMT(\+|-)\d{2}:\d{2}/,
+        shortTime: '9:03 AM',
+        mediumTime: '9:03:01 AM',
+        longTime: /9:03:01 AM GMT(\+|-)\d/,
+        fullTime: /9:03:01 AM GMT(\+|-)\d{2}:\d{2}/,
       };
 
       Object.keys(dateFixtures).forEach((pattern: string) => {
         expect(formatDate(date, pattern, ɵDEFAULT_LOCALE_ID)).toMatch(dateFixtures[pattern]);
       });
+    });
+
+    it('should throw if the date format exceeds 256 characters to prevent DoS', () => {
+      const expectedError = /Exceeded maximum length of 256 characters/;
+      expect(() => formatDate(date, 'y'.repeat(257), ɵDEFAULT_LOCALE_ID)).toThrowError(
+        expectedError,
+      );
+      expect(() => formatDate(date, "'literal'".repeat(257), ɵDEFAULT_LOCALE_ID)).toThrowError(
+        expectedError,
+      );
+    });
+
+    it('should treat format tokens that collide with Object.prototype members as literals', () => {
+      // A format token that matches an inherited property name (e.g. `__proto__`) must not
+      // resolve to a value off the prototype of the internal format caches. Before the caches
+      // were given a null prototype, `__proto__` read back `Object.prototype`, garbling the
+      // named-format lookup and crashing the token lookup (it was invoked as a formatter).
+      expect(formatDate(date, '__proto__', ɵDEFAULT_LOCALE_ID)).toEqual('__proto__');
+      expect(formatDate(date, 'y__proto__', ɵDEFAULT_LOCALE_ID)).toEqual('2015__proto__');
     });
 
     it('should format invalid in IE ISO date', () =>
@@ -383,7 +402,7 @@ describe('Format date', () => {
     it('should show the correct time when the timezone is fixed', () => {
       expect(
         formatDate('2017-06-13T10:14:39+0000', 'shortTime', ɵDEFAULT_LOCALE_ID, '+0000'),
-      ).toEqual('10:14 AM');
+      ).toEqual('10:14 AM');
       expect(formatDate('2017-06-13T10:14:39+0000', 'h:mm a', ɵDEFAULT_LOCALE_ID, '+0000')).toEqual(
         '10:14 AM',
       );
@@ -420,7 +439,7 @@ describe('Format date', () => {
 
     it(`should format the date correctly in various locales`, () => {
       expect(formatDate(date, 'short', 'de')).toEqual('15.06.15, 09:03');
-      expect(formatDate(date, 'short', 'ar')).toEqual('15‏/6‏/2015, 9:03 ص');
+      expect(formatDate(date, 'short', 'ar')).toEqual('15‏/6‏/2015، 9:03 ص');
       expect(formatDate(date, 'dd-MM-yy', 'th')).toEqual('15-06-15');
       expect(formatDate(date, 'a', 'hu')).toEqual('de.');
       expect(formatDate(date, 'a', 'sr')).toEqual('AM');
@@ -515,24 +534,22 @@ describe('Format date', () => {
     it('should support timezones', () => {
       const isoDate = '2024-02-17T12:00:00Z';
 
-      const date1 = formatDate(isoDate, 'long', 'en', 'America/New_York');
-      const date2 = formatDate(isoDate, 'long', 'en', 'EST');
-      expect(date1).toBe('February 17, 2024 at 12:00:00 PM GMT+0');
-      expect(date2).toBe('February 17, 2024 at 7:00:00 AM GMT-5');
+      const dateEst = formatDate(isoDate, 'long', 'en', 'EST');
+      expect(dateEst).toBe('February 17, 2024, 7:00:00 AM GMT-5');
 
-      const date3 = formatDate(isoDate, 'long', 'en', '+0500');
-      expect(date3).toBe('February 17, 2024 at 5:00:00 PM GMT+5');
+      const dateOffset = formatDate(isoDate, 'long', 'en', '+0500');
+      expect(dateOffset).toBe('February 17, 2024, 5:00:00 PM GMT+5');
     });
 
     it('should return thursday date of the same week', () => {
       // Dec. 31st is a Sunday, last day of the last week of 2023
-      expect(getThursdayThisIsoWeek(new Date('2023-12-31'))).toEqual(new Date('2023-12-28'));
+      expect(getThursdayThisIsoWeek(new Date(2023, 11, 31))).toEqual(new Date(2023, 11, 28));
 
       // Dec. 29th is a Thursday
-      expect(getThursdayThisIsoWeek(new Date('2022-12-29'))).toEqual(new Date('2022-12-29'));
+      expect(getThursdayThisIsoWeek(new Date(2022, 11, 29))).toEqual(new Date(2022, 11, 29));
 
       // Jan 01st is a Monday
-      expect(getThursdayThisIsoWeek(new Date('2024-01-01'))).toEqual(new Date('2024-01-04'));
+      expect(getThursdayThisIsoWeek(new Date(2024, 0, 1))).toEqual(new Date(2024, 0, 4));
     });
   });
 });

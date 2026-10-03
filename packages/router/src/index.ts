@@ -7,9 +7,10 @@
  */
 
 export {createUrlTreeFromSnapshot} from './create_url_tree';
+export {nonBlocking} from './router_resource';
 export {RouterLink, RouterLinkWithHref} from './directives/router_link';
 export {RouterLinkActive} from './directives/router_link_active';
-export {RouterOutlet, ROUTER_OUTLET_DATA, RouterOutletContract} from './directives/router_outlet';
+export {ROUTER_OUTLET_DATA, RouterOutlet, RouterOutletContract} from './directives/router_outlet';
 export {
   ActivationEnd,
   ActivationStart,
@@ -35,21 +36,29 @@ export {
   Scroll,
 } from './events';
 export {
+  CanActivate,
+  CanActivateChild,
   CanActivateChildFn,
-  MaybeAsync,
-  GuardResult,
   CanActivateFn,
+  CanDeactivate,
   CanDeactivateFn,
+  CanLoad,
   CanLoadFn,
+  CanMatch,
   CanMatchFn,
   Data,
   DefaultExport,
+  GuardResult,
   LoadChildren,
   LoadChildrenCallback,
+  MaybeAsync,
   NavigationBehaviorOptions,
   OnSameUrlNavigation,
+  PartialMatchRouteSnapshot,
   QueryParamsHandling,
+  RedirectCommand,
   RedirectFunction,
+  Resolve,
   ResolveData,
   ResolveFn,
   Route,
@@ -57,13 +66,8 @@ export {
   RunGuardsAndResolvers,
   UrlMatcher,
   UrlMatchResult,
-  RedirectCommand,
-  CanActivate,
-  CanActivateChild,
-  CanDeactivate,
-  CanLoad,
-  CanMatch,
-  Resolve,
+  ResourceContext,
+  ResourceResult,
 } from './models';
 export {ViewTransitionInfo, ViewTransitionsFeatureOptions} from './utils/view_transition';
 
@@ -71,34 +75,41 @@ export * from './models_deprecated';
 export {Navigation, NavigationExtras, UrlCreationOptions} from './navigation_transition';
 export {DefaultTitleStrategy, TitleStrategy} from './page_title_strategy';
 export {
+  AutoCleanupInjectorsFeature,
   ComponentInputBindingFeature,
   DebugTracingFeature,
   DisabledInitialNavigationFeature,
-  withViewTransitions,
-  ViewTransitionsFeature,
   EnabledBlockingInitialNavigationFeature,
   InitialNavigationFeature,
   InMemoryScrollingFeature,
   NavigationErrorHandlerFeature,
   PreloadingFeature,
   provideRouter,
-  provideRoutes,
   RouterConfigurationFeature,
   RouterFeature,
   RouterFeatures,
   RouterHashLocationFeature,
+  ViewTransitionsFeature,
   withComponentInputBinding,
   withDebugTracing,
   withDisabledInitialNavigation,
   withEnabledBlockingInitialNavigation,
+  withExperimentalAutoCleanupInjectors,
+  withAutoCleanupInjectors,
+  withExperimentalPlatformNavigation,
   withHashLocation,
   withInMemoryScrolling,
   withNavigationErrorHandler,
   withPreloading,
   withRouterConfig,
+  withViewTransitions,
+  withRouterResources,
+  RouterResourcesFeature,
 } from './provide_router';
+
 export {
   BaseRouteReuseStrategy,
+  destroyDetachedRouteHandle,
   DetachedRouteHandle,
   RouteReuseStrategy,
 } from './route_reuse_strategy';
@@ -109,6 +120,7 @@ export {
   InMemoryScrollingOptions,
   ROUTER_CONFIGURATION,
   RouterConfigOptions,
+  ComponentInputBindingOptions,
 } from './router_config';
 export {ROUTES} from './router_config_loader';
 export {ROUTER_INITIALIZER, RouterModule} from './router_module';
@@ -129,11 +141,13 @@ export {convertToParamMap, defaultUrlMatcher, ParamMap, Params, PRIMARY_OUTLET} 
 export {UrlHandlingStrategy} from './url_handling_strategy';
 export {
   DefaultUrlSerializer,
+  isActive,
   IsActiveMatchOptions,
   UrlSegment,
   UrlSegmentGroup,
   UrlSerializer,
   UrlTree,
+  containsTree,
 } from './url_tree';
 export {
   mapToCanActivate,

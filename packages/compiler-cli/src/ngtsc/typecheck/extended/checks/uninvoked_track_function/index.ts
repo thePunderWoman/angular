@@ -20,7 +20,12 @@ import ts from 'typescript';
 
 import {ErrorCode, ExtendedTemplateDiagnosticName} from '../../../../diagnostics';
 import {NgTemplateDiagnostic, SymbolKind} from '../../../api';
-import {TemplateCheckFactory, TemplateCheckWithVisitor, TemplateContext} from '../../api';
+import {
+  TemplateCheckFactory,
+  TemplateCheckWithVisitor,
+  TemplateContext,
+  formatExtendedError,
+} from '../../api';
 
 /**
  * Ensures that track functions in @for loops are invoked.
@@ -52,21 +57,57 @@ class UninvokedTrackFunctionCheck extends TemplateCheckWithVisitor<ErrorCode.UNI
 
     const symbol = ctx.templateTypeChecker.getSymbolOfNode(node.trackBy.ast, component);
 
-    if (
-      symbol !== null &&
-      symbol.kind === SymbolKind.Expression &&
-      symbol.tsType.getCallSignatures()?.length > 0
-    ) {
-      const fullExpressionText = generateStringFromExpression(
-        node.trackBy.ast,
-        node.trackBy.source || '',
-      );
-      const errorString = `The track function in the @for block should be invoked: ${fullExpressionText}(/* arguments */)`;
-      return [ctx.makeTemplateDiagnostic(node.sourceSpan, errorString)];
+    if (symbol !== null && symbol.kind === SymbolKind.Expression) {
+      const type = ctx.templateTypeChecker.getTypeOfSymbol(symbol);
+      if (type) {
+        const callSignatures = type.getCallSignatures();
+        if (callSignatures.length > 0) {
+          const hasParameters = callSignatures.some((sig) => sig.parameters.length > 0);
+          const tsSymbol = ctx.templateTypeChecker.getTsSymbolOfSymbol(symbol);
+          const isMethod = isMethodSymbol(tsSymbol, callSignatures);
+
+          if (hasParameters || isMethod) {
+            const fullExpressionText = generateStringFromExpression(
+              node.trackBy.ast,
+              node.trackBy.source || '',
+            );
+
+            const errorString = formatExtendedError(
+              ErrorCode.UNINVOKED_TRACK_FUNCTION,
+              `The track function in the @for block should be invoked: ${fullExpressionText}(/* arguments */)`,
+            );
+
+            return [ctx.makeTemplateDiagnostic(node.sourceSpan, errorString)];
+          }
+        }
+      }
     }
 
     return [];
   }
+}
+
+function isMethodSymbol(
+  tsSymbol: ts.Symbol | null,
+  callSignatures: readonly ts.Signature[],
+): boolean {
+  if (tsSymbol !== null) {
+    if ((tsSymbol.flags & ts.SymbolFlags.Method) !== 0) {
+      return true;
+    }
+    const declarations = tsSymbol.getDeclarations();
+    if (declarations !== undefined) {
+      if (declarations.some((decl) => ts.isMethodDeclaration(decl) || ts.isMethodSignature(decl))) {
+        return true;
+      }
+    }
+  }
+
+  return callSignatures.some(
+    (sig) =>
+      sig.declaration !== undefined &&
+      (ts.isMethodDeclaration(sig.declaration) || ts.isMethodSignature(sig.declaration)),
+  );
 }
 
 function generateStringFromExpression(expression: AST, source: string): string {
