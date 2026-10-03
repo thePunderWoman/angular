@@ -15,12 +15,12 @@ import {
   ɵgetTransferState as getTransferState,
   Injector,
   inject,
-  DOCUMENT,
+  ɵsetDocument as setDocument,
 } from '@angular/core';
 import {BrowserModule, withEventReplay, withIncrementalHydration} from '@angular/platform-browser';
 import {renderModule, ServerModule} from '../index';
 import {getHydrationInfoFromTransferState, ssr} from './hydration_utils';
-import domino from '../third_party/domino/bundled-domino';
+import domino from '../src/bundled-domino';
 
 describe('transfer_state', () => {
   const defaultExpectedOutput =
@@ -77,7 +77,7 @@ describe('transfer_state', () => {
     expect(output).toBe(
       '<html><head></head><body><esc-app ng-version="0.0.0-PLACEHOLDER" ng-server-context="other">Works!</esc-app>' +
         '<script id="ng-state" type="application/json">' +
-        `{"testString":"\\u003C\\u002Fscript>\\u003Cscript>alert('Hello&' + \\"World\\");"}` +
+        `{"testString":"\\u003C/script>\\u003Cscript>alert('Hello&' + \\"World\\");"}` +
         '</script></body></html>',
     );
   });
@@ -119,11 +119,11 @@ describe('transfer_state', () => {
         selector: 'app',
         imports: [Dep],
         template: `
-          <!-- This defer block will add internal defer data to the transfer state -->
+          <!-- This defer block will add internal defer data to the transfer state --> 
           @defer (hydrate on interaction) {
             <dep />
           }
-        `,
+      `,
       })
       class SimpleComponent {
         constructor() {
@@ -132,27 +132,18 @@ describe('transfer_state', () => {
         }
       }
 
+      const appId = 'custom-app-id';
+      const providers = [{provide: APP_ID, useValue: appId}];
       const hydrationFeatures = () => [withIncrementalHydration(), withEventReplay()];
 
-      const appId = 'custom-app-id';
-      const html = await ssr(SimpleComponent, {
-        envProviders: [{provide: APP_ID, useValue: appId}],
-        hydrationFeatures,
-      });
+      const html = await ssr(SimpleComponent, {envProviders: providers, hydrationFeatures});
       const transferCacheJson = getHydrationInfoFromTransferState(html)!;
 
       // getTransferState reaches into the DOM to retrieve the transfer state.
       // So we need to set the document with the generated HTML.
       const {document} = domino.createWindow(html);
-
-      const transferState = getTransferState(
-        Injector.create({
-          providers: [
-            {provide: DOCUMENT, useValue: document},
-            {provide: APP_ID, useValue: appId},
-          ],
-        }),
-      );
+      setDocument(document);
+      const transferState = getTransferState(Injector.create({providers}));
 
       // The transfer state also contains internal hydration keys,
       expect(Object.keys(transferState).length).not.toEqual(JSON.parse(transferCacheJson).length);

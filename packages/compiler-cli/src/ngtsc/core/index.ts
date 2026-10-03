@@ -8,4 +8,3 @@
 
 export * from './src/compiler';
 export {NgCompilerHost} from './src/host';
-export {UnifiedModulesHost, NgCompilerOptions, DiagnosticCategoryLabel} from './api';

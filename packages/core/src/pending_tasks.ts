@@ -34,9 +34,6 @@ import {PendingTasksInternal} from './pending_tasks_internal';
  * taskCleanup();
  * ```
  *
- *
- * @see [PendingTasks for Server Side Rendering (SSR)](guide/zoneless#pendingtasks-for-server-side-rendering-ssr)
- *
  * @publicApi 20.0
  */
 export class PendingTasks {
@@ -75,12 +72,7 @@ export class PendingTasks {
    */
   run(fn: () => Promise<unknown>): void {
     const removeTask = this.add();
-    try {
-      fn().catch(this.errorHandler).finally(removeTask);
-    } catch (err) {
-      this.errorHandler(err);
-      removeTask();
-    }
+    fn().catch(this.errorHandler).finally(removeTask);
   }
 
   /** @nocollapse */

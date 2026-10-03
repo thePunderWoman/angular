@@ -9,8 +9,6 @@ import {ParseSourceFile} from '@angular/compiler';
 import {runInEachFileSystem} from '../../file_system/testing';
 import {IndexingContext} from '../src/context';
 import * as util from './util';
-import {AbstractBoundTemplate} from '../src/api';
-import {DeclarationNode} from '../../reflection';
 
 runInEachFileSystem(() => {
   describe('ComponentAnalysisContext', () => {

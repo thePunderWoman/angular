@@ -1,6 +1,3 @@
-# Disable NG CLI TTY mode
-build --action_env=NG_FORCE_TTY=false
-
 # Enable debugging tests with --config=debug
 test:debug --test_arg=--node_options=--inspect-brk --test_output=streamed --test_strategy=exclusive --test_timeout=9999 --nocache_test_results --strategy=TestRunner=standalone
 
@@ -72,9 +69,6 @@ build:release --stamp
 # Snapshots should also be stamped with version control information.
 build:snapshot-build --workspace_status_command="pnpm --silent ng-dev release build-env-stamp --mode=snapshot"
 build:snapshot-build --stamp
-# @angular/language-server package depends directly on other Angular framework packages.
-# This flag ensures that the language server uses the snapshot-built framework packages from the repository.
-build:snapshot-build --//:enable_language_server_snapshot_repo_deps
 
 # Angular DevTools for Firefox releases *cannot* be stamped and `--config snapshot-build-firefox` is a no-op.
 # This is because Mozilla requires add-on source code to be uploaded and then they manually reproduce the build.
@@ -146,7 +140,7 @@ build:trusted-build --remote_upload_local_results=true
 # Ensure that tags like "no-remote-exec" get propagated to actions created by rules,
 # even if the rule implementation does not explicitly pass them to the execution requirements.
 # https://bazel.build/reference/command-line-reference#flag--experimental_allow_tags_propagation
-common --incompatible_allow_tags_propagation
+common --experimental_allow_tags_propagation
 
 # Disable network access in the sandbox by default. To enable network access
 # for a particular target, use:
@@ -158,6 +152,16 @@ common --incompatible_allow_tags_propagation
 #   tags = ["requires-network"]         # Enables network in sandbox
 # )
 build --nosandbox_default_allow_network
+
+##################################
+# Saucelabs tests settings       #
+# Turn on these settings with    #
+#  --config=saucelabs            #
+##################################
+
+# For saucelabs tests we don't want to enable flaky test attempts. Karma has its own integrated
+# retry mechanism and we do not want to retry unnecessarily if Karma already tried multiple times.
+test:saucelabs --flaky_test_attempts=1
 
 ################
 # Flag Aliases #

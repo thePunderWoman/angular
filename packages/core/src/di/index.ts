@@ -12,30 +12,35 @@
  * The `di` module provides dependency injection container services.
  */
 
+export * from './metadata';
 export {assertInInjectionContext, runInInjectionContext} from './contextual';
-export {forwardRef, ForwardRefFn, resolveForwardRef} from './forward_ref';
-export {HostAttributeToken} from './host_attribute_token';
-export {HOST_TAG_NAME} from './host_tag_name_token';
-export {ENVIRONMENT_INITIALIZER} from './initializer_token';
-export {injectAsync, InjectAsyncOptions, onIdle, PrefetchTrigger} from './inject_async';
+export {ɵɵdefineInjectable, ɵɵdefineInjector, InjectableType, InjectorType} from './interface/defs';
+export {forwardRef, resolveForwardRef, ForwardRefFn} from './forward_ref';
 export {Injectable, InjectableDecorator, InjectableProvider} from './injectable';
-export {InjectionToken} from './injection_token';
-export {DestroyableInjector, Injector} from './injector';
-export {inject, ɵɵinject, ɵɵinvalidFactoryDep} from './injector_compatibility';
-export {INJECTOR} from './injector_token';
-export {InjectableType, InjectorType, ɵɵdefineInjectable, ɵɵdefineInjector} from './interface/defs';
+export {Injector, DestroyableInjector} from './injector';
+export {EnvironmentInjector} from './r3_injector';
+export {
+  importProvidersFrom,
+  ImportProvidersSource,
+  makeEnvironmentProviders,
+  provideEnvironmentInitializer,
+} from './provider_collection';
+export {ENVIRONMENT_INITIALIZER} from './initializer_token';
+export {ProviderToken} from './provider_token';
+export {ɵɵinject, inject, ɵɵinvalidFactoryDep} from './injector_compatibility';
 export {InjectOptions} from './interface/injector';
+export {INJECTOR} from './injector_token';
 export {
   ClassProvider,
+  ModuleWithProviders,
   ClassSansProvider,
   ConstructorProvider,
-  ConstructorSansProvider,
   EnvironmentProviders,
+  ConstructorSansProvider,
   ExistingProvider,
   ExistingSansProvider,
   FactoryProvider,
   FactorySansProvider,
-  ModuleWithProviders,
   Provider,
   StaticClassProvider,
   StaticClassSansProvider,
@@ -44,14 +49,7 @@ export {
   ValueProvider,
   ValueSansProvider,
 } from './interface/provider';
-export {ɵɵdefineService} from './interface/service';
-export * from './metadata';
-export {
-  importProvidersFrom,
-  ImportProvidersSource,
-  makeEnvironmentProviders,
-  provideEnvironmentInitializer,
-} from './provider_collection';
-export {ProviderToken} from './provider_token';
-export {EnvironmentInjector, R3Injector as ɵR3Injector} from './r3_injector';
-export {Service, ServiceDecorator} from './service';
+export {InjectionToken} from './injection_token';
+export {HostAttributeToken} from './host_attribute_token';
+export {HOST_TAG_NAME} from './host_tag_name_token';
+export {R3Injector as ɵR3Injector} from './r3_injector';

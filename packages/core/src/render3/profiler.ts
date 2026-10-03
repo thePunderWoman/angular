@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {type Profiler} from '../../primitives/devtools';
+import {type Profiler} from './profiler_types';
 
 const profilerCallbacks: Profiler[] = [];
 

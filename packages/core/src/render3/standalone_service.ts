@@ -9,7 +9,7 @@ import {ɵɵinject as inject} from '../di/injector_compatibility';
 import {ɵɵdefineInjectable as defineInjectable} from '../di/interface/defs';
 import {internalImportProvidersFrom} from '../di/provider_collection';
 import {EnvironmentInjector} from '../di/r3_injector';
-import {OnDestroy} from '../change_detection/lifecycle_hooks';
+import {OnDestroy} from '../interface/lifecycle_hooks';
 import {ComponentDef} from './interfaces/definition';
 import {createEnvironmentInjector} from './ng_module_ref';
 
@@ -35,9 +35,7 @@ export class StandaloneService implements OnDestroy {
           ? createEnvironmentInjector(
               [providers],
               this._injector,
-              typeof ngDevMode !== 'undefined' && ngDevMode
-                ? `Standalone[${componentDef.type.name}]`
-                : '',
+              `Standalone[${componentDef.type.name}]`,
             )
           : null;
       this.cachedInjectors.set(componentDef, standaloneInjector);

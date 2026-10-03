@@ -73,7 +73,7 @@ export abstract class PlatformLocation {
  * @publicApi
  */
 export const LOCATION_INITIALIZED = new InjectionToken<Promise<any>>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'Location Initialized' : '',
+  typeof ngDevMode !== undefined && ngDevMode ? 'Location Initialized' : '',
 );
 
 /**
@@ -85,8 +85,6 @@ export const LOCATION_INITIALIZED = new InjectionToken<Promise<any>>(
 export interface LocationChangeEvent {
   type: string;
   state: any;
-  /** Whether the user agent performed a visual transition for this navigation. */
-  hasUAVisualTransition?: boolean;
 }
 
 /**

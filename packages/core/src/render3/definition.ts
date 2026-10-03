@@ -9,7 +9,7 @@
 import {ChangeDetectionStrategy} from '../change_detection/constants';
 import {EnvironmentInjector} from '../di/r3_injector';
 import {formatRuntimeError, RuntimeErrorCode} from '../errors';
-import {AbstractType, Type, Writable} from '../interface/type';
+import {Type, Writable} from '../interface/type';
 import {NgModuleDef} from '../metadata/ng_module_def';
 import {SchemaMetadata} from '../metadata/schema';
 import {ViewEncapsulation} from '../metadata/view';
@@ -35,7 +35,8 @@ import type {
   ViewQueriesFunction,
 } from './interfaces/definition';
 import {InputFlags} from './interfaces/input_flags';
-import type {TAttributes} from './interfaces/node';
+import type {TAttributes, TConstantsOrFactory} from './interfaces/node';
+import {CssSelectorList} from './interfaces/projection';
 import {stringifyCSSSelectorList} from './node_selector_matcher';
 import {StandaloneService} from './standalone_service';
 
@@ -97,29 +98,32 @@ import {StandaloneService} from './standalone_service';
  *  - The reason why this API and `outputs` API is not the same is that `NgOnChanges` has
  *    inconsistent behavior in that it uses declared names rather than minified or public.
  */
-type DirectiveInputs = Record<
-  string,
-  // Basic case. Mapping minified name to public name.
-  | string
-  // Complex input when there are flags, or differing public name and declared name, or there
-  // is a transform. Such inputs are not as common, so the array form is only generated then.
-  | [flags: number, publicName: string, declaredName?: string, transform?: InputTransformFunction]
-  | undefined
->;
+type DirectiveInputs<T> = {
+  [P in keyof T]?:  // Basic case. Mapping minified name to public name.
+    | string
+    // Complex input when there are flags, or differing public name and declared name, or there
+    // is a transform. Such inputs are not as common, so the array form is only generated then.
+    | [
+        flags: InputFlags,
+        publicName: string,
+        declaredName?: string,
+        transform?: InputTransformFunction,
+      ];
+};
 
 interface DirectiveDefinition<T> {
   /**
    * Directive type, needed to configure the injector.
    */
-  type: Type<T> | AbstractType<T>;
+  type: Type<T>;
 
   /** The selectors that will be used to match nodes to this directive. */
-  selectors?: (string | number)[][];
+  selectors?: CssSelectorList;
 
   /**
    * A map of input names.
    */
-  inputs?: DirectiveInputs;
+  inputs?: DirectiveInputs<T>;
 
   /**
    * A map of output names.
@@ -131,7 +135,7 @@ interface DirectiveDefinition<T> {
    * This allows the render to re-construct the minified and non-minified names
    * of properties.
    */
-  outputs?: Record<string, string | undefined>;
+  outputs?: {[P in keyof T]?: string};
 
   /**
    * A list of optional features to apply.
@@ -266,7 +270,7 @@ interface ComponentDefinition<T> extends Omit<DirectiveDefinition<T>, 'features'
    * Constants for the nodes in the component's view.
    * Includes attribute arrays, local definition arrays etc.
    */
-  consts?: any[] | (() => any[]);
+  consts?: TConstantsOrFactory;
 
   /**
    * An array of `ngContent[selector]` values that were found in the template.
@@ -349,7 +353,7 @@ export function ɵɵdefineComponent<T>(
       template: componentDefinition.template,
       consts: componentDefinition.consts || null,
       ngContentSelectors: componentDefinition.ngContentSelectors,
-      onPush: componentDefinition.changeDetection !== ChangeDetectionStrategy.Eager,
+      onPush: componentDefinition.changeDetection === ChangeDetectionStrategy.OnPush,
       directiveDefs: null!, // assigned in noSideEffects
       pipeDefs: null!, // assigned in noSideEffects
       dependencies: (baseDef.standalone && componentDefinition.dependencies) || null,
@@ -415,7 +419,7 @@ export function ɵɵdefineNgModule<T>(def: {
 
   /** Unique ID for the module that is used with `getModuleFactory`. */
   id?: string | null;
-}): NgModuleDef<T> {
+}): unknown {
   return noSideEffects(() => {
     const res: NgModuleDef<T> = {
       type: def.type,
@@ -508,7 +512,7 @@ function parseAndConvertInputsForDefinition<T>(
     [minifiedName: string, flags: InputFlags, transform: InputTransformFunction | null]
   > = {};
   for (const minifiedKey in obj) {
-    if (Object.hasOwn(obj, minifiedKey)) {
+    if (obj.hasOwnProperty(minifiedKey)) {
       const value = obj[minifiedKey]!;
       let publicName: string;
       let declaredName: string;
@@ -540,7 +544,7 @@ function parseAndConvertOutputsForDefinition<T>(
   if (obj == null) return EMPTY_OBJ as any;
   const newLookup: any = {};
   for (const minifiedKey in obj) {
-    if (Object.hasOwn(obj, minifiedKey)) {
+    if (obj.hasOwnProperty(minifiedKey)) {
       newLookup[obj[minifiedKey]!] = minifiedKey;
     }
   }
@@ -604,8 +608,8 @@ export function ɵɵdefinePipe<T>(pipeDef: {
    * Whether the pipe is standalone.
    */
   standalone?: boolean;
-}): PipeDef<T> {
-  return {
+}): unknown {
+  return <PipeDef<T>>{
     type: pipeDef.type,
     name: pipeDef.name,
     factory: null,
@@ -621,7 +625,6 @@ function getNgDirectiveDef<T>(directiveDefinition: DirectiveDefinition<T>): Dire
   return {
     type: directiveDefinition.type,
     providersResolver: null,
-    viewProvidersResolver: null,
     factory: null,
     hostBindings: directiveDefinition.hostBindings || null,
     hostVars: directiveDefinition.hostVars || 0,
@@ -638,8 +641,6 @@ function getNgDirectiveDef<T>(directiveDefinition: DirectiveDefinition<T>): Dire
     setInput: null,
     resolveHostDirectives: null,
     hostDirectives: null,
-    controlDef: null,
-    signalFormsInputPresence: null,
     inputs: parseAndConvertInputsForDefinition(directiveDefinition.inputs, declaredInputs),
     outputs: parseAndConvertOutputsForDefinition(directiveDefinition.outputs),
     debugInfo: null,
@@ -676,7 +677,7 @@ export function extractDefListOrFactory<T>(
 /**
  * A map that contains the generated component IDs and type.
  */
-export const GENERATED_COMP_IDS = new Map<string, Type<unknown> | AbstractType<unknown>>();
+export const GENERATED_COMP_IDS = new Map<string, Type<unknown>>();
 
 /**
  * A method can returns a component ID from the component definition using a variant of DJB2 hash

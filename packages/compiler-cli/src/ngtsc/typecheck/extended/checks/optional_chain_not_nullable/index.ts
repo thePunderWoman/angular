@@ -19,13 +19,7 @@ import ts from 'typescript';
 import {NgCompilerOptions} from '../../../../core/api';
 import {ErrorCode, ExtendedTemplateDiagnosticName} from '../../../../diagnostics';
 import {NgTemplateDiagnostic, SymbolKind} from '../../../api';
-import {
-  TemplateCheckFactory,
-  TemplateCheckWithVisitor,
-  TemplateContext,
-  formatExtendedError,
-  isAccessFromUncheckedIndex,
-} from '../../api';
+import {TemplateCheckFactory, TemplateCheckWithVisitor, TemplateContext} from '../../api';
 
 /**
  * Ensures the left side of an optional chain operation is nullable.
@@ -34,6 +28,7 @@ import {
  * otherwise it would produce inaccurate results.
  */
 class OptionalChainNotNullableCheck extends TemplateCheckWithVisitor<ErrorCode.OPTIONAL_CHAIN_NOT_NULLABLE> {
+  override readonly canVisitStructuralAttributes = false;
   override code = ErrorCode.OPTIONAL_CHAIN_NOT_NULLABLE as const;
 
   constructor(private readonly noUncheckedIndexedAccess: boolean) {
@@ -55,7 +50,7 @@ class OptionalChainNotNullableCheck extends TemplateCheckWithVisitor<ErrorCode.O
 
     // When `noUncheckedIndexedAccess` is disabled, an indexed access is not checked
     // and may result in `undefined`.
-    if (!this.noUncheckedIndexedAccess && isAccessFromUncheckedIndex(node.receiver)) {
+    if (node.receiver instanceof KeyedRead && !this.noUncheckedIndexedAccess) {
       return [];
     }
 
@@ -63,8 +58,8 @@ class OptionalChainNotNullableCheck extends TemplateCheckWithVisitor<ErrorCode.O
     if (symbolLeft === null || symbolLeft.kind !== SymbolKind.Expression) {
       return [];
     }
-    const typeLeft = ctx.templateTypeChecker.getTypeOfSymbol(symbolLeft);
-    if (!typeLeft || typeLeft.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
+    const typeLeft = symbolLeft.tsType;
+    if (typeLeft.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
       // We should not make assumptions about the any and unknown types; using a nullish coalescing
       // operator is acceptable for those.
       return [];
@@ -91,10 +86,7 @@ class OptionalChainNotNullableCheck extends TemplateCheckWithVisitor<ErrorCode.O
         : `the '?.' operator can be safely removed`;
     const diagnostic = ctx.makeTemplateDiagnostic(
       templateMapping.span,
-      formatExtendedError(
-        ErrorCode.OPTIONAL_CHAIN_NOT_NULLABLE,
-        `The left side of this optional chain operation does not include 'null' or 'undefined' in its type, therefore ${advice}`,
-      ),
+      `The left side of this optional chain operation does not include 'null' or 'undefined' in its type, therefore ${advice}.`,
     );
     return [diagnostic];
   }

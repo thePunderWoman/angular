@@ -36,7 +36,7 @@ import {
   ViewContainerRef,
   provideZoneChangeDetection,
 } from '../../src/core';
-import {inject, TestBed} from '../../testing';
+import {fakeAsync, inject, TestBed, tick} from '../../testing';
 import {BrowserModule, By, platformBrowser} from '@angular/platform-browser';
 import {expect} from '@angular/private/testing/matchers';
 
@@ -88,7 +88,7 @@ describe('regressions', () => {
       expect(CountingPipe.calls).toBe(1);
     });
 
-    it('should only update the bound property when using asyncPipe - #15205', async () => {
+    it('should only update the bound property when using asyncPipe - #15205', fakeAsync(() => {
       @Component({
         template: '<div myDir [a]="p | async" [b]="2"></div>',
         standalone: false,
@@ -130,12 +130,12 @@ describe('regressions', () => {
       dir.setterCalls = {};
       dir.changes = {};
 
-      await fixture.whenStable();
+      tick();
       fixture.detectChanges();
 
       expect(dir.setterCalls).toEqual({'a': 1});
       expect(Object.keys(dir.changes)).toEqual(['a']);
-    });
+    }));
 
     it('should only evaluate methods once - #10639', () => {
       TestBed.configureTestingModule({declarations: [MyCountingComp]});

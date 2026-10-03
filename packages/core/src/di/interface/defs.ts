@@ -55,12 +55,12 @@ export interface ɵɵInjectableDeclaration<T> {
   /**
    * Factory method to execute to create an instance of the injectable.
    */
-  factory: (t?: Type<any>) => any;
+  factory: (t?: Type<any>) => T;
 
   /**
    * In a case of no explicit injector, a location where the instance of the injectable is stored.
    */
-  value: any;
+  value: T | undefined;
 }
 
 /**
@@ -167,14 +167,14 @@ export interface InjectorTypeWithProviders<T> {
 export function ɵɵdefineInjectable<T>(opts: {
   token: unknown;
   providedIn?: Type<any> | 'root' | 'platform' | 'any' | 'environment' | null;
-  factory: (parent?: Type<any>) => T;
-}): ɵɵInjectableDeclaration<T> {
+  factory: () => T;
+}): unknown {
   return {
     token: opts.token,
     providedIn: (opts.providedIn as any) || null,
     factory: opts.factory,
     value: undefined,
-  };
+  } as ɵɵInjectableDeclaration<T>;
 }
 
 /**
@@ -218,7 +218,7 @@ export function isInjectable(type: any): boolean {
  */
 function getOwnDefinition<T>(type: any, field: string): ɵɵInjectableDeclaration<T> | null {
   // if the ɵprov prop exist but is undefined we still want to return null
-  return (Object.hasOwn(type, field) && type[field]) || null;
+  return (type.hasOwnProperty(field) && type[field]) || null;
 }
 
 /**
@@ -251,7 +251,7 @@ export function getInheritedInjectableDef<T>(type: any): ɵɵInjectableDeclarati
  * @param type type which may have an injector def (`ɵinj`)
  */
 export function getInjectorDef<T>(type: any): ɵɵInjectorDef<T> | null {
-  return type && Object.hasOwn(type, NG_INJ_DEF) ? (type as any)[NG_INJ_DEF] : null;
+  return type && type.hasOwnProperty(NG_INJ_DEF) ? (type as any)[NG_INJ_DEF] : null;
 }
 
 export const NG_PROV_DEF: string = getClosureSafeProperty({ɵprov: getClosureSafeProperty});

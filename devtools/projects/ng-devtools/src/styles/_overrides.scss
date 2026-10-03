@@ -7,7 +7,6 @@
   @include mat.expansion-overrides(
     (
       container-background-color: transparent,
-      container-elevation-shadow: none,
     )
   );
 
@@ -35,12 +34,6 @@
       item-label-text-font: tg.$font-family,
       item-label-text-size: tg.$font-size,
       item-label-text-line-height: 0.875rem,
-    )
-  );
-
-  @include mat.dialog-overrides(
-    (
-      container-elevation-shadow: 1,
     )
   );
 

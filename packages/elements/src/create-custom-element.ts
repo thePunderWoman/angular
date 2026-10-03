@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {Injector, Type, isSignal} from '@angular/core';
+import {Injector, Type} from '@angular/core';
 import {Subscription} from 'rxjs';
 
 import {ComponentNgElementStrategyFactory} from './component-factory-strategy';
@@ -136,7 +136,7 @@ export function createCustomElement<P>(
   const inputs = getComponentInputs(component, config.injector);
 
   const strategyFactory =
-    config.strategyFactory || new ComponentNgElementStrategyFactory(component);
+    config.strategyFactory || new ComponentNgElementStrategyFactory(component, config.injector);
 
   const attributeToPropertyInputs = getDefaultAttributeToPropertyInputs(inputs);
 
@@ -157,7 +157,7 @@ export function createCustomElement<P>(
         // strategy.
         // TODO(alxhub): why are we doing this? this makes no sense.
         inputs.forEach(({propName, transform}) => {
-          if (!Object.hasOwn(this, propName)) {
+          if (!this.hasOwnProperty(propName)) {
             // No pre-existing value for `propName`.
             return;
           }
@@ -237,11 +237,10 @@ export function createCustomElement<P>(
   }
 
   // Add getters and setters to the prototype for each property input.
-  inputs.forEach(({propName, transform, isSignal: _isSignal}) => {
+  inputs.forEach(({propName, transform}) => {
     Object.defineProperty(NgElementImpl.prototype, propName, {
       get(): any {
-        const inputValue = this.ngElementStrategy.getInputValue(propName);
-        return _isSignal && isSignal(inputValue) ? inputValue() : inputValue;
+        return this.ngElementStrategy.getInputValue(propName);
       },
       set(newValue: any): void {
         this.ngElementStrategy.setInputValue(propName, newValue, transform);

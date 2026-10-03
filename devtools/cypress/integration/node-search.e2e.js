@@ -28,9 +28,9 @@ function checkEmptyNodes() {
 
 function clickSearchArrows(upwards) {
   if (upwards) {
-    cy.get('.prev-btn').click();
+    cy.get('#up-button').click();
   } else {
-    cy.get('.next-btn').click();
+    cy.get('#down-button').click();
   }
 }
 
@@ -79,9 +79,7 @@ describe('Search items in component tree', () => {
   });
 
   it('should select correct node on enter', () => {
-    inputSearchText('todo');
-    checkSearchedNodesLength('.matched-text', 4);
-    inputSearchText('{enter}');
+    inputSearchText('todo{enter}');
     checkSearchedNodesLength('.selected', 1);
 
     // should show correct buttons in breadcrumbs
@@ -105,9 +103,9 @@ describe('Search items in component tree', () => {
   it('should be able to search and select @defers in different Angular applications', () => {
     inputSearchText('@defer');
     checkSearchedNodesLength('.matched-text', 2);
-    cy.get('ng-defer-view').should('contain.text', '@placeholder(minimum 5000 ms)');
+    cy.get('.defer-details').should('contain.text', '@placeholder(minimum 5000 ms)');
     inputSearchText('{enter}');
-    cy.get('ng-defer-view').should('contain.text', '@placeholder(minimum 2000 ms)');
+    cy.get('.defer-details').should('contain.text', '@placeholder(minimum 2000 ms)');
   });
 
   it('should not duplicate application roots if multiple applications are present', () => {

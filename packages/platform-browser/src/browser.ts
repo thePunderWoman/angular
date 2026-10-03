@@ -6,17 +6,19 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {CommonModule, DOCUMENT, ɵPLATFORM_BROWSER_ID as PLATFORM_BROWSER_ID} from '@angular/common';
+import {
+  CommonModule,
+  DOCUMENT,
+  XhrFactory,
+  ɵPLATFORM_BROWSER_ID as PLATFORM_BROWSER_ID,
+} from '@angular/common';
 import {
   ApplicationConfig,
   ApplicationModule,
   ApplicationRef,
   createPlatformFactory,
   ErrorHandler,
-  inject,
   InjectionToken,
-  ɵINJECTOR_SCOPE as INJECTOR_SCOPE,
-  ɵinternalCreateApplication as internalCreateApplication,
   NgModule,
   PLATFORM_ID,
   PLATFORM_INITIALIZER,
@@ -24,22 +26,22 @@ import {
   PlatformRef,
   Provider,
   RendererFactory2,
-  ɵresolveComponentResources as resolveComponentResources,
-  ɵRuntimeError as RuntimeError,
-  ɵSHARED_STYLES_HOST as SHARED_STYLES_HOST,
   StaticProvider,
-  NgZone,
   Testability,
-  TestabilityRegistry,
+  Type,
+  ɵINJECTOR_SCOPE as INJECTOR_SCOPE,
+  ɵinternalCreateApplication as internalCreateApplication,
+  ɵRuntimeError as RuntimeError,
+  ɵsetDocument,
   ɵTESTABILITY as TESTABILITY,
   ɵTESTABILITY_GETTER as TESTABILITY_GETTER,
-  ɵUSE_PENDING_TASKS,
-  Type,
-  ɵsetDocument,
+  inject,
+  ɵresolveComponentResources as resolveComponentResources,
 } from '@angular/core';
 
 import {BrowserDomAdapter} from './browser/browser_adapter';
 import {BrowserGetTestability} from './browser/testability';
+import {BrowserXhr} from './browser/xhr';
 import {DomRendererFactory2} from './dom/dom_renderer';
 import {DomEventsPlugin} from './dom/events/dom_events';
 import {EVENT_MANAGER_PLUGINS, EventManager} from './dom/events/event_manager';
@@ -63,25 +65,27 @@ export interface BootstrapContext {
 /**
  * Bootstraps an instance of an Angular application and renders a standalone component as the
  * application's root component. More information about standalone components can be found in [this
- * guide](guide/components).
+ * guide](guide/components/importing).
  *
  * @usageNotes
- * The root component passed into this function **must** be a standalone one
+ * The root component passed into this function *must* be a standalone one (should have the
+ * `standalone: true` flag in the `@Component` decorator config).
  *
  * ```angular-ts
  * @Component({
+ *   standalone: true,
  *   template: 'Hello world!'
  * })
- * class Root {}
+ * class RootComponent {}
  *
- * const appRef: ApplicationRef = await bootstrapApplication(Root);
+ * const appRef: ApplicationRef = await bootstrapApplication(RootComponent);
  * ```
  *
  * You can add the list of providers that should be available in the application injector by
  * specifying the `providers` field in an object passed as the second argument:
  *
  * ```ts
- * await bootstrapApplication(Root, {
+ * await bootstrapApplication(RootComponent, {
  *   providers: [
  *     {provide: BACKEND_URL, useValue: 'https://yourdomain.com/api'}
  *   ]
@@ -92,7 +96,7 @@ export interface BootstrapContext {
  * existing NgModule (and transitively from all NgModules that it imports):
  *
  * ```ts
- * await bootstrapApplication(Root, {
+ * await bootstrapApplication(RootComponent, {
  *   providers: [
  *     importProvidersFrom(SomeNgModule)
  *   ]
@@ -107,7 +111,7 @@ export interface BootstrapContext {
  * ```ts
  * import {provideProtractorTestingSupport} from '@angular/platform-browser';
  *
- * await bootstrapApplication(Root, {providers: [provideProtractorTestingSupport()]});
+ * await bootstrapApplication(RootComponent, {providers: [provideProtractorTestingSupport()]});
  * ```
  *
  * @param rootComponent A reference to a standalone component that should be rendered.
@@ -120,18 +124,26 @@ export interface BootstrapContext {
  *
  * @publicApi
  */
-export async function bootstrapApplication(
+export function bootstrapApplication(
   rootComponent: Type<unknown>,
   options?: ApplicationConfig,
   context?: BootstrapContext,
 ): Promise<ApplicationRef> {
   const config = {
     rootComponent,
-    ...createProvidersConfig(options, context),
+    platformRef: context?.platformRef,
+    ...createProvidersConfig(options),
   };
 
+  // Attempt to resolve component resources before bootstrapping in JIT mode,
+  // however don't interrupt the bootstrapping process.
   if ((typeof ngJitMode === 'undefined' || ngJitMode) && typeof fetch === 'function') {
-    await resolveJitResources();
+    return resolveComponentResources(fetch)
+      .catch((error) => {
+        console.error(error);
+        return Promise.resolve();
+      })
+      .then(() => internalCreateApplication(config));
   }
 
   return internalCreateApplication(config);
@@ -145,41 +157,19 @@ export async function bootstrapApplication(
  *
  * @param options Extra configuration for the application environment, see `ApplicationConfig` for
  *     additional info.
- * @param context Optional context object that can be used to provide a pre-existing
- *     platform injector. This is useful for advanced use-cases, for example, server-side
- *     rendering, where the platform is created for each request.
  * @returns A promise that returns an `ApplicationRef` instance once resolved.
  *
  * @publicApi
  */
-export async function createApplication(
-  options?: ApplicationConfig,
-  context?: BootstrapContext,
-): Promise<ApplicationRef> {
-  if ((typeof ngJitMode === 'undefined' || ngJitMode) && typeof fetch === 'function') {
-    await resolveJitResources();
-  }
-
-  return internalCreateApplication(createProvidersConfig(options, context));
+export function createApplication(options?: ApplicationConfig): Promise<ApplicationRef> {
+  return internalCreateApplication(createProvidersConfig(options));
 }
 
-function createProvidersConfig(options?: ApplicationConfig, context?: BootstrapContext) {
+function createProvidersConfig(options?: ApplicationConfig) {
   return {
-    platformRef: context?.platformRef,
     appProviders: [...BROWSER_MODULE_PROVIDERS, ...(options?.providers ?? [])],
     platformProviders: INTERNAL_BROWSER_PLATFORM_PROVIDERS,
   };
-}
-
-/** Attempt to resolve component resources before bootstrapping in JIT mode. */
-async function resolveJitResources(): Promise<void> {
-  try {
-    return await resolveComponentResources(fetch);
-  } catch (error) {
-    // Log, but don't block bootstrapping on error.
-    // tslint:disable-next-line:no-console
-    console.error(error);
-  }
 }
 
 /**
@@ -193,18 +183,11 @@ async function resolveJitResources(): Promise<void> {
  *
  * @publicApi
  */
-export function provideProtractorTestingSupport(
-  options: {usePendingTasksForStability?: boolean} = {},
-): Provider[] {
+export function provideProtractorTestingSupport(): Provider[] {
   // Return a copy to prevent changes to the original array in case any in-place
   // alterations are performed to the `provideProtractorTestingSupport` call results in app
   // code.
-  return [
-    ...TESTABILITY_PROVIDERS,
-    options?.usePendingTasksForStability !== undefined
-      ? {provide: ɵUSE_PENDING_TASKS, useValue: options.usePendingTasksForStability ?? false}
-      : [],
-  ];
+  return [...TESTABILITY_PROVIDERS];
 }
 
 export function initDomAdapter() {
@@ -254,12 +237,10 @@ const TESTABILITY_PROVIDERS = [
   {
     provide: TESTABILITY,
     useClass: Testability,
-    deps: [NgZone, TestabilityRegistry, TESTABILITY_GETTER],
   },
   {
     provide: Testability, // Also provide as `Testability` for backwards-compatibility.
     useClass: Testability,
-    deps: [NgZone, TestabilityRegistry, TESTABILITY_GETTER],
   },
 ];
 
@@ -273,11 +254,10 @@ const BROWSER_MODULE_PROVIDERS: Provider[] = [
   },
   {provide: EVENT_MANAGER_PLUGINS, useClass: KeyEventsPlugin, multi: true},
   DomRendererFactory2,
-  {provide: SHARED_STYLES_HOST, useClass: SharedStylesHost},
-  // Only remains for backwards compatibility, should be removed once g3 no longer needs it.
-  {provide: SharedStylesHost, useExisting: SHARED_STYLES_HOST},
+  SharedStylesHost,
   EventManager,
   {provide: RendererFactory2, useExisting: DomRendererFactory2},
+  {provide: XhrFactory, useClass: BrowserXhr},
   typeof ngDevMode === 'undefined' || ngDevMode
     ? {provide: BROWSER_MODULE_PROVIDERS_MARKER, useValue: true}
     : [],

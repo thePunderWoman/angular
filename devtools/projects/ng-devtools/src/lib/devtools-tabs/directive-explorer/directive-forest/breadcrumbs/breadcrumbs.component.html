@@ -1,4 +1,12 @@
-<ng-horizontal-scroller #scroller>
+<button
+  class="scroll-button"
+  [class.hidden]="!showScrollLeftButton()"
+  (click)="scroll(-100)"
+  aria-label="Scroll left"
+>
+  <mat-icon> chevron_left </mat-icon>
+</button>
+<div class="breadcrumbs" #breadcrumbs (scroll)="updateScrollButtonVisibility()">
   @for (node of parents(); track $index) {
     <button
       (mouseover)="mouseOverNode.emit(node)"
@@ -8,7 +16,15 @@
       [class.selected]="$last"
       class="breadcrumb"
     >
-      {{ node.original.component?.name || node.original.tagName }}
+      {{ node.original.component?.name || node.original.element }}
     </button>
   }
-</ng-horizontal-scroller>
+</div>
+<button
+  class="scroll-button"
+  [class.hidden]="!showScrollRightButton()"
+  (click)="scroll(100)"
+  aria-label="Scroll right"
+>
+  <mat-icon> chevron_right </mat-icon>
+</button>

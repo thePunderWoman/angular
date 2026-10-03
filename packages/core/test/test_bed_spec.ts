@@ -7,24 +7,15 @@
  */
 
 import {ɵPLATFORM_BROWSER_ID} from '@angular/common';
-import {By} from '@angular/platform-browser';
-import {expect} from '@angular/private/testing/matchers';
 import {
   APP_INITIALIZER,
-  ChangeDetectionStrategy,
   ChangeDetectorRef,
   Compiler,
+  provideZoneChangeDetection,
   Component,
-  ɵɵdefineComponent as defineComponent,
-  ɵɵdefineInjector as defineInjector,
-  ɵɵdefineNgModule as defineNgModule,
   Directive,
-  DOCUMENT,
-  ɵɵelementEnd as elementEnd,
   ElementRef,
-  ɵɵelementStart as elementStart,
   ErrorHandler,
-  EventEmitter,
   getNgModuleById,
   inject,
   Inject,
@@ -33,28 +24,35 @@ import {
   InjectOptions,
   Injector,
   Input,
-  inputBinding,
   LOCALE_ID,
   ModuleWithProviders,
   NgModule,
   Optional,
-  Output,
-  outputBinding,
   Pipe,
   PLATFORM_ID,
-  provideZoneChangeDetection,
-  provideZonelessChangeDetection,
-  Service,
-  ɵsetClassMetadata as setClassMetadata,
-  ɵɵsetNgModuleScope as setNgModuleScope,
-  signal,
-  ɵɵtext as text,
-  twoWayBinding,
   Type,
   ViewChild,
+  ɵsetClassMetadata as setClassMetadata,
+  ɵɵdefineComponent as defineComponent,
+  ɵɵdefineInjector as defineInjector,
+  ɵɵdefineNgModule as defineNgModule,
+  ɵɵelementEnd as elementEnd,
+  ɵɵelementStart as elementStart,
+  ɵɵsetNgModuleScope as setNgModuleScope,
+  ɵɵtext as text,
+  DOCUMENT,
+  signal,
+  provideZonelessChangeDetection,
+  inputBinding,
+  Output,
+  EventEmitter,
+  outputBinding,
+  twoWayBinding,
 } from '../src/core';
 import {DeferBlockBehavior} from '../testing';
 import {TestBed, TestBedImpl} from '../testing/src/test_bed';
+import {By} from '@angular/platform-browser';
+import {expect} from '@angular/private/testing/matchers';
 
 import {NgModuleType} from '../src/render3';
 import {depsTracker} from '../src/render3/deps_tracker/deps_tracker';
@@ -82,7 +80,6 @@ class SimpleService {
   selector: 'hello-world',
   template: '<greeting-cmp></greeting-cmp>',
   standalone: false,
-  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class HelloWorld {}
 
@@ -91,7 +88,6 @@ export class HelloWorld {}
   selector: 'greeting-cmp',
   template: 'Hello {{ name }}',
   standalone: false,
-  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class GreetingCmp {
   name: string;
@@ -155,11 +151,8 @@ export class HostBindingDir {
   selector: 'component-with-prop-bindings',
   template: `
     <div hostBindingDir [title]="title" [attr.aria-label]="label"></div>
-    <p
-      title="( {{ label }} - {{ title }} )"
-      [attr.aria-label]="label"
-      id="[ {{ label }} ] [ {{ title }} ]"
-    ></p>
+    <p title="( {{ label }} - {{ title }} )" [attr.aria-label]="label" id="[ {{ label }} ] [ {{ title }} ]">
+    </p>
   `,
   standalone: false,
 })
@@ -170,7 +163,9 @@ export class ComponentWithPropBindings {
 
 @Component({
   selector: 'simple-app',
-  template: ` <simple-cmp></simple-cmp> - <inherited-cmp></inherited-cmp> `,
+  template: `
+    <simple-cmp></simple-cmp> - <inherited-cmp></inherited-cmp>
+  `,
   standalone: false,
 })
 export class SimpleApp {}
@@ -198,7 +193,7 @@ export class ComponentWithInlineTemplate {}
 })
 export class HelloWorldModule {}
 
-describe('TestBed (isolated)', () => {
+describe('TestBed', () => {
   // This test is extracted to an individual `describe` block to avoid any extra TestBed
   // initialization logic that happens in the `beforeEach` functions in other `describe` sections.
   it('should apply scopes correctly for components in the lazy-loaded module', () => {
@@ -1702,140 +1697,37 @@ describe('TestBed', () => {
           },
         });
       }
-      if (dependencies.length || deferrableDependencies.length) {
-        setClassMetadataAsync(
-          ComponentClass,
-          function () {
-            const promises: Array<Promise<Type<unknown>>> = deferrableDependencies.map(
-              // Emulates a dynamic import, e.g. `import('./cmp-a').then(m => m.CmpA)`
-              (dep) => new Promise((resolve) => setTimeout(() => resolve(dep))),
-            );
-            return promises;
-          },
-          function (...deferrableSymbols) {
-            setClassMetadata(
-              ComponentClass,
-              [
-                {
-                  type: Component,
-                  args: [
-                    {
-                      selector,
-                      imports: [...dependencies, ...deferrableSymbols],
-                      template: `<div>root cmp!</div>`,
-                    },
-                  ],
-                },
-              ],
-              null,
-              null,
-            );
-          },
-        );
-      }
+      setClassMetadataAsync(
+        ComponentClass,
+        function () {
+          const promises: Array<Promise<Type<unknown>>> = deferrableDependencies.map(
+            // Emulates a dynamic import, e.g. `import('./cmp-a').then(m => m.CmpA)`
+            (dep) => new Promise((resolve) => setTimeout(() => resolve(dep))),
+          );
+          return promises;
+        },
+        function (...deferrableSymbols) {
+          setClassMetadata(
+            ComponentClass,
+            [
+              {
+                type: Component,
+                args: [
+                  {
+                    selector,
+                    imports: [...dependencies, ...deferrableSymbols],
+                    template: `<div>root cmp!</div>`,
+                  },
+                ],
+              },
+            ],
+            null,
+            null,
+          );
+        },
+      );
       return ComponentClass;
     };
-
-    it('should not require compilerComponents if the component with a defer-block is not overridden', async () => {
-      const DeferredComponent = getAOTCompiledComponent('deferred');
-      const RootAotComponent = getAOTCompiledComponent('root', [], [DeferredComponent]);
-
-      TestBed.configureTestingModule({imports: [RootAotComponent]});
-
-      // If we had overriden the component, we would need to compile it
-      // but since we didn't, we can create the component synchronously
-      const fixture = TestBed.createComponent(RootAotComponent);
-      fixture.detectChanges();
-
-      expect(fixture.nativeElement.textContent).toBe('root cmp!');
-
-      // Here we're just confirming that the same component would throw on override.
-      TestBed.resetTestingModule()
-        .configureTestingModule({imports: [RootAotComponent]})
-        .overrideComponent(RootAotComponent, {
-          set: {template: `Override of a root template!`},
-        });
-      expect(() => TestBed.createComponent(RootAotComponent)).toThrow();
-    });
-
-    it('should not throw an error in AOT component is overriden but has no async metadata', () => {
-      const RootAotComponent = getAOTCompiledComponent('root', [], []);
-      TestBed.configureTestingModule({imports: [RootAotComponent]});
-
-      TestBed.overrideComponent(RootAotComponent, {
-        set: {template: `Override of a root template! <nested-cmp />`},
-      });
-
-      expect(() => TestBed.createComponent(RootAotComponent)).not.toThrowError();
-    });
-
-    it('should throw an error if a deferred component is not compiled', () => {
-      @Component({
-        selector: 'cmp-a',
-        template: 'CmpA!',
-      })
-      class CmpA {}
-
-      const NestedAotComponent = getAOTCompiledComponent('nested-cmp', [], [CmpA]);
-      const RootAotComponent = getAOTCompiledComponent('root', [], [NestedAotComponent]);
-
-      TestBed.configureTestingModule({imports: [RootAotComponent]});
-
-      TestBed.overrideComponent(RootAotComponent, {
-        set: {template: `Override of a root template! <nested-cmp />`},
-      });
-      TestBed.overrideComponent(NestedAotComponent, {
-        set: {template: `Override of a nested template! <cmp-a />`},
-      });
-
-      // We did override but not compile, therefore we expect to throw on createComponent
-      expect(() => TestBed.createComponent(RootAotComponent)).toThrowError(
-        `Component 'ComponentClass' has unresolved metadata. Please call \`await TestBed.compileComponents()\` before running this test.`,
-      );
-    });
-
-    it('should not throw if component is created after override+reset', async () => {
-      @Component({
-        selector: 'cmp-a',
-        template: 'CmpA!',
-      })
-      class CmpA {}
-
-      const NestedAotComponent = getAOTCompiledComponent('nested-cmp', [], [CmpA]);
-      const RootAotComponent = getAOTCompiledComponent('root', [], [NestedAotComponent]);
-
-      TestBed.configureTestingModule({imports: [RootAotComponent]});
-
-      TestBed.overrideComponent(RootAotComponent, {
-        set: {template: `Override of a root template! <nested-cmp />`},
-      });
-      TestBed.overrideComponent(NestedAotComponent, {
-        set: {template: `Override of a nested template! <cmp-a />`},
-      });
-
-      // Not compiled yet, so we expect to throw
-      expect(() => TestBed.createComponent(RootAotComponent)).toThrowError();
-
-      await TestBed.compileComponents();
-
-      // We're compiled now, so we can create the component
-      const fixture = TestBed.createComponent(RootAotComponent);
-      fixture.detectChanges();
-
-      expect(fixture.nativeElement.textContent).toBe(
-        'Override of a root template! Override of a nested template! CmpA!',
-      );
-
-      // We reset the override
-      TestBed.resetTestingModule();
-      TestBed.configureTestingModule({imports: [RootAotComponent]});
-
-      // We're back to the nominal behavior
-      const fixture2 = TestBed.createComponent(RootAotComponent);
-      fixture2.detectChanges();
-
-      expect(fixture2.nativeElement.textContent).toBe('root cmp!');
-    });
 
     it('should handle async metadata on root and nested components', async () => {
       @Component({
@@ -1856,7 +1748,7 @@ describe('TestBed', () => {
         set: {template: `Override of a nested template! <cmp-a />`},
       });
 
-      // We need to compile the component because it has async metadata + overrides
+      // This is only required because the components are AOT compiled and thus include setClassMetadataAsync
       await TestBed.compileComponents();
 
       const fixture = TestBed.createComponent(RootAotComponent);
@@ -1943,7 +1835,7 @@ describe('TestBed', () => {
       TestBed.configureTestingModule({imports: [ParentCmp], providers: [COMMON_PROVIDERS]});
       TestBed.overrideProvider(ImportantService, {useValue: {value: 'overridden'}});
 
-      // We need to compile the component because it has async metadata + overrides
+      // This is only required because the component has setClassMetadataAsync
       await TestBed.compileComponents();
 
       const fixture = TestBed.createComponent(ParentCmp);
@@ -1956,9 +1848,8 @@ describe('TestBed', () => {
     });
 
     it('should allow import overrides on components with async metadata', async () => {
-      const DeferredComponent = getAOTCompiledComponent('deferred', [], []);
       const NestedAotComponent = getAOTCompiledComponent('nested-cmp', [], []);
-      const RootAotComponent = getAOTCompiledComponent('root', [], [DeferredComponent]);
+      const RootAotComponent = getAOTCompiledComponent('root', [], []);
 
       TestBed.configureTestingModule({imports: [RootAotComponent]});
 
@@ -1970,7 +1861,7 @@ describe('TestBed', () => {
         },
       });
 
-      // We need to compile the component because it has async metadata + overrides
+      // This is only required because the components are AOT compiled and thus include setClassMetadataAsync
       await TestBed.compileComponents();
 
       const fixture = TestBed.createComponent(RootAotComponent);
@@ -1979,64 +1870,6 @@ describe('TestBed', () => {
       expect(fixture.nativeElement.textContent).toBe(
         'Override of a root template! nested-cmp cmp!',
       );
-    });
-
-    it('should throw when overriding template', async () => {
-      const DeferredComponent = getAOTCompiledComponent('deferred', [], []);
-      const RootAotComponent = getAOTCompiledComponent('root', [], [DeferredComponent]);
-      TestBed.overrideTemplate(RootAotComponent, 'foobar');
-
-      expect(() => TestBed.createComponent(RootAotComponent)).toThrowError(
-        /has unresolved metadata/,
-      );
-    });
-
-    it('should throw if overriding template', async () => {
-      const DeferredComponent = getAOTCompiledComponent('deferred', [], []);
-      const RootAotComponent = getAOTCompiledComponent('root', [], [DeferredComponent]);
-      class Foo {}
-
-      TestBed.overrideComponent(RootAotComponent, {set: {providers: [Foo]}});
-
-      expect(() => TestBed.createComponent(RootAotComponent)).toThrowError(
-        /has unresolved metadata/,
-      );
-    });
-
-    describe('ensure AsyncMetadata loading is side-effect free', () => {
-      let Component: any;
-      let run = 1;
-      beforeEach(() => {
-        const DeferredComponent = getAOTCompiledComponent('deferred', [], []);
-        Component = getAOTCompiledComponent('root', [], [DeferredComponent]);
-        TestBed.overrideComponent(Component, {set: {template: 'bar'}});
-      });
-
-      it('should throw if creating an overridden component', async () => {
-        if (run === 1) {
-          await TestBed.compileComponents();
-          const fixture = TestBed.createComponent(Component);
-          expect(fixture.nativeElement.textContent).toBe('bar');
-        } else {
-          // Component was compiled in the previous test
-          // but we still require compileComponents because of the override
-          expect(() => TestBed.createComponent(Component)).toThrowError();
-        }
-        run++;
-      });
-
-      it('should throw if creating an overridden component (run 2)', async () => {
-        if (run === 1) {
-          await TestBed.compileComponents();
-          const fixture = TestBed.createComponent(Component);
-          expect(fixture.nativeElement.textContent).toBe('bar');
-        } else {
-          // Component was compiled in the previous test
-          // but we still require compileComponents because of the override
-          expect(() => TestBed.createComponent(Component)).toThrowError();
-        }
-        run++;
-      });
     });
   });
 
@@ -2287,26 +2120,26 @@ describe('TestBed', () => {
       });
       TestBed.createComponent(ComponentWithNoAnnotations);
 
-      expect(Object.hasOwn(ComponentWithNoAnnotations, 'ɵcmp')).toBeTruthy();
-      expect(Object.hasOwn(SomeComponent, 'ɵcmp')).toBeTruthy();
+      expect(ComponentWithNoAnnotations.hasOwnProperty('ɵcmp')).toBeTruthy();
+      expect(SomeComponent.hasOwnProperty('ɵcmp')).toBeTruthy();
 
-      expect(Object.hasOwn(DirectiveWithNoAnnotations, 'ɵdir')).toBeTruthy();
-      expect(Object.hasOwn(SomeDirective, 'ɵdir')).toBeTruthy();
+      expect(DirectiveWithNoAnnotations.hasOwnProperty('ɵdir')).toBeTruthy();
+      expect(SomeDirective.hasOwnProperty('ɵdir')).toBeTruthy();
 
-      expect(Object.hasOwn(PipeWithNoAnnotations, 'ɵpipe')).toBeTruthy();
-      expect(Object.hasOwn(SomePipe, 'ɵpipe')).toBeTruthy();
+      expect(PipeWithNoAnnotations.hasOwnProperty('ɵpipe')).toBeTruthy();
+      expect(SomePipe.hasOwnProperty('ɵpipe')).toBeTruthy();
 
       TestBed.resetTestingModule();
 
       // ng defs should be removed from classes with no annotations
-      expect(Object.hasOwn(ComponentWithNoAnnotations, 'ɵcmp')).toBeFalsy();
-      expect(Object.hasOwn(DirectiveWithNoAnnotations, 'ɵdir')).toBeFalsy();
-      expect(Object.hasOwn(PipeWithNoAnnotations, 'ɵpipe')).toBeFalsy();
+      expect(ComponentWithNoAnnotations.hasOwnProperty('ɵcmp')).toBeFalsy();
+      expect(DirectiveWithNoAnnotations.hasOwnProperty('ɵdir')).toBeFalsy();
+      expect(PipeWithNoAnnotations.hasOwnProperty('ɵpipe')).toBeFalsy();
 
       // ng defs should be preserved on super types
-      expect(Object.hasOwn(SomeComponent, 'ɵcmp')).toBeTruthy();
-      expect(Object.hasOwn(SomeDirective, 'ɵdir')).toBeTruthy();
-      expect(Object.hasOwn(SomePipe, 'ɵpipe')).toBeTruthy();
+      expect(SomeComponent.hasOwnProperty('ɵcmp')).toBeTruthy();
+      expect(SomeDirective.hasOwnProperty('ɵdir')).toBeTruthy();
+      expect(SomePipe.hasOwnProperty('ɵpipe')).toBeTruthy();
     });
 
     it('should cleanup scopes (configured via `TestBed.configureTestingModule`) between tests', () => {
@@ -2750,7 +2583,7 @@ describe('TestBed module teardown', () => {
 
     const spy = spyOn(console, 'error');
     expect(() => TestBed.resetTestingModule()).toThrowError(
-      '1 fixture threw errors during cleanup',
+      '1 component threw errors during cleanup',
     );
     expect(spy).toHaveBeenCalledTimes(1);
   });
@@ -2777,7 +2610,7 @@ describe('TestBed module teardown', () => {
 
     const spy = spyOn(console, 'error');
     expect(() => TestBed.resetTestingModule()).toThrowError(
-      '3 fixtures threw errors during cleanup',
+      '3 components threw errors during cleanup',
     );
     expect(spy).toHaveBeenCalledTimes(3);
   });
@@ -2839,26 +2672,14 @@ describe('TestBed module teardown', () => {
   it('should remove the styles associated with a test component when the test module is torn down', () => {
     @Component({
       template: '<span>Hello</span>',
-      styles: [
-        `
-          span {
-            color: hotpink;
-          }
-        `,
-      ],
+      styles: [`span {color: hotpink;}`],
       standalone: false,
     })
     class StyledComp1 {}
 
     @Component({
       template: '<div>Hello</div>',
-      styles: [
-        `
-          div {
-            color: red;
-          }
-        `,
-      ],
+      styles: [`div {color: red;}`],
       standalone: false,
     })
     class StyledComp2 {}
@@ -2879,6 +2700,19 @@ describe('TestBed module teardown', () => {
     expect(styleCountBefore).toBeGreaterThan(0);
     TestBed.resetTestingModule();
     expect(fixtureDocument.querySelectorAll('style').length).toBeLessThan(styleCountBefore);
+  });
+
+  it('should remove the fixture root element from the DOM when module teardown is enabled', () => {
+    TestBed.configureTestingModule({
+      declarations: [SimpleCmp],
+      teardown: {destroyAfterEach: true},
+    });
+    const fixture = TestBed.createComponent(SimpleCmp);
+    const fixtureDocument = fixture.nativeElement.ownerDocument;
+
+    expect(fixtureDocument.body.contains(fixture.nativeElement)).toBe(true);
+    TestBed.resetTestingModule();
+    expect(fixtureDocument.body.contains(fixture.nativeElement)).toBe(false);
   });
 
   it('should rethrow errors based on the default teardown behavior', () => {
@@ -2963,217 +2797,5 @@ describe('TestBed module `errorOnUnknownProperties`', () => {
     expect(TestBedImpl.INSTANCE.shouldThrowErrorOnUnknownProperties()).toBe(true);
     TestBed.resetTestingModule();
     expect(TestBedImpl.INSTANCE.shouldThrowErrorOnUnknownProperties()).toBe(false);
-  });
-});
-
-describe('TestBed.createDirective', () => {
-  beforeEach(() => {
-    TestBed.resetTestingModule();
-  });
-
-  it('should be able to create a directive', () => {
-    @Directive({
-      host: {'class': 'foo'},
-    })
-    class Dir {}
-
-    const fixture = TestBed.createDirective(Dir, {tagName: 'div'});
-    fixture.detectChanges();
-
-    expect(fixture.directiveInstance).toBeInstanceOf(Dir);
-    expect(fixture.nativeElement.classList.contains('foo')).toBe(true);
-  });
-
-  it('should be able to attach an input binding to the directive', () => {
-    @Directive()
-    class Dir {
-      @Input() value = 'initial';
-    }
-
-    const value = signal('override');
-    const fixture = TestBed.createDirective(Dir, {
-      tagName: 'div',
-      bindings: [inputBinding('value', value)],
-    });
-    fixture.detectChanges();
-    expect(fixture.directiveInstance.value).toBe('override');
-
-    value.set('override-changed');
-    fixture.detectChanges();
-    expect(fixture.directiveInstance.value).toBe('override-changed');
-  });
-
-  it('should be able to attach an output binding to the directive', () => {
-    @Directive()
-    class Dir {
-      @Output() event = new EventEmitter<void>();
-    }
-
-    let emitCount = 0;
-    const fixture = TestBed.createDirective(Dir, {
-      tagName: 'div',
-      bindings: [outputBinding('event', () => emitCount++)],
-    });
-    fixture.detectChanges();
-    expect(emitCount).toBe(0);
-
-    fixture.directiveInstance.event.emit();
-    fixture.detectChanges();
-    expect(emitCount).toBe(1);
-  });
-
-  it('should be able to set the tag name of the host element', () => {
-    @Directive({selector: 'hello-world'})
-    class Dir {}
-
-    const fixture = TestBed.createDirective(Dir, {tagName: 'my-dir'});
-    expect(fixture.nativeElement.tagName).toBe('MY-DIR');
-  });
-
-  it('should infer the tag name from the selector by default', () => {
-    @Directive({selector: 'my-inferred-tag[hello-world]'})
-    class Dir {}
-
-    const fixture = TestBed.createDirective(Dir);
-    expect(fixture.nativeElement.tagName).toBe('MY-INFERRED-TAG');
-  });
-
-  it('should throw if the directive selector does not set a tag name and `tagName` is not specified', () => {
-    @Directive({selector: '[dir]'})
-    class Dir {}
-
-    expect(() => TestBed.createDirective(Dir)).toThrowError(
-      /Cannot determine tag name for Dir, because one was not set in the options object and the selector for Dir does not include a tag name/,
-    );
-  });
-
-  it('should throw if the directive selector specifies multiple tag name', () => {
-    @Directive({selector: 'button[my-dir], a[my-dir]'})
-    class Dir {}
-
-    expect(() => TestBed.createDirective(Dir)).toThrowError(
-      /Directive Dir specifies multiple tag names in its selector \(button, a\)/,
-    );
-  });
-
-  it('should be able to create non-standalone directive declared in an imported module', () => {
-    @Directive({
-      standalone: false,
-      selector: '[dir]',
-      host: {
-        '[class.foo]': 'isFoo',
-      },
-    })
-    class Dir {
-      @Input() value = 'initial';
-      isFoo = true;
-    }
-
-    TestBed.configureTestingModule({declarations: [Dir]});
-
-    const fixture = TestBed.createDirective(Dir, {
-      tagName: 'div',
-      bindings: [inputBinding('value', () => 'hello')],
-    });
-    fixture.detectChanges();
-
-    expect(fixture.directiveInstance).toBeInstanceOf(Dir);
-    expect(fixture.directiveInstance.value).toBe('hello');
-    expect(fixture.nativeElement.classList.contains('foo')).toBe(true);
-  });
-
-  it('should be able to use dependency injection', () => {
-    @Service()
-    class SomeService {
-      readonly value = 'hello';
-    }
-
-    @Directive()
-    class Dir {
-      readonly service = inject(SomeService);
-    }
-
-    const fixture = TestBed.createDirective(Dir, {tagName: 'div'});
-    expect(fixture.directiveInstance.service.value).toBe('hello');
-  });
-
-  it('should be able to inject provider from the test module', () => {
-    @Injectable()
-    class MyService {
-      readonly message = 'hello';
-    }
-
-    @Directive({
-      standalone: false,
-      selector: '[dir]',
-    })
-    class Dir {
-      readonly service = inject(MyService);
-    }
-
-    TestBed.configureTestingModule({
-      declarations: [Dir],
-      providers: [MyService],
-    });
-
-    const fixture = TestBed.createDirective(Dir, {tagName: 'div'});
-    fixture.detectChanges();
-
-    expect(fixture.directiveInstance.service.message).toBe('hello');
-  });
-
-  it('should be able to inject provider from an imported module', () => {
-    @Injectable()
-    class ModuleService {
-      value = 'hello-module';
-    }
-
-    @Injectable()
-    class DirProvidedService {
-      value = 'hello-directive';
-    }
-
-    @Directive({
-      standalone: false,
-      selector: '[dir]',
-      providers: [DirProvidedService],
-    })
-    class Dir {
-      readonly moduleService = inject(ModuleService);
-      readonly dirService = inject(DirProvidedService);
-    }
-
-    @NgModule({
-      declarations: [Dir],
-      exports: [Dir],
-      providers: [ModuleService],
-    })
-    class DirModule {}
-
-    TestBed.configureTestingModule({imports: [DirModule]});
-    const fixture = TestBed.createDirective(Dir, {tagName: 'div'});
-    const dir = fixture.directiveInstance;
-
-    expect(dir.moduleService.value).toBe('hello-module');
-    expect(dir.dirService.value).toBe('hello-directive');
-  });
-
-  it('should invoke destroy callbacks when the fixture is destroyed', () => {
-    const callbacks: string[] = [];
-
-    @Directive()
-    class Dir {
-      ngOnDestroy() {
-        callbacks.push('directive: ngOnDestroy');
-      }
-    }
-
-    const fixture = TestBed.createDirective(Dir, {tagName: 'div'});
-    fixture.onDestroy(() => callbacks.push('fixture: onDestroy'));
-    fixture.detectChanges();
-    expect(callbacks).toEqual([]);
-
-    fixture.destroy();
-    expect(callbacks).toEqual(['directive: ngOnDestroy', 'fixture: onDestroy']);
   });
 });

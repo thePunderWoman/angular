@@ -6,60 +6,38 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import * as webdriver from 'selenium-webdriver';
-import {
-  createWebDriver,
-  verifyNoBrowserErrors,
-  waitForAngular,
-} from '../../../../packages/examples/test-utils/index.js';
+import {verifyNoBrowserErrors} from '../../../utilities/index';
+import {browser} from 'protractor';
 
 describe('hello world', function () {
-  let driver: webdriver.WebDriver;
-  let baseUrl: string;
-
-  beforeAll(async () => {
-    ({driver, baseUrl} = await createWebDriver());
-  });
-
-  afterAll(async () => {
-    await driver.quit();
-  });
-
-  afterEach(async () => {
-    await verifyNoBrowserErrors(driver);
-  });
+  afterEach(verifyNoBrowserErrors);
 
   describe('hello world app', function () {
-    it('should greet', async function () {
-      await driver.get(`${baseUrl}/`);
-      await waitForAngular(driver);
+    const URL = '/';
 
-      expect(await getComponentText(driver, 'hello-app', '.greeting')).toEqual('hello world!');
+    it('should greet', function () {
+      browser.get(URL);
+
+      expect(getComponentText('hello-app', '.greeting')).toEqual('hello world!');
     });
 
-    it('should change greeting', async function () {
-      await driver.get(`${baseUrl}/`);
-      await waitForAngular(driver);
+    it('should change greeting', function () {
+      browser.get(URL);
 
-      await clickComponentButton(driver, 'hello-app', '.changeButton');
-      await waitForAngular(driver);
-      expect(await getComponentText(driver, 'hello-app', '.greeting')).toEqual('howdy world!');
+      clickComponentButton('hello-app', '.changeButton');
+      expect(getComponentText('hello-app', '.greeting')).toEqual('howdy world!');
     });
   });
 });
 
-function getComponentText(driver: webdriver.WebDriver, selector: string, innerSelector: string) {
-  return driver.executeScript(
+function getComponentText(selector: string, innerSelector: string) {
+  return browser.executeScript(
     `return document.querySelector("${selector}").querySelector("${innerSelector}").textContent`,
   );
 }
 
-function clickComponentButton(
-  driver: webdriver.WebDriver,
-  selector: string,
-  innerSelector: string,
-) {
-  return driver.executeScript(
+function clickComponentButton(selector: string, innerSelector: string) {
+  return browser.executeScript(
     `return document.querySelector("${selector}").querySelector("${innerSelector}").click()`,
   );
 }

@@ -8,13 +8,11 @@
   .filter {
     border-bottom: 1px solid var(--color-separator);
     display: flex;
-    justify-content: space-between;
     gap: 1.25rem;
     padding: 0.5rem;
 
-    ng-filter {
-      --ng-filter-width: 8rem;
-      --ng-filter-height: 24px;
+    .filter-input {
+      width: 12rem;
     }
 
     .show-full-path {
@@ -31,9 +29,7 @@
 
     .side-pane {
       position: relative;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
+      padding: 1rem;
 
       .close-btn {
         position: absolute;
@@ -51,13 +47,10 @@
         @extend %heading-400;
         margin: 0;
         padding-top: 0;
-        padding: 1rem;
       }
 
-      .scrollable-wrapper {
-        padding: 0 1rem 1rem 1rem;
-        height: 100%;
-        overflow-y: auto;
+      table {
+        margin-top: 1rem;
       }
     }
 
@@ -108,6 +101,15 @@
             border-color: var(--green-02);
             background-color: var(--green-03);
           }
+
+          &.dashed-line::before {
+            border-color: var(--quaternary-contrast);
+            background-color: transparent;
+            border-style: dashed;
+            border-width: 1px;
+            width: 16px;
+            height: 0;
+          }
         }
       }
     }
@@ -117,9 +119,4 @@
 .unsupported-version {
   width: 50%;
   margin: auto;
-  text-align: center;
-
-  ng-angie {
-    margin: 0 auto 1rem;
-  }
 }

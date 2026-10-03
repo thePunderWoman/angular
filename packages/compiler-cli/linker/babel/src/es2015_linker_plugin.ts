@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {File, NodePath, PluginObject, types as t} from '@babel/core';
+import {BabelFile, NodePath, PluginObj, types as t} from '@babel/core';
 
 import {FileLinker, isFatalLinkerError, LinkerEnvironment} from '../../../linker';
 
@@ -25,13 +25,8 @@ export function createEs2015LinkerPlugin({
   fileSystem,
   logger,
   ...options
-}: LinkerPluginOptions): PluginObject {
-  let fileLinker: FileLinker<
-    ConstantScopePath,
-    t.Statement,
-    t.Expression | t.SpreadElement,
-    t.TSType
-  > | null = null;
+}: LinkerPluginOptions): PluginObj {
+  let fileLinker: FileLinker<ConstantScopePath, t.Statement, t.Expression> | null = null;
 
   return {
     visitor: {
@@ -52,11 +47,13 @@ export function createEs2015LinkerPlugin({
           }
           const sourceUrl = fileSystem.resolve(file.opts.cwd ?? '.', filename);
 
-          const linkerEnvironment = LinkerEnvironment.create<
-            t.Statement,
-            t.Expression | t.SpreadElement,
-            t.TSType
-          >(fileSystem, logger, new BabelAstHost(), new BabelAstFactory(sourceUrl), options);
+          const linkerEnvironment = LinkerEnvironment.create<t.Statement, t.Expression>(
+            fileSystem,
+            logger,
+            new BabelAstHost(),
+            new BabelAstFactory(sourceUrl),
+            options,
+          );
           fileLinker = new FileLinker(linkerEnvironment, sourceUrl, file.code);
         },
 
@@ -187,8 +184,8 @@ function assertNotNull<T>(obj: T | null): asserts obj is T {
 /**
  * Create a string representation of an error that includes the code frame of the `node`.
  */
-function buildCodeFrameError(file: File, message: string, node: t.Node): string {
+function buildCodeFrameError(file: BabelFile, message: string, node: t.Node): string {
   const filename = file.opts.filename || '(unknown file)';
-  const error = file.hub.buildError(node, message, Error);
+  const error = file.hub.buildError(node, message);
   return `${filename}: ${error.message}`;
 }

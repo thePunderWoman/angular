@@ -6,17 +6,14 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {enableProdMode} from '@angular/core';
-import {bootstrapApplication} from '@angular/platform-browser';
+import {enableProdMode, NgModule} from '@angular/core';
+import {BrowserModule, platformBrowser} from '@angular/platform-browser';
+
 import {MyComponent} from './my_component';
 
 enableProdMode();
 
-bootstrapApplication(MyComponent, {
-  providers: [
-    // Add your global providers here
-    // provideRouter(routes),
-    // provideHttpClient(),
-    // etc.
-  ],
-});
+@NgModule({imports: [BrowserModule], declarations: [MyComponent], bootstrap: [MyComponent]})
+export class AppModule {}
+
+platformBrowser().bootstrapModule(AppModule);

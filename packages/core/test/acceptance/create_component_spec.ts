@@ -7,7 +7,6 @@
  */
 
 import {
-  ChangeDetectionStrategy,
   Component,
   createComponent,
   createEnvironmentInjector,
@@ -37,13 +36,12 @@ import {
 } from '../../src/core';
 import {stringifyForError} from '../../src/render3/util/stringify_utils';
 import {TestBed} from '../../testing';
+import {ChangeDetectionStrategy} from '@angular/compiler';
 
 describe('createComponent', () => {
   it('should create an instance of a standalone component', () => {
     @Component({
       template: 'Hello {{ name }}!',
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class StandaloneComponent {
       name = 'Angular';
@@ -67,8 +65,6 @@ describe('createComponent', () => {
     @Component({
       template: 'Hello {{ name }}!',
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class NgModuleBasedComponent {
       name = 'Angular';
@@ -98,11 +94,10 @@ describe('createComponent', () => {
   it('should render projected content', () => {
     @Component({
       template: `
-        <ng-content></ng-content>| <ng-content></ng-content>|
+        <ng-content></ng-content>|
+        <ng-content></ng-content>|
         <ng-content></ng-content>
       `,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class StandaloneComponent {}
 
@@ -130,8 +125,6 @@ describe('createComponent', () => {
     const A = new InjectionToken('A');
     @Component({
       template: 'Token: {{ a }}',
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class StandaloneComponent {
       a = inject(A);
@@ -153,8 +146,6 @@ describe('createComponent', () => {
     const B = new InjectionToken('B');
     @Component({
       template: '{{ a }} and {{ b }}',
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class ChildStandaloneComponent {
       a = inject(A);
@@ -164,8 +155,6 @@ describe('createComponent', () => {
     @Component({
       template: 'Tokens: <div #target></div>',
       providers: [{provide: A, useValue: 'ElementInjector(A)'}],
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class RootStandaloneComponent {
       @ViewChild('target', {read: ElementRef}) target!: ElementRef;
@@ -204,8 +193,6 @@ describe('createComponent', () => {
     @Component({
       selector,
       template: 'Hello {{ name }}!',
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class StandaloneComponent {
       name = 'Angular';
@@ -232,8 +219,6 @@ describe('createComponent', () => {
       @Component({
         selector: '.some-class',
         template: 'Hello {{ name }}!',
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class StandaloneComponent {
         name = 'Angular';
@@ -289,8 +274,6 @@ describe('createComponent', () => {
           'class': 'host',
           'attr-three': 'host',
         },
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class HostComponent {
         constructor() {
@@ -325,7 +308,7 @@ describe('createComponent', () => {
         }
       }
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class HostComponent {}
 
       const hostElement = document.createElement('div');
@@ -407,8 +390,6 @@ describe('createComponent', () => {
         selector: 'my-comp',
         template: '',
         hostDirectives: [Chain1, Chain2, Chain3],
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class HostComponent {
         constructor() {
@@ -469,7 +450,7 @@ describe('createComponent', () => {
         }
       }
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class HostComponent implements OnDestroy {
         ngOnDestroy() {
           logs.push('HostComponent');
@@ -499,7 +480,7 @@ describe('createComponent', () => {
         }
       }
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class HostComponent {
         constructor() {
           injectedInstance = inject(Dir);
@@ -531,7 +512,7 @@ describe('createComponent', () => {
         }
       }
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class HostComponent {
         @Input() someInput = 0;
       }
@@ -560,7 +541,7 @@ describe('createComponent', () => {
       @Directive({})
       class Dir {}
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class HostComponent {}
 
       const hostElement = document.createElement('div');
@@ -578,7 +559,7 @@ describe('createComponent', () => {
     it('should throw if a non-directive class is attached', () => {
       class NotADir {}
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class HostComponent {}
 
       const hostElement = document.createElement('div');
@@ -596,7 +577,7 @@ describe('createComponent', () => {
     it('should throw if a non-directive class is attached using the DirectiveWithBinding syntax', () => {
       class NotADir {}
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class HostComponent {}
 
       const hostElement = document.createElement('div');
@@ -617,10 +598,10 @@ describe('createComponent', () => {
     });
 
     it('should throw if a component class is attached', () => {
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class NotADir {}
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class HostComponent {}
 
       const hostElement = document.createElement('div');
@@ -639,7 +620,7 @@ describe('createComponent', () => {
       @Directive({standalone: false})
       class Dir {}
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class HostComponent {}
 
       const hostElement = document.createElement('div');
@@ -659,10 +640,7 @@ describe('createComponent', () => {
 
   describe('root component inputs', () => {
     it('should be able to bind to inputs of the root component', () => {
-      @Component({
-        template: '{{one}} - {{two}} - {{other}}',
-        changeDetection: ChangeDetectionStrategy.Eager,
-      })
+      @Component({template: '{{one}} - {{two}} - {{other}}'})
       class RootComp {
         @Input() one = '';
         @Input({alias: 'twoAlias'}) two = '';
@@ -707,7 +685,7 @@ describe('createComponent', () => {
         }
       }
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Input() someInput = '';
       }
@@ -756,8 +734,6 @@ describe('createComponent', () => {
       @Component({
         template: '',
         hostDirectives: [{directive: RootHostDir, inputs: ['someInput']}],
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class RootComp {
         @Input() someInput = '';
@@ -806,7 +782,7 @@ describe('createComponent', () => {
       })
       class RootDir {}
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {}
 
       const value = signal('initial');
@@ -845,8 +821,6 @@ describe('createComponent', () => {
       @Component({
         template: '',
         hostDirectives: [{directive: RootHostDir, inputs: ['someAlias: alias']}],
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class RootComp {}
 
@@ -888,7 +862,7 @@ describe('createComponent', () => {
         }
       }
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Input() someInput = '';
         @Input() someOtherInput = '';
@@ -930,7 +904,7 @@ describe('createComponent', () => {
     it('should invoke ngOnChanges when binding to a root component input', () => {
       const changes: SimpleChange[] = [];
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp implements OnChanges {
         @Input() someInput = '';
 
@@ -973,7 +947,7 @@ describe('createComponent', () => {
     });
 
     it('should transform input bound to the root component', () => {
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Input({transform: (value: string) => parseInt(value)}) someInput = -1;
       }
@@ -1016,7 +990,7 @@ describe('createComponent', () => {
         }
       }
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Input() someInput = '';
       }
@@ -1058,7 +1032,7 @@ describe('createComponent', () => {
     it('should only invoke setters if the value has changed', () => {
       let setterCount = 0;
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Input()
         set someInput(_: string) {
@@ -1089,7 +1063,7 @@ describe('createComponent', () => {
     });
 
     it('should throw if target does not have an input with a specific name', () => {
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Input() someInput = '';
       }
@@ -1118,7 +1092,7 @@ describe('createComponent', () => {
     });
 
     it('should throw when using setInput on a component already using inputBindings', () => {
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Input() someInput = '';
       }
@@ -1141,6 +1115,7 @@ describe('createComponent', () => {
 
     it('should update view of component set with the onPush strategy after input change', () => {
       @Component({
+        changeDetection: ChangeDetectionStrategy.OnPush,
         template: 'Value: {{ value }}',
       })
       class DisplayOnPushComponent {
@@ -1164,39 +1139,11 @@ describe('createComponent', () => {
       componentRef.changeDetectorRef.detectChanges();
       expect(hostElement.textContent).toBe('Value: 20');
     });
-
-    it(`should support input bindings named 'formField'`, () => {
-      // Angular has specialized support for binding to form controls (e.g. `[formField]="field"`).
-      // This test ensures that dynamic input bindings can still target arbitrary inputs with the
-      // same name.
-
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
-      class RootComp {
-        @Input() formField = '';
-      }
-
-      const hostElement = document.createElement('div');
-      const environmentInjector = TestBed.inject(EnvironmentInjector);
-      const valueSignal = signal('hello');
-
-      const ref = createComponent(RootComp, {
-        hostElement,
-        environmentInjector,
-        bindings: [inputBinding('formField', valueSignal)],
-      });
-
-      ref.changeDetectorRef.detectChanges();
-      expect(ref.instance.formField).toBe('hello');
-
-      valueSignal.set('goodbye');
-      ref.changeDetectorRef.detectChanges();
-      expect(ref.instance.formField).toBe('goodbye');
-    });
   });
 
   describe('root component outputs', () => {
     it('should be able to bind to outputs of the root component', () => {
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Output() event = new EventEmitter<{value: number}>();
       }
@@ -1223,7 +1170,7 @@ describe('createComponent', () => {
     });
 
     it('should clean up root component output listeners', () => {
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Output() event = new EventEmitter<void>();
       }
@@ -1248,7 +1195,7 @@ describe('createComponent', () => {
     });
 
     it('should handle errors in root component listeners through the ErrorHandler', () => {
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Output() event = new EventEmitter<void>();
       }
@@ -1304,8 +1251,6 @@ describe('createComponent', () => {
             outputs: ['myEvent: event'],
           },
         ],
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class RootComp {
         @Output() event = new EventEmitter<string>();
@@ -1345,7 +1290,7 @@ describe('createComponent', () => {
     it('should not listen to directive outputs with the same name as outputs on the root component', () => {
       let dirInstance!: RootDir;
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Output() event = new EventEmitter<string>();
       }
@@ -1381,7 +1326,7 @@ describe('createComponent', () => {
     it('should not listen to root component outputs with the same name as outputs on one of the directives', () => {
       let dirInstance!: RootDir;
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Output() event = new EventEmitter<string>();
       }
@@ -1419,7 +1364,7 @@ describe('createComponent', () => {
     });
 
     it('should throw if root component does not have an output with the specified name', () => {
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {}
 
       const hostElement = document.createElement('div');
@@ -1435,7 +1380,7 @@ describe('createComponent', () => {
     });
 
     it('should not listen to native event when creating an output binding', () => {
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Output() click = new EventEmitter<void>();
       }
@@ -1456,7 +1401,7 @@ describe('createComponent', () => {
 
   describe('root component two-way bindings', () => {
     it('should be able to use a two-way binding on the root component', () => {
-      @Component({template: 'Value: {{value}}', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: 'Value: {{value}}'})
       class RootComp {
         @Input() value = '';
         @Output() valueChange = new EventEmitter<string>();
@@ -1499,7 +1444,7 @@ describe('createComponent', () => {
         }
       }
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Input() value = '';
         @Output() valueChange = new EventEmitter<string>();
@@ -1558,7 +1503,7 @@ describe('createComponent', () => {
         }
       }
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Input() value = '';
         @Output() valueChange = new EventEmitter<string>();
@@ -1626,8 +1571,6 @@ describe('createComponent', () => {
       @Component({
         template: '',
         hostDirectives: [{directive: RootHostDir, inputs: ['value'], outputs: ['valueChange']}],
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class RootComp {
         @Input() value = '';
@@ -1705,7 +1648,7 @@ describe('createComponent', () => {
       })
       class RootDir {}
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {}
 
       const value = signal('initial');
@@ -1759,8 +1702,6 @@ describe('createComponent', () => {
             outputs: ['valueAliasChange: myAliasChange'],
           },
         ],
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class RootComp {}
 
@@ -1812,7 +1753,7 @@ describe('createComponent', () => {
         }
       }
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Input() value = '';
         @Output() valueChange = new EventEmitter<string>();
@@ -1914,7 +1855,7 @@ describe('createComponent', () => {
         }
       }
 
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Input() value = '';
         @Output() valueChange = new EventEmitter<string>();
@@ -1981,7 +1922,7 @@ describe('createComponent', () => {
     });
 
     it('should throw if two-way binding target does not have an input with the specific name', () => {
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Output() valueChange = new EventEmitter<string>();
       }
@@ -2001,7 +1942,7 @@ describe('createComponent', () => {
     });
 
     it('should throw if two-way binding target does not have an output with the specific name', () => {
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Input() value = '';
       }
@@ -2020,7 +1961,7 @@ describe('createComponent', () => {
     });
 
     it('should throw when using setInput on a component already using twoWayBinding', () => {
-      @Component({template: '', changeDetection: ChangeDetectionStrategy.Eager})
+      @Component({template: ''})
       class RootComp {
         @Input() value = '';
         @Output() valueChange = new EventEmitter<string>();

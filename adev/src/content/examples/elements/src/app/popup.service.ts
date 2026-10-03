@@ -1,17 +1,13 @@
-import {
-  ApplicationRef,
-  createComponent,
-  EnvironmentInjector,
-  inject,
-  Injectable,
-} from '@angular/core';
+import {ApplicationRef, createComponent, EnvironmentInjector, Injectable} from '@angular/core';
 import {NgElement, WithProperties} from '@angular/elements';
-import {Popup} from './popup';
+import {PopupComponent} from './popup.component';
 
 @Injectable()
 export class PopupService {
-  private readonly injector = inject(EnvironmentInjector);
-  private readonly applicationRef = inject(ApplicationRef);
+  constructor(
+    private injector: EnvironmentInjector,
+    private applicationRef: ApplicationRef,
+  ) {}
 
   // Previous dynamic-loading method required you to set up infrastructure
   // before adding the popup to the DOM.
@@ -20,7 +16,7 @@ export class PopupService {
     const popup = document.createElement('popup-component');
 
     // Create the component and wire it up with the element
-    const popupComponentRef = createComponent(Popup, {
+    const popupComponentRef = createComponent(PopupComponent, {
       environmentInjector: this.injector,
       hostElement: popup,
     });
@@ -35,7 +31,7 @@ export class PopupService {
     });
 
     // Set the message
-    popupComponentRef.setInput('message', message);
+    popupComponentRef.instance.message = message;
 
     // Add to the DOM
     document.body.appendChild(popup);
@@ -44,7 +40,7 @@ export class PopupService {
   // This uses the new custom-element method to add the popup to the DOM.
   showAsElement(message: string) {
     // Create element
-    const popupEl: NgElement & WithProperties<Popup> = document.createElement(
+    const popupEl: NgElement & WithProperties<PopupComponent> = document.createElement(
       'popup-element',
     ) as any;
 
@@ -52,7 +48,8 @@ export class PopupService {
     popupEl.addEventListener('closed', () => document.body.removeChild(popupEl));
 
     // Set the message
-    popupEl.setAttribute('message', message);
+    popupEl.message = message;
+
     // Add to the DOM
     document.body.appendChild(popupEl);
   }

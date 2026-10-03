@@ -7,10 +7,10 @@
  */
 
 import {ɵgetDOM as getDOM} from '@angular/common';
-import {DOCUMENT, Injectable} from '@angular/core';
+import {Injectable} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {expect} from '@angular/private/testing/matchers';
 import {BrowserModule, Meta} from '../../index';
+import {expect} from '@angular/private/testing/matchers';
 
 describe('Meta service', () => {
   let doc: Document;
@@ -19,8 +19,7 @@ describe('Meta service', () => {
 
   beforeEach(() => {
     doc = getDOM().createHtmlDocument();
-    TestBed.configureTestingModule({providers: [{provide: DOCUMENT, useValue: doc}]});
-    metaService = TestBed.inject(Meta);
+    metaService = new Meta(doc);
     defaultMeta = getDOM().createElement('meta', doc) as HTMLMetaElement;
     defaultMeta.setAttribute('property', 'fb:app_id');
     defaultMeta.setAttribute('content', '123456789');
@@ -90,44 +89,6 @@ describe('Meta service', () => {
     expect(actual!.getAttribute('content')).toEqual('4321');
   });
 
-  it('should reject event handler attributes targeting a body meta tag', () => {
-    doc.body.appendChild(defaultMeta);
-
-    const evil = 'alert(1)';
-
-    expect(metaService.getTag('property="fb:app_id"')).toBe(defaultMeta);
-    expect(() =>
-      metaService.updateTag({
-        property: 'fb:app_id',
-        style: 'content-visibility:auto',
-        oncontentvisibilityautostatechange: evil,
-      }),
-    ).toThrowError(
-      /NG05203: The Meta service does not allow setting event handler attribute 'oncontentvisibilityautostatechange'/,
-    );
-
-    expect(defaultMeta.getAttribute('style')).toBeNull();
-    expect(defaultMeta.getAttribute('oncontentvisibilityautostatechange')).toBeNull();
-  });
-
-  it('should not allow a custom selector to match off target elements like the body tag', () => {
-    // This payload attempts to break out of the `meta[name="..."]` constraint entirely
-    // and inject a comma to target arbitrary DOM elements like the `body` tag via the
-    // `selector` argument of `updateTag`.
-    const attackerSelector = 'name="description"], body, meta[name="pwned"';
-
-    const firstMeta = metaService.updateTag({content: 'pwned'}, attackerSelector)!;
-
-    expect(firstMeta).not.toBeNull();
-    // It creates a new meta element instead of targeting `body` because it did not
-    // find a meta element matching the dirty selector since `body` is not a `meta` tag
-    expect(firstMeta!.nodeName.toLowerCase()).toEqual('meta');
-    expect(firstMeta!.getAttribute('content')).toEqual('pwned');
-    expect(doc.body.getAttribute('content')).toBeNull();
-
-    metaService.removeTagElement(firstMeta);
-  });
-
   it('should extract selector from the tag definition', () => {
     const selector = 'property="fb:app_id"';
     metaService.updateTag({property: 'fb:app_id', content: '666'});
@@ -164,42 +125,6 @@ describe('Meta service', () => {
     metaService.removeTagElement(actual);
   });
 
-  it('should reject event handler attributes without adding a tag', () => {
-    const selector = 'name="og:title"';
-    const evil = 'alert(1)';
-
-    expect(() =>
-      metaService.addTag({
-        name: 'og:title',
-        style: 'content-visibility:auto',
-        oncontentvisibilityautostatechange: evil,
-      }),
-    ).toThrowError(
-      /NG05203: The Meta service does not allow setting event handler attribute 'oncontentvisibilityautostatechange'/,
-    );
-
-    expect(metaService.getTag(selector)).toBeNull();
-  });
-
-  it('should reject event handler attributes in addTags without adding tags', () => {
-    const selector = 'name="og:title"';
-    const evil = 'alert(1)';
-
-    expect(() =>
-      metaService.addTags([
-        {
-          name: 'og:title',
-          style: 'content-visibility:auto',
-          oncontentvisibilityautostatechange: evil,
-        },
-      ]),
-    ).toThrowError(
-      /NG05203: The Meta service does not allow setting event handler attribute 'oncontentvisibilityautostatechange'/,
-    );
-
-    expect(metaService.getTag(selector)).toBeNull();
-  });
-
   it('should add httpEquiv meta tag as http-equiv', () => {
     metaService.addTag({httpEquiv: 'refresh', content: '3;url=http://test'});
 
@@ -210,59 +135,6 @@ describe('Meta service', () => {
 
     // clean up
     metaService.removeTagElement(actual);
-  });
-
-  it('should add attributes whose names match Object prototype keys', () => {
-    const meta = metaService.addTag({
-      name: 'prototype-keys',
-      constructor: 'constructor',
-      toString: 'toString',
-      ['__proto__']: '__proto__',
-    })!;
-
-    expect(meta.getAttribute('constructor')).toEqual('constructor');
-    expect(meta.getAttribute('toString')).toEqual('toString');
-    expect(meta.getAttribute('__proto__')).toEqual('__proto__');
-
-    // clean up
-    metaService.removeTagElement(meta);
-  });
-
-  it('should escape selector values when deriving the match selector', () => {
-    // This payload attempts to prematurely close the attribute selector
-    // and match another attribute.
-    const property = 'fb:app_id"][content="123456789';
-
-    const meta = metaService.updateTag({property, content: 'pwned'})!;
-
-    expect(meta).not.toBe(defaultMeta);
-    expect(meta.getAttribute('property')).toEqual(property);
-    expect(meta.getAttribute('content')).toEqual('pwned');
-    expect(metaService.getTags('property="fb:app_id"').length).toEqual(1);
-
-    // clean up
-    metaService.removeTagElement(meta);
-  });
-
-  it('should not let a quoted name break out of the meta selector and target body', () => {
-    // This payload attempts to break out of the `meta[name="..."]` constraint entirely
-    // and inject a comma to target arbitrary DOM elements like the `body` tag.
-    const attackerName = 'description"], body';
-
-    const firstMeta = metaService.addTag({name: attackerName, content: 'safe'})!;
-    const secondMeta = metaService.addTag({name: attackerName, content: 'safe'})!;
-
-    expect(firstMeta).toBe(secondMeta);
-    expect(firstMeta.tagName).toEqual('META');
-    expect(
-      Array.from(doc.getElementsByTagName('meta')).filter(
-        (meta) => meta.getAttribute('name') === attackerName,
-      ).length,
-    ).toEqual(1);
-    expect(doc.body).not.toBeNull();
-
-    // clean up
-    metaService.removeTagElement(firstMeta);
   });
 
   it('should add multiple new meta tags', () => {
@@ -326,22 +198,21 @@ describe('Meta service', () => {
     // clean up
     metaService.removeTagElement(meta);
   });
+});
 
-  describe('integration test', () => {
-    @Injectable()
-    class DependsOnMeta {
-      constructor(public meta: Meta) {}
-    }
+describe('integration test', () => {
+  @Injectable()
+  class DependsOnMeta {
+    constructor(public meta: Meta) {}
+  }
 
-    beforeEach(() => {
-      TestBed.resetTestingModule();
-      TestBed.configureTestingModule({
-        imports: [BrowserModule],
-        providers: [DependsOnMeta],
-      });
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [BrowserModule],
+      providers: [DependsOnMeta],
     });
-
-    it('should inject Meta service when using BrowserModule', () =>
-      expect(TestBed.inject(DependsOnMeta).meta).toBeInstanceOf(Meta));
   });
+
+  it('should inject Meta service when using BrowserModule', () =>
+    expect(TestBed.inject(DependsOnMeta).meta).toBeInstanceOf(Meta));
 });

@@ -1,35 +1,34 @@
+import {Component, signal, computed, ChangeDetectionStrategy} from '@angular/core';
+
 // TODO: Import effect from @angular/core
-import {Component, computed, signal} from '@angular/core';
 
 @Component({
   selector: 'app-root',
   template: `
     <div [class]="themeClass()">
       <h2>Theme Manager with Effects</h2>
-
+      
       <div class="controls">
         <button (click)="toggleTheme()">
-          Switch to
+          Switch to 
           @if (theme() === 'light') {
             Dark
           } @else {
             Light
-          }
-          Theme
+          } Theme
         </button>
-
+        
         @if (!isLoggedIn()) {
           <button (click)="login()">Login</button>
         } @else {
           <button (click)="logout()">Logout</button>
         }
       </div>
-
+      
       <div class="info">
         <p>Current theme: {{ theme() }}</p>
         <p>User: {{ username() }}</p>
-        <p>
-          Status:
+        <p>Status: 
           @if (isLoggedIn()) {
             Logged in
           } @else {
@@ -37,7 +36,7 @@ import {Component, computed, signal} from '@angular/core';
           }
         </p>
       </div>
-
+      
       <div class="demo">
         <p>Open the browser console to see the effects in action!</p>
         <p>Effects will automatically:</p>
@@ -50,6 +49,7 @@ import {Component, computed, signal} from '@angular/core';
     </div>
   `,
   styleUrl: './app.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class App {
   theme = signal<'light' | 'dark'>('light');

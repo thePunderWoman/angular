@@ -29,7 +29,7 @@ const NG_I18N_CLOSURE_MODE = 'ngI18nClosureMode';
 const TRANSLATION_VAR_PREFIX = 'i18n_';
 
 /** Prefix of ICU expressions for post processing */
-const I18N_ICU_MAPPING_PREFIX = 'I18N_EXP_';
+export const I18N_ICU_MAPPING_PREFIX = 'I18N_EXP_';
 
 /**
  * The escape sequence used for message param values.
@@ -40,18 +40,12 @@ const ESCAPE = '\uFFFD';
 const CLOSURE_TRANSLATION_VAR_PREFIX = 'MSG_';
 
 /**
- * Amount of messages per template after which we need to start pulling the i18n generation code
- * into a separate function in order to avoid hitting TypeScript's control flow analysis limit.
- */
-const MESSAGE_EXTRACTION_LIMIT = 250;
-
-/**
  * Generates a prefix for translation const name.
  *
  * @param extra Additional local prefix that should be injected into translation var name
  * @returns Complete translation const prefix
  */
-function getTranslationConstPrefix(extra: string): string {
+export function getTranslationConstPrefix(extra: string): string {
   return `${CLOSURE_TRANSLATION_VAR_PREFIX}${extra}`.toUpperCase();
 }
 
@@ -59,7 +53,7 @@ function getTranslationConstPrefix(extra: string): string {
  * Generate AST to declare a variable. E.g. `var I18N_1;`.
  * @param variable the name of the variable to declare.
  */
-function declareI18nVariable(variable: o.ReadVarExpr): o.Statement {
+export function declareI18nVariable(variable: o.ReadVarExpr): o.Statement {
   return new o.DeclareVarStmt(
     variable.name!,
     undefined,
@@ -105,10 +99,6 @@ export function collectI18nConsts(job: ComponentCompilationJob): void {
         expressions.push(op);
         i18nExpressionsByElement.set(op.target, expressions);
       } else if (op.kind === ir.OpKind.I18nMessage) {
-        if (op.requiresExtraction === null) {
-          op.requiresExtraction = messages.size >= MESSAGE_EXTRACTION_LIMIT;
-        }
-
         messages.set(op.xref, op);
       }
     }
@@ -132,25 +122,25 @@ export function collectI18nConsts(job: ComponentCompilationJob): void {
     for (const op of unit.create) {
       if (op.kind === ir.OpKind.I18nMessage) {
         if (op.messagePlaceholder === null) {
-          const {value, statements} = collectMessage(job, fileBasedI18nSuffix, messages, op);
+          const {mainVar, statements} = collectMessage(job, fileBasedI18nSuffix, messages, op);
           if (op.i18nBlock !== null) {
             // This is a regular i18n message with a corresponding i18n block. Collect it into the
             // const array.
-            const i18nConst = job.addConst(value, statements);
+            const i18nConst = job.addConst(mainVar, statements);
             messageConstIndices.set(op.i18nBlock, i18nConst);
           } else {
             // This is an i18n attribute. Extract the initializers into the const pool.
             job.constsInitializers.push(...statements);
 
             // Save the i18n variable value for later.
-            i18nValuesByContext.set(op.i18nContext, value);
+            i18nValuesByContext.set(op.i18nContext, mainVar);
 
             // This i18n message may correspond to an individual extracted attribute. If so, The
             // value of that attribute is updated to read the extracted i18n variable.
             const attributesForMessage = extractedAttributesByI18nContext.get(op.i18nContext);
             if (attributesForMessage !== undefined) {
               for (const attr of attributesForMessage) {
-                attr.expression = value.clone();
+                attr.expression = mainVar.clone();
               }
             }
           }
@@ -231,17 +221,16 @@ function collectMessage(
   fileBasedI18nSuffix: string,
   messages: Map<ir.XrefId, ir.I18nMessageOp>,
   messageOp: ir.I18nMessageOp,
-): {value: o.Expression; statements: o.Statement[]} {
+): {mainVar: o.ReadVarExpr; statements: o.Statement[]} {
   // Recursively collect any sub-messages, record each sub-message's main variable under its
   // placeholder so that we can add them to the params for the parent message. It is possible
   // that multiple sub-messages will share the same placeholder, so we need to track an array of
   // variables for each placeholder.
   const statements: o.Statement[] = [];
   const subMessagePlaceholders = new Map<string, o.Expression[]>();
-
   for (const subMessageId of messageOp.subMessages) {
     const subMessage = messages.get(subMessageId)!;
-    const {value: subMessageValue, statements: subMessageStatements} = collectMessage(
+    const {mainVar: subMessageVar, statements: subMessageStatements} = collectMessage(
       job,
       fileBasedI18nSuffix,
       messages,
@@ -249,7 +238,7 @@ function collectMessage(
     );
     statements.push(...subMessageStatements);
     const subMessages = subMessagePlaceholders.get(subMessage.messagePlaceholder!) ?? [];
-    subMessages.push(subMessageValue);
+    subMessages.push(subMessageVar);
     subMessagePlaceholders.set(subMessage.messagePlaceholder!, subMessages);
   }
   addSubMessageParams(messageOp, subMessagePlaceholders);
@@ -257,6 +246,7 @@ function collectMessage(
   // Sort the params for consistency with TemaplateDefinitionBuilder output.
   messageOp.params = new Map([...messageOp.params.entries()].sort());
 
+  const mainVar = o.variable(job.pool.uniqueName(TRANSLATION_VAR_PREFIX));
   // Closure Compiler requires const names to start with `MSG_` but disallows any other
   // const to start with `MSG_`. We define a variable starting with `MSG_` just for the
   // `goog.getMsg` call
@@ -287,52 +277,18 @@ function collectMessage(
       o.importExpr(Identifiers.i18nPostprocess).callFn([expr, ...extraTransformFnParams]);
   }
 
-  if (messageOp.requiresExtraction === null) {
-    throw new Error('AssertionError: requiresExtraction of a message operation was not computed');
-  }
-
-  let value: o.Expression;
-
-  // If the message needs to be extracted, we wrap it in a function and add a return expression.
-  // We can use a generic name like `msg` for the main variable, because we don't need to worry
-  // about name collisions in the new function.
-  if (messageOp.requiresExtraction) {
-    const fnName = job.pool.uniqueName(TRANSLATION_VAR_PREFIX);
-    const returnVar = o.variable('msg');
-    const translationStatements = getTranslationDeclStmts(
+  // Add the message's statements
+  statements.push(
+    ...getTranslationDeclStmts(
       messageOp.message,
-      returnVar,
+      mainVar,
       closureVar,
       messageOp.params,
       transformFn,
-    );
+    ),
+  );
 
-    translationStatements.push(new o.ReturnStatement(returnVar));
-
-    // Note: add the function ourselves, instead of going through `getSharedFunctionReference`
-    // to avoid comparing the functions since all i18n functions are unique.
-    job.pool.statements.push(
-      new o.FunctionExpr([], translationStatements, o.DYNAMIC_TYPE).toDeclStmt(
-        fnName,
-        o.StmtModifier.Final,
-      ),
-    );
-    value = o.variable(fnName).callFn([]);
-  } else {
-    const mainVar = o.variable(job.pool.uniqueName(TRANSLATION_VAR_PREFIX), o.DYNAMIC_TYPE);
-    value = mainVar;
-    statements.push(
-      ...getTranslationDeclStmts(
-        messageOp.message,
-        mainVar,
-        closureVar,
-        messageOp.params,
-        transformFn,
-      ),
-    );
-  }
-
-  return {value, statements};
+  return {mainVar, statements};
 }
 
 /**

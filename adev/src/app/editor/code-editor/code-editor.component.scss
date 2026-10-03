@@ -159,7 +159,7 @@
 .docs-delete-file,
 .docs-rename-file {
   docs-icon {
-    color: var(--quaternary-contrast);
+    color: var(--gray-400);
     transition: color 0.3s ease;
     font-size: 1.2rem;
   }
@@ -170,17 +170,11 @@
   }
 }
 
-.adev-add-file {
-  display: flex;
-  align-items: center;
-}
-
 .docs-delete-file,
 .docs-rename-file {
   padding-inline-start: 0.1rem;
   padding-inline-end: 0;
   margin-block-start: 0.2rem;
-  margin-inline-start: 0.2rem;
   docs-icon {
     font-size: 1rem;
   }
@@ -195,7 +189,7 @@
   background: transparent;
   outline: none;
   transition: color 0.3s ease;
-  &:focus-visible {
+  &:focus {
     background: transparent;
     border-block-end: 1px solid var(--primary-contrast);
   }
@@ -270,7 +264,7 @@
   border-inline-start: 1px solid var(--senary-contrast);
 
   docs-icon {
-    color: var(--quaternary-contrast);
+    color: var(--gray-400);
     transition: color 0.3s ease;
     font-size: 1.3rem;
   }

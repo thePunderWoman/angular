@@ -6,12 +6,13 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {Component, computed, input} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, input} from '@angular/core';
 import {ApiItemType} from '../interfaces/api-item-type';
 import {shortLabelsMap} from '../pipes/api-label.pipe';
 
 @Component({
   selector: 'docs-api-item-label',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[class]': `clazz()`,
   },

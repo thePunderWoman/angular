@@ -27,15 +27,13 @@ export interface CreateComputedOptions<T> {
 
 /**
  * Create a computed `Signal` which derives a reactive value from an expression.
- * @see [Computed signals](guide/signals#computed-signals)
  */
 export function computed<T>(computation: () => T, options?: CreateComputedOptions<T>): Signal<T> {
   const getter = createComputed(computation, options?.equal);
 
-  if (typeof ngDevMode !== 'undefined' && ngDevMode) {
-    const debugName = options?.debugName;
-    getter[SIGNAL].debugName = debugName;
-    getter.toString = () => `[Computed${debugName ? ' (' + debugName + ')' : ''}: ${getter()}]`;
+  if (ngDevMode) {
+    getter.toString = () => `[Computed: ${getter()}]`;
+    getter[SIGNAL].debugName = options?.debugName;
   }
 
   return getter;

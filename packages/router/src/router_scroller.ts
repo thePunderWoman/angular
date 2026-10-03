@@ -7,16 +7,7 @@
  */
 
 import {ViewportScroller} from '@angular/common';
-import {
-  ApplicationRef,
-  inject,
-  Injectable,
-  InjectionToken,
-  NgZone,
-  OnDestroy,
-  untracked,
-  ɵIS_HYDRATION_DOM_REUSE_ENABLED as IS_HYDRATION_DOM_REUSE_ENABLED,
-} from '@angular/core';
+import {Injectable, InjectionToken, NgZone, OnDestroy} from '@angular/core';
 import {Unsubscribable} from 'rxjs';
 
 import {
@@ -31,9 +22,7 @@ import {
 import {NavigationTransitions} from './navigation_transition';
 import {UrlSerializer} from './url_tree';
 
-export const ROUTER_SCROLLER = new InjectionToken<RouterScroller>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'Router Scroller' : '',
-);
+export const ROUTER_SCROLLER = new InjectionToken<RouterScroller>('');
 
 @Injectable()
 export class RouterScroller implements OnDestroy {
@@ -45,30 +34,20 @@ export class RouterScroller implements OnDestroy {
   private restoredId = 0;
   private store: {[key: string]: [number, number]} = {};
 
-  private isHydrating = inject(IS_HYDRATION_DOM_REUSE_ENABLED, {optional: true}) ?? false;
-
-  private readonly urlSerializer = inject(UrlSerializer);
-  private readonly zone = inject(NgZone);
-  readonly viewportScroller = inject(ViewportScroller);
-  private readonly transitions = inject(NavigationTransitions);
-
   /** @docs-private */
   constructor(
+    readonly urlSerializer: UrlSerializer,
+    private transitions: NavigationTransitions,
+    public readonly viewportScroller: ViewportScroller,
+    private readonly zone: NgZone,
     private options: {
       scrollPositionRestoration?: 'disabled' | 'enabled' | 'top';
       anchorScrolling?: 'disabled' | 'enabled';
-    },
+    } = {},
   ) {
     // Default both options to 'disabled'
-    this.options.scrollPositionRestoration ||= 'disabled';
-    this.options.anchorScrolling ||= 'disabled';
-    if (this.isHydrating) {
-      inject(ApplicationRef)
-        .whenStable()
-        .then(() => {
-          this.isHydrating = false;
-        });
-    }
+    options.scrollPositionRestoration ||= 'disabled';
+    options.anchorScrolling ||= 'disabled';
   }
 
   init(): void {
@@ -105,14 +84,13 @@ export class RouterScroller implements OnDestroy {
 
   private consumeScrollEvents() {
     return this.transitions.events.subscribe((e) => {
-      if (!(e instanceof Scroll) || e.scrollBehavior === 'manual') return;
-      const instantScroll: ScrollOptions = {behavior: 'instant'};
+      if (!(e instanceof Scroll)) return;
       // a popstate event. The pop state event will always ignore anchor scrolling.
       if (e.position) {
         if (this.options.scrollPositionRestoration === 'top') {
-          this.viewportScroller.scrollToPosition([0, 0], instantScroll);
+          this.viewportScroller.scrollToPosition([0, 0]);
         } else if (this.options.scrollPositionRestoration === 'enabled') {
-          this.viewportScroller.scrollToPosition(e.position, instantScroll);
+          this.viewportScroller.scrollToPosition(e.position);
         }
         // imperative navigation "forward"
       } else {
@@ -129,8 +107,6 @@ export class RouterScroller implements OnDestroy {
     routerEvent: NavigationEnd | NavigationSkipped,
     anchor: string | null,
   ): void {
-    if (this.isHydrating) return;
-    const scroll = untracked(this.transitions.currentNavigation)?.extras.scroll;
     this.zone.runOutsideAngular(async () => {
       // The scroll event needs to be delayed until after change detection. Otherwise, we may
       // attempt to restore the scroll position before the router outlet has fully rendered the
@@ -152,7 +128,6 @@ export class RouterScroller implements OnDestroy {
             routerEvent,
             this.lastSource === 'popstate' ? this.store[this.restoredId] : null,
             anchor,
-            scroll,
           ),
         );
       });

@@ -63,8 +63,6 @@ import {PendingTasksInternal} from './pending_tasks_internal';
  * <zippy (open)="onOpen($event)" (close)="onClose($event)"></zippy>
  * ```
  *
- * @see [Declaring outputs with the @Output decorator](guide/components/outputs#declaring-outputs-with-the-output-decorator)
- *
  * @publicApi
  */
 export interface EventEmitter<T> extends Subject<T>, OutputRef<T> {

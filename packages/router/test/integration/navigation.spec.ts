@@ -6,59 +6,42 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {Location, PlatformNavigation} from '@angular/common';
-import {ApplicationRef, Component, inject, NgModule} from '@angular/core';
+import {Component, inject, NgModule} from '@angular/core';
+import {Location} from '@angular/common';
 import {TestBed} from '@angular/core/testing';
-import {RouterTestingHarness} from '@angular/router/testing';
-import {timeout} from '@angular/private/testing';
-import {BehaviorSubject, filter, firstValueFrom} from 'rxjs';
 import {
-  ActivatedRoute,
-  ActivationStart,
   Event,
-  GuardsCheckStart,
-  Navigation,
-  NavigationCancel,
-  NavigationCancellationCode,
-  NavigationEnd,
-  NavigationError,
-  NavigationStart,
-  Params,
   provideRouter,
-  RedirectCommand,
-  ResolveStart,
-  Router,
-  RouterLink,
-  RouterModule,
-  Routes,
+  Navigation,
   withRouterConfig,
+  Router,
+  NavigationStart,
+  NavigationEnd,
+  RouterLink,
+  ActivatedRoute,
+  Params,
+  RouterModule,
+  NavigationCancel,
+  Routes,
+  NavigationError,
+  RedirectCommand,
+  NavigationCancellationCode,
+  ActivationStart,
 } from '../../src';
 import {
-  advance,
-  createRoot,
-  expectEvents,
-  onlyNavigationStartAndEnd,
-  RelativeLinkCmp,
   RootCmp,
   SimpleCmp,
+  onlyNavigationStartAndEnd,
+  expectEvents,
+  RelativeLinkCmp,
+  createRoot,
+  advance,
 } from './integration_helpers';
+import {BehaviorSubject, filter, firstValueFrom} from 'rxjs';
+import {RouterTestingHarness} from '@angular/router/testing';
+import {timeout} from '../helpers';
 
-export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigation') {
-  function setup(routes?: Routes): Router {
-    TestBed.configureTestingModule({
-      providers: [
-        provideRouter(
-          routes ?? [
-            {
-              path: '**',
-              component: class {},
-            },
-          ],
-        ),
-      ],
-    });
-    return TestBed.inject(Router);
-  }
+export function navigationIntegrationTestSuite() {
   describe('navigation', () => {
     it('should navigate to the current URL', async () => {
       TestBed.configureTestingModule({
@@ -87,7 +70,7 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
       ]);
     });
 
-    it('should override default onSameUrlNavigation with extras (ignore => reload)', async () => {
+    it('should override default onSameUrlNavigation with extras', async () => {
       TestBed.configureTestingModule({
         providers: [provideRouter([], withRouterConfig({onSameUrlNavigation: 'ignore'}))],
       });
@@ -117,7 +100,7 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
       ]);
     });
 
-    it('should override default onSameUrlNavigation with extras (reload => ignore)', async () => {
+    it('should override default onSameUrlNavigation with extras', async () => {
       TestBed.configureTestingModule({
         providers: [provideRouter([], withRouterConfig({onSameUrlNavigation: 'reload'}))],
       });
@@ -153,7 +136,7 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
           component: SimpleCmp,
           canActivate: [
             () => {
-              observedInfo = inject(Router).currentNavigation()?.extras?.info;
+              observedInfo = inject(Router).getCurrentNavigation()?.extras?.info;
               return true;
             },
           ],
@@ -173,7 +156,7 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
           component: SimpleCmp,
           canActivate: [
             () => {
-              observedInfo = inject(Router).currentNavigation()?.extras?.info;
+              observedInfo = inject(Router).getCurrentNavigation()?.extras?.info;
               return true;
             },
           ],
@@ -210,7 +193,7 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
           component: SimpleCmp,
           canActivate: [
             () => {
-              observedInfo = inject(Router).currentNavigation()?.extras?.info;
+              observedInfo = inject(Router).getCurrentNavigation()?.extras?.info;
               return true;
             },
           ],
@@ -274,7 +257,7 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
       let navigation: Navigation = null!;
       router.events.subscribe((e) => {
         if (e instanceof NavigationStart) {
-          navigation = router.currentNavigation()!;
+          navigation = router.getCurrentNavigation()!;
         }
       });
 
@@ -300,7 +283,7 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
       let navigation: Navigation = null!;
       router.events.subscribe((e) => {
         if (e instanceof NavigationStart) {
-          navigation = <Navigation>router.currentNavigation()!;
+          navigation = <Navigation>router.getCurrentNavigation()!;
         }
       });
 
@@ -316,9 +299,8 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
       expect(navigation.extras.state).toEqual(state);
 
       // Manually set state rather than using navigate()
-      state = {foo: 'replaced'};
+      state = {bar: 'foo'};
       location.replaceState(location.path(), '', state);
-      await timeout();
       location.back();
       await timeout();
       location.forward();
@@ -381,7 +363,7 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
       let navigation: Navigation = null!;
       router.events.subscribe((e) => {
         if (e instanceof NavigationStart) {
-          navigation = <Navigation>router.currentNavigation()!;
+          navigation = <Navigation>router.getCurrentNavigation()!;
         }
       });
 
@@ -393,13 +375,7 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
 
       // Angular does not support restoring state to the primitive.
       expect(navigation.extras.state).toEqual(undefined);
-      // On a traversal, we really can't add state when using the navigation API.
-      // A traversal is a strict restoration of a previous state. To add our own state to the entry,
-      // we would need to perform a replaceState under the hood, and that would cancel/reject
-      // the traversal NavigateEvent and break scroll and focus restoration.
-      if (browserAPI === 'history') {
-        expect((location.getState() as any).navigationId).toBeDefined();
-      }
+      expect(location.getState()).toEqual({navigationId: 3});
     });
 
     it('should not pollute browser history when replaceUrl is set to true', async () => {
@@ -418,11 +394,7 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
       router.navigateByUrl('/b', {replaceUrl: true});
       await timeout();
 
-      if (browserAPI === 'history') {
-        expect(replaceSpy.calls.count()).toEqual(1);
-      } else {
-        expect(TestBed.inject(PlatformNavigation).entries().length).toBe(1);
-      }
+      expect(replaceSpy.calls.count()).toEqual(1);
     });
 
     it('should skip navigation if another navigation is already scheduled', async () => {
@@ -474,143 +446,6 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
        */
       expect(router.url).toEqual('/b?b=true');
     });
-
-    it('cancels navigation immediately if navigation happens during activation', async () => {
-      @Component({template: ''})
-      class NavigatingComponent {
-        constructor() {
-          inject(Router).navigateByUrl('/b');
-        }
-      }
-      const router = setup([
-        {path: 'a', component: NavigatingComponent},
-        {path: 'b', component: SimpleCmp},
-      ]);
-      const events: Event[] = [];
-      router.events.subscribe((e: Event) => {
-        events.push(e);
-      });
-
-      await RouterTestingHarness.create('/a');
-      await TestBed.inject(ApplicationRef).whenStable();
-
-      expect(router.url).toEqual('/b');
-      const navigationCancel = events.find(
-        (e) => e instanceof NavigationCancel,
-      ) as NavigationCancel;
-      expect(navigationCancel).toBeDefined();
-      expect(navigationCancel.url).toEqual('/a');
-      expect(navigationCancel.code).toEqual(NavigationCancellationCode.SupersededByNewNavigation);
-    });
-
-    it('cancels navigation immediately if navigation happens during guard execution', async () => {
-      const router = setup([
-        {
-          path: 'a',
-          component: SimpleCmp,
-          canActivate: [
-            () => {
-              inject(Router).navigateByUrl('/b');
-              return true;
-            },
-          ],
-        },
-        {path: 'b', component: SimpleCmp},
-      ]);
-      const events: Event[] = [];
-      router.events.subscribe((e: Event) => {
-        events.push(e);
-      });
-
-      await RouterTestingHarness.create('/a');
-      await TestBed.inject(ApplicationRef).whenStable();
-
-      expect(router.url).toEqual('/b');
-      const navigationCancel = events.find(
-        (e) => e instanceof NavigationCancel,
-      ) as NavigationCancel;
-      expect(navigationCancel).toBeDefined();
-      // bizarrely, the ActivationStart fires during guard execution and before GuardsCheckEnd...
-      expect(events[events.indexOf(navigationCancel) - 1]).toBeInstanceOf(ActivationStart);
-      expect(navigationCancel.url).toEqual('/a');
-      expect(navigationCancel.code).toEqual(NavigationCancellationCode.SupersededByNewNavigation);
-    });
-
-    it('cancels navigation immediately if navigation happens during guard event', async () => {
-      // Note, this isn't exactly a spec of how it _should_ work, but a spec of how it _does_ work today
-      // so we don't unintentionally break it.
-      const guardSpy = jasmine.createSpy('guard spy');
-      guardSpy.and.returnValue(true);
-      const router = setup([
-        {
-          path: 'a',
-          component: SimpleCmp,
-          canActivate: [guardSpy],
-        },
-        {path: 'b', component: SimpleCmp},
-      ]);
-      const events: Event[] = [];
-      router.events.subscribe((e: Event) => {
-        events.push(e);
-        if (
-          e instanceof GuardsCheckStart &&
-          router.currentNavigation()?.initialUrl.toString() === '/a'
-        ) {
-          router.navigateByUrl('/b');
-        }
-      });
-
-      await RouterTestingHarness.create('/a');
-      await TestBed.inject(ApplicationRef).whenStable();
-
-      expect(router.url).toEqual('/b');
-      const navigationCancel = events.find(
-        (e) => e instanceof NavigationCancel,
-      ) as NavigationCancel;
-      expect(navigationCancel).toBeDefined();
-      expect(events[events.indexOf(navigationCancel) - 1]).toBeInstanceOf(GuardsCheckStart);
-      expect(guardSpy).not.toHaveBeenCalled();
-      expect(navigationCancel.url).toEqual('/a');
-      expect(navigationCancel.code).toEqual(NavigationCancellationCode.SupersededByNewNavigation);
-    });
-
-    it('cancels navigation immediately if navigation happens during ResolveStart event', async () => {
-      // Note, this isn't exactly a spec of how it _should_ work, but a spec of how it _does_ work today
-      // so we don't unintentionally break it.
-      const resolveSpy = jasmine.createSpy('resolve spy');
-      resolveSpy.and.returnValue(true);
-      const router = setup([
-        {
-          path: 'a',
-          component: SimpleCmp,
-          resolve: {d: resolveSpy},
-        },
-        {path: 'b', component: SimpleCmp},
-      ]);
-      const events: Event[] = [];
-      router.events.subscribe((e: Event) => {
-        events.push(e);
-        if (
-          e instanceof ResolveStart &&
-          router.currentNavigation()?.initialUrl.toString() === '/a'
-        ) {
-          router.navigateByUrl('/b');
-        }
-      });
-
-      await RouterTestingHarness.create('/a');
-      await TestBed.inject(ApplicationRef).whenStable();
-
-      expect(router.url).toEqual('/b');
-      const navigationCancel = events.find(
-        (e) => e instanceof NavigationCancel,
-      ) as NavigationCancel;
-      expect(navigationCancel).toBeDefined();
-      expect(events[events.indexOf(navigationCancel) - 1]).toBeInstanceOf(ResolveStart);
-      expect(resolveSpy).not.toHaveBeenCalled();
-      expect(navigationCancel.url).toEqual('/a');
-      expect(navigationCancel.code).toEqual(NavigationCancellationCode.SupersededByNewNavigation);
-    });
   });
 
   describe('should execute navigations serially', () => {
@@ -635,10 +470,10 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
 
       @Component({
         template: `
-          <router-outlet (deactivate)="logDeactivate('primary')"></router-outlet>
-          <router-outlet name="first" (deactivate)="logDeactivate('first')"></router-outlet>
-          <router-outlet name="second" (deactivate)="logDeactivate('second')"></router-outlet>
-        `,
+         <router-outlet (deactivate)="logDeactivate('primary')"></router-outlet>
+         <router-outlet name="first" (deactivate)="logDeactivate('first')"></router-outlet>
+         <router-outlet name="second" (deactivate)="logDeactivate('second')"></router-outlet>
+         `,
         standalone: false,
       })
       class NamedOutletHost {
@@ -877,13 +712,30 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
   });
 
   describe('abort an ongoing navigation', () => {
+    let router: Router;
+    function setup(routes?: Routes) {
+      TestBed.configureTestingModule({
+        providers: [
+          provideRouter(
+            routes ?? [
+              {
+                path: '**',
+                component: class {},
+              },
+            ],
+          ),
+        ],
+      });
+      router = TestBed.inject(Router);
+    }
+
     it('resolves the promise, clears current navigation, and send NavigationCancel', async () => {
-      const router = setup();
+      setup();
       const replay = new BehaviorSubject<Event | null>(null);
       router.events.subscribe(replay);
 
       const navigationPromise = router.navigateByUrl('a');
-      router.currentNavigation()!.abort();
+      router.getCurrentNavigation()!.abort();
 
       expect(router.getCurrentNavigation()).toBe(null);
       expect(router.currentNavigation()).toBe(null);
@@ -895,15 +747,15 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
       @Component({template: ''})
       class Aborting {
         constructor() {
-          inject(Router).currentNavigation()!.abort();
+          inject(Router).getCurrentNavigation()!.abort();
         }
       }
-      const router = setup([{path: '**', component: Aborting}]);
+      setup([{path: '**', component: Aborting}]);
       const events = [] as Event[];
       router.events.subscribe({next: (e) => void events.push(e)});
 
       const navigationPromise = (await RouterTestingHarness.create()).navigateByUrl('/abc');
-      const navigation = router.currentNavigation()!;
+      const navigation = router.getCurrentNavigation()!;
       await navigationPromise;
 
       expect(events.at(-1)).toBeInstanceOf(NavigationEnd);
@@ -921,12 +773,12 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
     });
 
     it('does not result in errors if the navigation enters navigation already canceled from guards', async () => {
-      const router = setup([{path: '**', component: class {}, canActivate: [() => false]}]);
+      setup([{path: '**', component: class {}, canActivate: [() => false]}]);
       const events = [] as Event[];
       router.events.subscribe({next: (e) => void events.push(e)});
 
       const navigationPromise = router.navigateByUrl('/abc')!;
-      const navigation = router.currentNavigation()!;
+      const navigation = router.getCurrentNavigation()!;
       await navigationPromise;
 
       expect(events.at(-1)).toBeInstanceOf(NavigationCancel);
@@ -941,13 +793,13 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
     });
 
     it('does not result in double cancellation if activate guard aborts and returns', async () => {
-      const router = setup([
+      setup([
         {
           path: '**',
           component: class {},
           canActivate: [
             () => {
-              inject(Router).currentNavigation()!.abort();
+              inject(Router).getCurrentNavigation()!.abort();
               return false;
             },
           ],
@@ -963,13 +815,13 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
     });
 
     it('does not result in double cancellation if match guard aborts and returns', async () => {
-      const router = setup([
+      setup([
         {
           path: '**',
           component: class {},
           canMatch: [
             () => {
-              inject(Router).currentNavigation()!.abort();
+              inject(Router).getCurrentNavigation()!.abort();
               return false;
             },
           ],
@@ -986,7 +838,7 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
     });
 
     it('does not result in cancelation if the navigation was already redirected', async () => {
-      const router = setup([
+      setup([
         {
           path: 'initial',
           component: class {},
@@ -1001,7 +853,7 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
       router.events.subscribe({next: (e) => void events.push(e)});
 
       const navigationPromise = router.navigateByUrl('/initial')!;
-      const navigation = router.currentNavigation()!;
+      const navigation = router.getCurrentNavigation()!;
       // wait for NavigationStart from the redirecting navigation
       await firstValueFrom(router.events.pipe(filter((e) => e instanceof NavigationStart)));
       // abort the original navigation
@@ -1019,7 +871,7 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
     it('can abort in while guards are executing and prevents later guards and resolvers from running', async () => {
       let canActivateCalled = false;
       let resolveCalled = false;
-      const router = setup([
+      setup([
         {
           path: '**',
           canMatch: [() => new Promise<boolean>(() => {})],
@@ -1041,8 +893,8 @@ export function navigationIntegrationTestSuite(browserAPI: 'history' | 'navigati
 
       const navigationPromise = router.navigateByUrl('/abc123');
       // wait one macrotask to ensure we're in the canMatch guard
-      await timeout();
-      router.currentNavigation()?.abort();
+      await new Promise((resolve) => setTimeout(resolve));
+      router.getCurrentNavigation()?.abort();
 
       expect(events.at(-1)).toBeInstanceOf(NavigationCancel);
       await expectAsync(navigationPromise).toBeResolvedTo(false);

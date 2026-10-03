@@ -14,7 +14,6 @@ import {
   OnInit,
   output,
   input,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 
 import {Todo} from './todo';
@@ -33,8 +32,9 @@ const fib = (n: number): number => {
 
 @Component({
   selector: 'base-case',
-  template: ` <h2>Base Case</h2> `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  template: `
+    <h2>Base Case</h2>
+  `,
 })
 export class BaseCaseComponent {
   // This component serves as a base case for the recursive component.
@@ -46,10 +46,10 @@ export class BaseCaseComponent {
   template: `
     <div class="recursive-component">
       @if (level() === 0) {
-        <base-case />
+        <base-case/>
       } @else {
         <h3>Level {{ level() }}</h3>
-        <recursive-component [level]="level() - 1" />
+        <recursive-component [level]="level() - 1"/>
       }
     </div>
   `,
@@ -57,12 +57,6 @@ export class BaseCaseComponent {
 export class RecursiveComponent {
   level = input(5);
 }
-
-@Component({
-  selector: '[appSvgDemo]',
-  template: '<ng-content />',
-})
-export class SvgDemoComponent {}
 
 @Component({
   templateUrl: 'todos.component.html',
@@ -74,7 +68,6 @@ export class SvgDemoComponent {}
     SamplePipe,
     TodosFilter,
     RecursiveComponent,
-    SvgDemoComponent,
   ],
 })
 export class TodosComponent implements OnInit, OnDestroy {

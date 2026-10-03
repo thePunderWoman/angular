@@ -51,7 +51,6 @@ def ng_package(readme_md = None, license_banner = None, license = None, deps = [
     })
 
     rollup_runtime_deps = [
-        "//:node_modules/@babel/core",
         "//:node_modules/@rollup/plugin-commonjs",
         "//:node_modules/@rollup/plugin-node-resolve",
         "//:node_modules/magic-string",

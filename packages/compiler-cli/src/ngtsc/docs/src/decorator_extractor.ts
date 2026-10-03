@@ -17,7 +17,7 @@ import {
   PropertyEntry,
 } from './entities';
 import {extractJsDocDescription, extractJsDocTags, extractRawJsDoc} from './jsdoc_extractor';
-import {extractInterface} from './interface_extractor';
+import {extractInterface} from './class_extractor';
 
 /** Extracts an API documentation entry for an Angular decorator. */
 export function extractorDecorator(
@@ -168,7 +168,7 @@ function extractParams(
 }
 
 /**
- * Find the interface usually suffixed with "Decorator" that describes the decorator.
+ * Find the the interface usually suffixed with "Decorator" that describes the decorator.
  */
 function getDecoratorInterface(declaration: ts.VariableDeclaration, typeChecker: ts.TypeChecker) {
   const name = declaration.name.getText();
@@ -202,18 +202,13 @@ function getDecoratorJsDocNode(
   const decoratorInterface = getDecoratorInterface(declaration, typeChecker);
 
   // The public-facing JsDoc for each decorator is on one of its interface's call signatures.
-  const callSignaturesWithJsDoc = decoratorInterface.members.filter(
-    (node): node is ts.CallSignatureDeclaration => {
+  const callSignature = decoratorInterface.members
+    .filter((node) => {
       // The description block lives on one of the call signatures for this interface.
-      return ts.isCallSignatureDeclaration(node) && !!extractRawJsDoc(node);
-    },
-  );
+      return ts.isCallSignatureDeclaration(node) && extractRawJsDoc(node);
+    })
+    .at(-1); // Get the last one, as it is the most complete
 
-  // There may be multiple call signatures, so we need to find the one with the
-  // longest JSDoc block. This is the one that is intended for public consumption.
-  const callSignature = callSignaturesWithJsDoc.sort(
-    (a, b) => (extractRawJsDoc(b)?.length ?? 0) - (extractRawJsDoc(a)?.length ?? 0),
-  )[0];
   if (!callSignature || !ts.isCallSignatureDeclaration(callSignature)) {
     throw new Error(`No call signature with JsDoc on "${name}Decorator"`);
   }

@@ -15,7 +15,6 @@ import {
   FunctionEntry,
   FunctionSignatureMetadata,
   InitializerApiFunctionEntry,
-  InterfaceEntry,
   JsDocTagEntry,
   MemberEntry,
   ParameterEntry,
@@ -56,11 +55,7 @@ export type ConstantEntryRenderable = ConstantEntry &
   };
 
 /** Documentation entity for a type alias augmented transformed content for rendering. */
-export type TypeAliasEntryRenderable = TypeAliasEntry &
-  DocEntryRenderable &
-  HasRenderableToc & {
-    members: MemberEntryRenderable[];
-  };
+export type TypeAliasEntryRenderable = TypeAliasEntry & DocEntryRenderable & HasRenderableToc;
 
 /** Documentation entity for a TypeScript class augmented transformed content for rendering. */
 export type ClassEntryRenderable = ClassEntry &
@@ -75,11 +70,7 @@ export type PipeEntryRenderable = PipeEntry &
     members: MemberEntryRenderable[];
   };
 
-export type DecoratorEntryRenderable = Omit<DecoratorEntry, 'members'> &
-  DocEntryRenderable &
-  HasRenderableToc & {
-    members: PropertyEntryRenderable[];
-  };
+export type DecoratorEntryRenderable = DecoratorEntry & DocEntryRenderable & HasRenderableToc;
 
 /** Documentation entity for a TypeScript enum augmented transformed content for rendering. */
 export type EnumEntryRenderable = EnumEntry &
@@ -89,11 +80,7 @@ export type EnumEntryRenderable = EnumEntry &
   };
 
 /** Documentation entity for a TypeScript interface augmented transformed content for rendering. */
-export type InterfaceEntryRenderable = InterfaceEntry &
-  DocEntryRenderable &
-  HasRenderableToc & {
-    members: MemberEntryRenderable[];
-  };
+export type InterfaceEntryRenderable = ClassEntryRenderable;
 
 export type FunctionEntryRenderable = FunctionEntry &
   DocEntryRenderable &
@@ -104,11 +91,7 @@ export type FunctionEntryRenderable = FunctionEntry &
 export type FunctionSignatureMetadataRenderable = FunctionSignatureMetadata &
   DocEntryRenderable & {
     params: ParameterEntryRenderable[];
-    htmlReturnDescription?: string;
   };
-
-/** Documentation entity for a block augmented with transformed content for rendering. */
-export type BlockEntryRenderable = DocEntry & DocEntryRenderable;
 
 /** Sub-entry for a single class or enum member augmented with transformed content for rendering. */
 export interface MemberEntryRenderable extends MemberEntry {
@@ -116,16 +99,6 @@ export interface MemberEntryRenderable extends MemberEntry {
   jsdocTags: JsDocTagRenderable[];
   deprecationMessage: string | null;
   htmlUsageNotes: string;
-  displayName?: string;
-
-  stable: {version: string | undefined} | undefined;
-  deprecated: {version: string | undefined} | undefined;
-  developerPreview: {version: string | undefined} | undefined;
-  experimental: {version: string | undefined} | undefined;
-}
-
-export interface PropertyEntryRenderable extends MemberEntryRenderable {
-  type: string;
 }
 
 /** Sub-entry for a class method augmented transformed content for rendering. */
@@ -149,7 +122,6 @@ export interface LinkEntryRenderable {
   label: string;
   url: string;
   title?: string;
-  target?: string;
 }
 
 export type CliOptionRenderable = CliOption & {
@@ -168,9 +140,11 @@ export type CliCommandRenderable = CliCommand & {
   htmlDescription: string;
   cards: CliCardRenderable[];
   argumentsLabel: string;
-  optionsLabel: string;
+  hasOptions: boolean;
   subcommands?: CliCommandRenderable[];
 };
 
 export interface InitializerApiFunctionRenderable
-  extends Omit<InitializerApiFunctionEntry, 'jsdocTags'>, DocEntryRenderable, HasRenderableToc {}
+  extends Omit<InitializerApiFunctionEntry, 'jsdocTags'>,
+    DocEntryRenderable,
+    HasRenderableToc {}

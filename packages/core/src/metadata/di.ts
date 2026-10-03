@@ -123,7 +123,7 @@ export interface ContentChildrenDecorator {
    * * **emitDistinctChangesOnly** - The ` QueryList#changes` observable will emit new values only
    *   if the QueryList result has changed. When `false` the `changes` observable might emit even
    *   if the QueryList has not changed.
-   *   **Note:** This config option is **deprecated**, it will be permanently set to `true` and
+   *   ** Note: *** This config option is **deprecated**, it will be permanently set to `true` and
    *   removed in future versions of Angular.
    * * **read** - Used to read a different token from the queried elements.
    *
@@ -146,7 +146,7 @@ export interface ContentChildrenDecorator {
    *   * Any provider defined on the injector of the component that is matched by the `selector` of
    * this query
    *   * Any provider defined through a string token (e.g. `{provide: 'token', useValue: 'val'}`)
-   *   * `TemplateRef`, `ElementRef`, `ViewContainerRef`, and `Injector`
+   *   * `TemplateRef`, `ElementRef`, and `ViewContainerRef`
    *
    * @usageNotes
    *
@@ -162,7 +162,6 @@ export interface ContentChildrenDecorator {
    * {@example core/di/ts/contentChildren/content_children_example.ts region='Component'}
    *
    * @Annotation
-   * @see [Content queries](guide/components/queries#decorator-content-queries)
    */
   (
     selector: ProviderToken<unknown> | Function | string,
@@ -249,7 +248,7 @@ export interface ContentChildDecorator {
    *   * Any provider defined on the injector of the component that is matched by the `selector` of
    * this query
    *   * Any provider defined through a string token (e.g. `{provide: 'token', useValue: 'val'}`)
-   *   * `TemplateRef`, `ElementRef`, `ViewContainerRef`, and `Injector`
+   *   * `TemplateRef`, `ElementRef`, and `ViewContainerRef`
    *
    * Difference between dynamic and static queries:
    *
@@ -271,7 +270,6 @@ export interface ContentChildDecorator {
    * {@example core/di/ts/contentChild/content_child_example.ts region='Component'}
    *
    * @Annotation
-   * @see [Content queries](guide/components/queries#decorator-content-queries)
    */
   (
     selector: ProviderToken<unknown> | Function | string,
@@ -335,7 +333,7 @@ export interface ViewChildrenDecorator {
    * * **emitDistinctChangesOnly** - The ` QueryList#changes` observable will emit new values only
    *   if the QueryList result has changed. When `false` the `changes` observable might emit even
    *   if the QueryList has not changed.
-   *   **Note:** This config option is **deprecated**, it will be permanently set to `true` and
+   *   ** Note: *** This config option is **deprecated**, it will be permanently set to `true` and
    * removed in future versions of Angular.
    *
    * The following selectors are supported.
@@ -357,7 +355,7 @@ export interface ViewChildrenDecorator {
    *   * Any provider defined on the injector of the component that is matched by the `selector` of
    * this query
    *   * Any provider defined through a string token (e.g. `{provide: 'token', useValue: 'val'}`)
-   *   * `TemplateRef`, `ElementRef`, `ViewContainerRef`, and `Injector`
+   *   * `TemplateRef`, `ElementRef`, and `ViewContainerRef`
    *
    * @usageNotes
    *
@@ -368,7 +366,6 @@ export interface ViewChildrenDecorator {
    * {@example core/di/ts/viewChildren/view_children_example.ts region='Component'}
    *
    * @Annotation
-   * @see [View queries](guide/components/queries#decorator-view-queries)
    */
   (
     selector: ProviderToken<unknown> | Function | string,
@@ -444,7 +441,7 @@ export interface ViewChildDecorator {
    *   * Any provider defined on the injector of the component that is matched by the `selector` of
    * this query
    *   * Any provider defined through a string token (e.g. `{provide: 'token', useValue: 'val'}`)
-   *   * `TemplateRef`, `ElementRef`, `ViewContainerRef`, and `Injector`
+   *   * `TemplateRef`, `ElementRef`, and `ViewContainerRef`
    *
    * Difference between dynamic and static queries:
    *   * Dynamic queries \(`static: false`\) - The query resolves before the `ngAfterViewInit()`
@@ -466,7 +463,6 @@ export interface ViewChildDecorator {
    * {@example core/di/ts/viewChild/view_child_howto.ts region='HowTo'}
    *
    * @Annotation
-   * @see [View queries](guide/components/queries#decorator-view-queries)
    */
   (
     selector: ProviderToken<unknown> | Function | string,

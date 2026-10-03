@@ -99,8 +99,6 @@ let ngZoneInstanceId = 0;
  * }
  * ```
  *
- * @see [Resolving zone pollution](best-practices/zone-pollution#run-tasks-outside-ngzone)
- *
  * @publicApi
  */
 export class NgZone {

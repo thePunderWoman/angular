@@ -80,20 +80,4 @@ export class LinkedSignalSignatureTest {
     source,
     computation: (s, previous) => String(s),
   });
-
-  /** number */
-  shorthandWithCustomSetter = linkedSignal(() => 0, {
-    set: (value: number, rawSet) => {
-      rawSet(value);
-    },
-  });
-
-  /** string */
-  advancedWithCustomSetter = linkedSignal({
-    source,
-    computation: (s) => String(s),
-    set: (value: string, rawSet) => {
-      rawSet(value);
-    },
-  });
 }

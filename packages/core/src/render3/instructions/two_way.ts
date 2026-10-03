@@ -10,8 +10,7 @@ import type {EventCallback} from '../../event_delegation_utils';
 import {bindingUpdated} from '../bindings';
 import {SanitizerFn} from '../interfaces/sanitization';
 import {RENDERER} from '../interfaces/view';
-import {isWritableSignal} from '../reactivity/api';
-import {WritableSignal} from '../reactivity/signal';
+import {isWritableSignal, WritableSignal} from '../reactivity/signal';
 import {getCurrentTNode, getLView, getSelectedTNode, getTView, nextBindingIndex} from '../state';
 
 import {listenerInternal} from './listener';

@@ -78,9 +78,6 @@ describe('public PendingTasks', () => {
     // stability is delayed until a tick happens
     await expectAsync(applicationRefIsStable(appRef)).toBeResolvedTo(false);
     TestBed.inject(ApplicationRef).tick();
-    // Stability is not synchronous after a tick. We wait for a microtask
-    // in case there is a Promise inside tick that requires tick again
-    await Promise.resolve();
     await expectAsync(applicationRefIsStable(appRef)).toBeResolvedTo(true);
   });
 
@@ -88,10 +85,14 @@ describe('public PendingTasks', () => {
     const appRef = TestBed.inject(ApplicationRef);
     const pendingTasks = TestBed.inject(PendingTasks);
 
-    const {promise, resolve} = Promise.withResolvers<void>();
-    pendingTasks.run(() => promise);
+    let resolveFn: () => void;
+    pendingTasks.run(() => {
+      return new Promise<void>((r) => {
+        resolveFn = r;
+      });
+    });
     await expectAsync(applicationRefIsStable(appRef)).toBeResolvedTo(false);
-    resolve();
+    resolveFn!();
     await expectAsync(TestBed.inject(ApplicationRef).whenStable()).toBeResolved();
   });
 
@@ -101,30 +102,16 @@ describe('public PendingTasks', () => {
     const errorHandler = TestBed.inject(ErrorHandler);
     const spy = spyOn(errorHandler, 'handleError');
 
-    const {promise, reject} = Promise.withResolvers<void>();
-    pendingTasks.run(() => promise);
-    await expectAsync(applicationRefIsStable(appRef)).toBeResolvedTo(false);
-    reject();
-    await expectAsync(appRef.whenStable()).toBeResolved();
-    expect(spy).toHaveBeenCalled();
-  });
-
-  it('should stop blocking stability if run function throws synchronously', async () => {
-    TestBed.configureTestingModule({
-      rethrowApplicationErrors: false,
-    });
-
-    const appRef = TestBed.inject(ApplicationRef);
-    const pendingTasks = TestBed.inject(PendingTasks);
-    const errorHandler = TestBed.inject(ErrorHandler);
-    const spy = spyOn(errorHandler, 'handleError');
-
+    let rejectFn: () => void;
     pendingTasks.run(() => {
-      throw new Error('Sync error');
+      return new Promise<void>((_, reject) => {
+        rejectFn = reject;
+      });
     });
+    await expectAsync(applicationRefIsStable(appRef)).toBeResolvedTo(false);
+    rejectFn!();
     await expectAsync(appRef.whenStable()).toBeResolved();
     expect(spy).toHaveBeenCalled();
-    expect(spy.calls.mostRecent().args[0].message).toContain('Sync error');
   });
 });
 

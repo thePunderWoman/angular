@@ -1,9 +1,9 @@
-/*!
+/**
  * @license
- * Copyright Google LLC All Rights Reserved.
+ * Copyright Google Inc. All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
- * found in the LICENSE file at https://angular.dev/license
+ * found in the LICENSE file at https://angular.io/license
  */
 
 import * as vscode from 'vscode';
@@ -182,22 +182,16 @@ function goToTemplateForComponent(ngClient: AngularLanguageClient): Command {
 /**
  * Proxy command for opening links in jsdoc comments.
  *
- * This is needed to avoid VS Code incorrectly rewriting file names.
+ * This is needed to avoid incorrectly rewriting uris.
  */
 function openJsDocLinkCommand(): Command<OpenJsDocLinkCommand_Args> {
   return {
     id: OpenJsDocLinkCommandId,
     isTextEditorCommand: false,
     async execute(args) {
-      if (typeof args?.file !== 'string' || args.file.length === 0) {
-        return;
-      }
-      // Command URI arguments are untrusted. This value is a filesystem path, so use `Uri.file`
-      // to prevent URI schemes from selecting another VS Code resource provider.
-      // https://code.visualstudio.com/api/references/vscode-api#Uri.file
-      const uri = vscode.Uri.file(args.file);
-      const document = await vscode.workspace.openTextDocument(uri);
-      return await vscode.window.showTextDocument(document, {
+      return await vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(args.file), <
+        vscode.TextDocumentShowOptions
+      >{
         selection: new vscode.Range(
           new vscode.Position(args.position?.start.line ?? 0, args.position?.start.character ?? 0),
           new vscode.Position(args.position?.end.line ?? 0, args.position?.end.character ?? 0),

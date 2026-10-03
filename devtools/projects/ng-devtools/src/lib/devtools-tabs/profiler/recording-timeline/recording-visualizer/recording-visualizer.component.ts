@@ -6,9 +6,8 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {Component, computed, input, linkedSignal} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, input, linkedSignal} from '@angular/core';
 import {DecimalPipe} from '@angular/common';
-import {MatIcon} from '@angular/material/icon';
 
 import {ProfilerFrame} from '../../../../../../../protocol';
 
@@ -21,7 +20,6 @@ import {TreeMapVisualizerComponent} from './tree-map-visualizer/tree-map-visuali
 import {FlamegraphVisualizerComponent} from './flamegraph-visualizer/flamegraph-visualizer.component';
 import {SplitComponent} from '../../../../shared/split/split.component';
 import {SplitAreaDirective} from '../../../../shared/split/splitArea.directive';
-import {ButtonComponent} from '../../../../shared/button/button.component';
 
 @Component({
   selector: 'ng-recording-visualizer',
@@ -35,9 +33,8 @@ import {ButtonComponent} from '../../../../shared/button/button.component';
     BargraphVisualizerComponent,
     ExecutionDetailsComponent,
     DecimalPipe,
-    ButtonComponent,
-    MatIcon,
   ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RecordingVisualizerComponent {
   readonly visualizationMode = input.required<VisualizationMode>();
@@ -45,21 +42,8 @@ export class RecordingVisualizerComponent {
   readonly changeDetection = input.required<boolean>();
 
   readonly cmpVisualizationModes = VisualizationMode;
-
-  // We use this technique in order to:
-  // - Close the details (i.e. unset the selected node) when the frame is changed
-  // - Close the details when the visualization mode is changed
-  private readonly selectedNodeCleanUpDeps = computed(
-    // We don't care about the output format as long as
-    // the value is different when a dependency changes
-    // (i.e. it acts as a hash).
-    // NOTE: It's safe to stringify the frames since they
-    // are valid JSON objects that are also exported as part
-    // of the profiler results report.
-    () => JSON.stringify(this.frame()) + this.visualizationMode(),
-  );
-  private readonly selectedNode = linkedSignal<string, SelectedEntry | null>({
-    source: this.selectedNodeCleanUpDeps,
+  private readonly selectedNode = linkedSignal<VisualizationMode, SelectedEntry | null>({
+    source: this.visualizationMode,
     computation: () => null,
   });
 
@@ -67,7 +51,7 @@ export class RecordingVisualizerComponent {
   readonly selectedDirectives = computed(() => this.selectedNode()?.selectedDirectives ?? []);
   readonly parentHierarchy = computed(() => this.selectedNode()?.parentHierarchy ?? []);
 
-  selectNode(selected: SelectedEntry | null): void {
+  selectNode(selected: SelectedEntry): void {
     this.selectedNode.set(selected);
   }
 }

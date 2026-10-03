@@ -19,6 +19,7 @@ import {
   bindArguments,
   FALSE_STR,
   isBrowser,
+  isIEOrEdge,
   isMix,
   isNode,
   ObjectCreate,
@@ -63,6 +64,7 @@ export function patchUtil(Zone: ZoneType): void {
     }
     api.patchEventPrototype = patchEventPrototype;
     api.patchEventTarget = patchEventTarget;
+    api.isIEOrEdge = isIEOrEdge;
     api.ObjectDefineProperty = ObjectDefineProperty;
     api.ObjectGetOwnPropertyDescriptor = ObjectGetOwnPropertyDescriptor;
     api.ObjectCreate = ObjectCreate;

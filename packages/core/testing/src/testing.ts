@@ -13,7 +13,7 @@
  */
 
 export * from './async';
-export {ComponentFixture, DirectiveFixture} from './fixture';
+export {ComponentFixture} from './component_fixture';
 export {
   resetFakeAsyncZone,
   discardPeriodicTasks,
@@ -30,7 +30,6 @@ export {
   InjectSetupWrapper,
   withModule,
   TestComponentOptions,
-  TestDirectiveOptions,
 } from './test_bed';
 export {
   TestComponentRenderer,

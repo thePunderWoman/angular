@@ -11,46 +11,33 @@ import {ApplicationOperations} from '../application-operations';
 
 export const SETTINGS_STORE_KEY = 'ng-dt-settings';
 
-type KeyCategoryPair<Key extends string, Category extends string> = `${Key}@${Category}`;
-
-type ValueFor<T, Key extends string, Category extends string> =
-  KeyCategoryPair<Key, Category> extends keyof T ? T[KeyCategoryPair<Key, Category>] : never;
-
 /** Provides an API for storing and preserving settings values. */
-export class SettingsStore<T extends object> {
+export class SettingsStore {
   private readonly appOperations = inject(ApplicationOperations);
   private readonly injector = inject(Injector);
   private readonly signals = new Map<string, WritableSignal<unknown>>();
 
-  constructor(private data: T) {}
+  constructor(private data: {[key: string]: unknown}) {}
 
   /**
    * Create a settings value a provided key, as a writable signal.
    * If the item doesn't exist, a new one will be created.
    * Updates to the signal value are automatically stored in the storage.
    */
-  create<Key extends string, Category extends string>(config: {
-    key: Key;
-    category: Category;
-    initialValue: ValueFor<T, Key, Category>;
-  }): WritableSignal<ValueFor<T, Key, Category>> {
-    const data = this.data as {[key: string]: unknown};
+  create<T>(config: {key: string; category: string; initialValue: T}): WritableSignal<T> {
     const storeKey = `${config.key}@${config.category}`;
     const existing = this.signals.get(storeKey);
     if (existing) {
-      return existing as WritableSignal<ValueFor<T, Key, Category>>;
+      return existing as WritableSignal<T>;
     }
 
-    const initialValue =
-      storeKey in data && data[storeKey] !== undefined
-        ? (data[storeKey] as ValueFor<T, Key, Category>)
-        : config.initialValue;
-    const value = signal(initialValue);
+    const initialValue = storeKey in this.data ? (this.data[storeKey] as T) : config.initialValue;
+    const value = signal<T>(initialValue);
     this.signals.set(storeKey, value);
 
     effect(
       () => {
-        data[storeKey] = value();
+        this.data[storeKey] = value();
         this.appOperations.setStorageItems({[SETTINGS_STORE_KEY]: this.data});
       },
       {injector: this.injector},

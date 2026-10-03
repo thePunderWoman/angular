@@ -6,40 +6,25 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import * as webdriver from 'selenium-webdriver';
-import {collectBrowserLogs, createWebDriver, waitForBrowserLogs} from '../browser-logs-util';
+import {browser, by, element, ExpectedConditions} from 'protractor';
+import {logging} from 'selenium-webdriver';
 
-describe('NgOptimizedImage directive (oversized-image)', () => {
-  let driver: webdriver.WebDriver;
-  let baseUrl: string;
+import {collectBrowserLogs} from '../browser-logs-util';
 
-  beforeAll(async () => {
-    ({driver, baseUrl} = await createWebDriver());
-  });
-
-  afterAll(async () => {
-    await driver.quit();
-  });
-
+describe('NgOptimizedImage directive', () => {
   it('should not warn if there is no oversized image', async () => {
-    await driver.get(`${baseUrl}/e2e/oversized-image-passing`);
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    const logs = await collectBrowserLogs(driver, webdriver.logging.Level.WARNING);
+    await browser.get('/e2e/oversized-image-passing');
+    const logs = await collectBrowserLogs(logging.Level.WARNING);
     expect(logs.length).toEqual(0);
   });
 
   it('should warn if rendered image size is much smaller than intrinsic size', async () => {
-    await driver.get(`${baseUrl}/e2e/oversized-image-failing`);
-    const expectedMessageRegex = /the intrinsic image is significantly larger than necessary\./;
-    const logs = await waitForBrowserLogs(
-      driver,
-      webdriver.logging.Level.WARNING,
-      1,
-      10000,
-      (l) => expectedMessageRegex.test(l.message) || l.message.includes('NG02960'),
-    );
+    await browser.get('/e2e/oversized-image-failing');
+    const logs = await collectBrowserLogs(logging.Level.WARNING);
 
     expect(logs.length).toEqual(1);
+
+    const expectedMessageRegex = /the intrinsic image is significantly larger than necessary\./;
     expect(expectedMessageRegex.test(logs[0].message)).toBeTruthy();
   });
 });

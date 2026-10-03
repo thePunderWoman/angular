@@ -58,13 +58,13 @@ export class SimplePlaceholderMapper extends i18n.RecurseVisitor implements Plac
   }
 
   toPublicName(internalName: string): string | null {
-    return Object.hasOwn(this.internalToPublic, internalName)
+    return this.internalToPublic.hasOwnProperty(internalName)
       ? this.internalToPublic[internalName]
       : null;
   }
 
   toInternalName(publicName: string): string | null {
-    return Object.hasOwn(this.publicToInternal, publicName)
+    return this.publicToInternal.hasOwnProperty(publicName)
       ? this.publicToInternal[publicName]
       : null;
   }
@@ -95,13 +95,13 @@ export class SimplePlaceholderMapper extends i18n.RecurseVisitor implements Plac
 
   // XMB placeholders could only contains A-Z, 0-9 and _
   private visitPlaceholderName(internalName: string): void {
-    if (!internalName || Object.hasOwn(this.internalToPublic, internalName)) {
+    if (!internalName || this.internalToPublic.hasOwnProperty(internalName)) {
       return;
     }
 
     let publicName = this.mapName(internalName);
 
-    if (Object.hasOwn(this.publicToInternal, publicName)) {
+    if (this.publicToInternal.hasOwnProperty(publicName)) {
       // Create a new XMB when it has already been used
       const nextId = this.publicToNextId[publicName];
       this.publicToNextId[publicName] = nextId + 1;

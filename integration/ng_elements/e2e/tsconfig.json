@@ -1,8 +1,6 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "target": "ES2022",
-    "skipLibCheck": true,
-    "types": ["jasmine", "node", "selenium-webdriver"]
+    "outDir": "../built/e2e",
+    "types": ["jasmine", "jasminewd2"],
   }
 }

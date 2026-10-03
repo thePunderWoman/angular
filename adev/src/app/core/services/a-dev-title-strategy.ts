@@ -6,24 +6,20 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {inject, Service} from '@angular/core';
+import {Injectable, inject} from '@angular/core';
 import {NavigationItem} from '@angular/docs';
-import {Meta, Title} from '@angular/platform-browser';
+import {Title} from '@angular/platform-browser';
 import {ActivatedRouteSnapshot, RouterStateSnapshot, TitleStrategy} from '@angular/router';
 
+export const ROUTE_TITLE_PROPERTY = 'label';
+export const ROUTE_PARENT_PROPERTY = 'parent';
 export const TITLE_SUFFIX = 'Angular';
-const TITLE_SEPARATOR = ' • ';
+export const TITLE_SEPARATOR = ' • ';
 export const DEFAULT_PAGE_TITLE = 'Overview';
 
-const TITLE_OG_META_TAG = 'og:title';
-const TITLE_TWITTER_META_TAG = 'twitter:title';
-
-export const ALL_TITLE_META_TAGS = [TITLE_OG_META_TAG, TITLE_TWITTER_META_TAG];
-
-@Service()
+@Injectable({providedIn: 'root'})
 export class ADevTitleStrategy extends TitleStrategy {
   private readonly title = inject(Title);
-  private readonly meta = inject(Meta);
 
   constructor() {
     super();
@@ -34,7 +30,6 @@ export class ADevTitleStrategy extends TitleStrategy {
 
     if (title !== undefined) {
       this.title.setTitle(title);
-      ALL_TITLE_META_TAGS.forEach((tag) => this.meta.updateTag({property: tag, content: title}));
     }
   }
 

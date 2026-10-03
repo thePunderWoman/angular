@@ -14,7 +14,7 @@ export const enum RuntimeErrorCode {
   // Structure validation errors (10xx)
   NO_CONTROLS = 1000,
   MISSING_CONTROL = 1001,
-  MISSING_CONTROL_VALUE = -1002,
+  MISSING_CONTROL_VALUE = 1002,
 
   // Reactive Forms errors (1050-1099)
   FORM_CONTROL_NAME_MISSING_PARENT = 1050,
@@ -37,5 +37,4 @@ export const enum RuntimeErrorCode {
   NGMODEL_IN_FORM_GROUP_NAME = 1351,
   NGMODEL_WITHOUT_NAME = 1352,
   NGMODELGROUP_IN_FORM_GROUP = 1353,
-  NGMODEL_IN_CHILD_COMPONENT = -1354,
 }

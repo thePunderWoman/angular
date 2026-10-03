@@ -8,17 +8,14 @@
 
 import {initializeMessageBus} from '../../../ng-devtools-backend';
 
-import {removeHighlightsByType} from '../../../ng-devtools-backend/src/lib/shared/highlighter';
-import {HighlightType} from '../../../ng-devtools-backend/src/lib/shared/highlighter/highlights';
+import {unHighlight} from '../../../ng-devtools-backend/src/lib/highlighter';
 
 import {initializeExtendedWindowOperations} from './chrome-window-extensions';
-import {getBackendUri, getContentScriptUri} from './comm-utils';
 import {SamePageMessageBus} from './same-page-message-bus';
 
 const messageBus = new SamePageMessageBus(
-  '[Backend=>ContentScript]',
-  getBackendUri(),
-  getContentScriptUri(),
+  `angular-devtools-backend-${location.href}`,
+  `angular-devtools-content-script-${location.href}`,
 );
 
 let initialized = false;
@@ -45,7 +42,7 @@ messageBus.on('handshake', () => {
     'mousemove',
     () => {
       if (!inspectorRunning) {
-        removeHighlightsByType(HighlightType.InspectElement);
+        unHighlight();
       }
     },
     false,

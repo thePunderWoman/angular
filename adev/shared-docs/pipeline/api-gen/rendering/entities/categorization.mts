@@ -7,7 +7,6 @@
  */
 
 import {
-  BlockEntry,
   ClassEntry,
   ConstantEntry,
   DecoratorEntry,
@@ -28,7 +27,6 @@ import {
 import {CliCommand} from '../cli-entities.mjs';
 
 import {
-  BlockEntryRenderable,
   ClassEntryRenderable,
   ConstantEntryRenderable,
   DecoratorEntryRenderable,
@@ -86,13 +84,10 @@ export function isEnumEntry(entry: DocEntry): entry is EnumEntry {
 }
 
 /** Gets whether the given entry represents an interface. */
-export function isInterfaceEntry(
-  entry: MemberEntryRenderable,
-): entry is InterfaceEntryRenderable & MemberEntryRenderable;
 export function isInterfaceEntry(entry: DocEntryRenderable): entry is InterfaceEntryRenderable;
 export function isInterfaceEntry(entry: DocEntry): entry is InterfaceEntry;
-export function isInterfaceEntry(entry: DocEntry | MemberEntryRenderable): entry is InterfaceEntry {
-  return (entry as DocEntry).entryType === EntryType.Interface;
+export function isInterfaceEntry(entry: DocEntry): entry is InterfaceEntry {
+  return entry.entryType === EntryType.Interface;
 }
 
 /** Gets whether the given member entry is a method entry. */
@@ -107,13 +102,6 @@ export function isFunctionEntry(entry: DocEntryRenderable): entry is FunctionEnt
 export function isFunctionEntry(entry: DocEntry): entry is FunctionEntry;
 export function isFunctionEntry(entry: DocEntry): entry is FunctionEntry {
   return entry.entryType === EntryType.Function;
-}
-
-/** Gets whether the given entry represents a block */
-export function isBlockEntry(entry: DocEntryRenderable): entry is BlockEntryRenderable;
-export function isBlockEntry(entry: DocEntry): entry is BlockEntry;
-export function isBlockEntry(entry: DocEntry): entry is BlockEntry {
-  return entry.entryType === EntryType.Block;
 }
 
 export function isInitializerApiFunctionEntry(
@@ -183,15 +171,14 @@ function getTag<T extends HasJsDocTags | FunctionEntry>(entry: T, tag: string, e
 export function getTagSinceVersion<T extends HasJsDocTags>(
   entry: T,
   tagName: string,
-  every = false,
 ): {version: string | undefined} | undefined {
-  const tag = getTag(entry, tagName, every);
+  const tag = getTag(entry, tagName);
   if (!tag) {
     return undefined;
   }
 
   // In case of deprecated tag we need to separate the version from the deprecation message.
-  const version = tag.comment.match(/^\s*(?:(?:since|from|as of)\s+)?v?(\d+(?:\.\d+)?)/i)?.[1];
+  const version = tag.comment.match(/\d+(\.\d+)?/)?.[0];
   return {version};
 }
 

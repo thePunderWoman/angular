@@ -8,16 +8,20 @@
 
 import ts from 'typescript';
 
-import {ReflectionHost, TypeScriptReflectionHost} from '@angular/compiler-cli/private/migrations';
+import {
+  ReflectionHost,
+  TypeScriptReflectionHost,
+} from '@angular/compiler-cli/src/ngtsc/reflection/index';
 import {ChangeTracker, PendingChange} from '../../utils/change_tracker';
 
 import {findClassDeclaration} from '../../utils/typescript/class_declaration';
 import {findLiteralProperty} from '../../utils/typescript/property_name';
 import {
   isAngularRoutesArray,
-  isProvideRouterCallExpression,
+  isProvideRoutesCallExpression,
   isRouterCallExpression,
   isRouterModuleCallExpression,
+  isRouterProviderCallExpression,
   isStandaloneComponent,
 } from './util';
 
@@ -78,8 +82,9 @@ function findRoutesArrayToMigrate(sourceFile: ts.SourceFile, typeChecker: ts.Typ
     if (ts.isCallExpression(node)) {
       if (
         isRouterModuleCallExpression(node, typeChecker) ||
+        isRouterProviderCallExpression(node, typeChecker) ||
         isRouterCallExpression(node, typeChecker) ||
-        isProvideRouterCallExpression(node, typeChecker)
+        isProvideRoutesCallExpression(node, typeChecker)
       ) {
         const arg = node.arguments[0]; // ex: RouterModule.forRoot(routes) or provideRouter(routes)
         const routeFileImports = sourceFile.statements.filter(ts.isImportDeclaration);
@@ -93,7 +98,7 @@ function findRoutesArrayToMigrate(sourceFile: ts.SourceFile, typeChecker: ts.Typ
           });
         } else if (ts.isIdentifier(arg)) {
           // ex: reference to routes array: RouterModule.forRoot(routes)
-          // RouterModule.forRoot(routes), provideRouter(routes)
+          // RouterModule.forRoot(routes), provideRouter(routes), provideRoutes(routes)
           const symbol = typeChecker.getSymbolAtLocation(arg);
           if (!symbol?.declarations) return;
 
@@ -278,26 +283,9 @@ function migrateRoute(
     return routeMigrationResults;
   }
 
-  // Resolve the import that provides this component by exact specifier match
-  // Handles default imports, named imports, and aliases (e.g., `import { Foo as Bar }`).
-  const componentImport = route.routeFileImports.find((importDecl) => {
-    const clause = importDecl.importClause;
-    if (!clause) return false;
-    // Default import: import FooComponent from '...'
-    if (clause.name && ts.isIdentifier(clause.name) && clause.name.text === componentClassName) {
-      return true;
-    }
-    // Named imports: import { FooComponent } from '...'
-    const named = clause.namedBindings;
-    if (named && ts.isNamedImports(named)) {
-      return named.elements.some((el: ts.ImportSpecifier) => {
-        // Support alias: import { Foo as Bar }
-        const importedName = el.propertyName ? el.propertyName.text : el.name.text;
-        return importedName === componentClassName;
-      });
-    }
-    return false;
-  })!;
+  const componentImport = route.routeFileImports.find((importDecl) =>
+    importDecl.importClause?.getText().includes(componentClassName),
+  )!;
 
   // remove single and double quotes from the import path
   let componentImportPath = ts.isStringLiteral(componentImport?.moduleSpecifier)

@@ -62,7 +62,7 @@ describe('I18nPluralPipe', () => {
     });
   });
 
-  it('should be available as a standalone pipe', async () => {
+  it('should be available as a standalone pipe', () => {
     @Component({
       selector: 'test-component',
       imports: [I18nPluralPipe],
@@ -74,7 +74,7 @@ describe('I18nPluralPipe', () => {
     }
 
     const fixture = TestBed.createComponent(TestComponent);
-    await fixture.whenStable();
+    fixture.detectChanges();
 
     const content = fixture.nativeElement.textContent;
     expect(content).toBe('One message.');

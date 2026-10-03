@@ -30,7 +30,7 @@ In the code editor, import the `input` helper method from `@angular/core` into t
 <docs-step title="Add the Input property">
 Add a required property called `housingLocation` and initialize it using `input.required()` with the type `HousingLocationInfo`.
 
-  <docs-code header="Declare the input property in housing-location.ts" path="adev/src/content/tutorials/first-app/steps/06-property-binding/src/app/housing-location/housing-location.ts" visibleLines="[10]"/>
+  <docs-code header="Declare the input property in housing-location.ts" path="adev/src/content/tutorials/first-app/steps/06-property-binding/src/app/housing-location/housing-location.ts" visibleLines="[12]"/>
 
 You have to invoke the `required` method on `input` to indicate that the parent component must provide a value. In our example application, we know this value will always be passed in — this is by design. The `.required()` call ensures that the TypeScript compiler enforces this and treats the property as non-nullable when this component is used in a template.
 
@@ -39,7 +39,7 @@ You have to invoke the `required` method on `input` to indicate that the parent 
 <docs-step title="Pass data to the input">
 Send the `housingLocation` value from the `Home` component to the `housingLocation` property of the HousingLocation component.
 
-<docs-code language="angular-ts" header="Declare the input property for HousingLocation in home.ts" path="adev/src/content/tutorials/first-app/steps/06-property-binding/src/app/home/home.ts" visibleLines="[16]"/>
+<docs-code header="Declare the input property for HousingLocation in home.ts" path="adev/src/content/tutorials/first-app/steps/06-property-binding/src/app/home/home.ts" visibleLines="[16]"/>
 
 </docs-step>
 

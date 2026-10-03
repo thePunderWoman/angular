@@ -6,10 +6,7 @@ exports_files(
 
 copy_to_bin(
     name = "others",
-    srcs = glob(
-        include = ["**/*"],
-        exclude = ["BUILD.bazel"],
-    ),
+    srcs = glob(["**/*"]),
     visibility = [
         "//visibility:public",
     ],

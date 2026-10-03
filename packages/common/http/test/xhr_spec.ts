@@ -6,10 +6,6 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {TestBed} from '@angular/core/testing';
-import {Observable} from 'rxjs';
-import {toArray} from 'rxjs/operators';
-import {XhrFactory} from '../../index';
 import {HttpRequest} from '../src/request';
 import {
   HttpDownloadProgressEvent,
@@ -23,6 +19,8 @@ import {
   HttpUploadProgressEvent,
 } from '../src/response';
 import {HttpXhrBackend} from '../src/xhr';
+import {Observable} from 'rxjs';
+import {toArray} from 'rxjs/operators';
 
 import {MockXhrFactory} from './xhr_mock';
 
@@ -55,11 +53,8 @@ describe('XhrBackend', () => {
   let factory: MockXhrFactory = null!;
   let backend: HttpXhrBackend = null!;
   beforeEach(() => {
-    TestBed.configureTestingModule({
-      providers: [{provide: XhrFactory, useClass: MockXhrFactory}],
-    });
-    factory = TestBed.inject(XhrFactory) as MockXhrFactory;
-    backend = TestBed.inject(HttpXhrBackend);
+    factory = new MockXhrFactory();
+    backend = new HttpXhrBackend(factory);
   });
   it('emits status immediately', () => {
     const events = trackEvents(backend.handle(TEST_POST));
@@ -290,23 +285,6 @@ describe('XhrBackend', () => {
       factory.mock.mockUploadProgressEvent(200, 300);
       factory.mock.mockFlush(HttpStatusCode.Ok, 'OK', 'Done');
     });
-    it('are emitted when only upload progress is requested', (done) => {
-      backend
-        .handle(TEST_POST.clone({reportUploadProgress: true}))
-        .pipe(toArray())
-        .subscribe((events) => {
-          expect(events.map((event) => event.type)).toEqual([
-            HttpEventType.Sent,
-            HttpEventType.UploadProgress,
-            HttpEventType.UploadProgress,
-            HttpEventType.Response,
-          ]);
-          done();
-        });
-      factory.mock.mockUploadProgressEvent(100, 300);
-      factory.mock.mockUploadProgressEvent(200, 300);
-      factory.mock.mockFlush(HttpStatusCode.Ok, 'OK', 'Done');
-    });
     it('are emitted when both upload and download progress are available', (done) => {
       backend
         .handle(TEST_POST.clone({reportProgress: true}))
@@ -322,22 +300,6 @@ describe('XhrBackend', () => {
           done();
         });
       factory.mock.mockUploadProgressEvent(100, 300);
-      factory.mock.mockDownloadProgressEvent(200, 300);
-      factory.mock.mockFlush(HttpStatusCode.Ok, 'OK', 'Done');
-    });
-    it('are emitted when only download progress is requested', (done) => {
-      backend
-        .handle(TEST_POST.clone({reportDownloadProgress: true}))
-        .pipe(toArray())
-        .subscribe((events) => {
-          expect(events.map((event) => event.type)).toEqual([
-            HttpEventType.Sent,
-            HttpEventType.ResponseHeader,
-            HttpEventType.DownloadProgress,
-            HttpEventType.Response,
-          ]);
-          done();
-        });
       factory.mock.mockDownloadProgressEvent(200, 300);
       factory.mock.mockFlush(HttpStatusCode.Ok, 'OK', 'Done');
     });

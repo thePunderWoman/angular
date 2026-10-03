@@ -9,8 +9,10 @@
 import {SecurityContext} from '../../../../core';
 import * as o from '../../../../output/output_ast';
 import {Identifiers} from '../../../../render3/r3_identifiers';
+import {isIframeSecuritySensitiveAttr} from '../../../../schema/dom_security_schema';
 import * as ir from '../../ir';
 import {CompilationJob, CompilationJobKind} from '../compilation';
+import {createOpXrefMap} from '../util/elements';
 
 /**
  * Map of security contexts to their sanitizer function.
@@ -21,7 +23,6 @@ const sanitizerFns = new Map<SecurityContext, o.ExternalReference>([
   [SecurityContext.SCRIPT, Identifiers.sanitizeScript],
   [SecurityContext.STYLE, Identifiers.sanitizeStyle],
   [SecurityContext.URL, Identifiers.sanitizeUrl],
-  [SecurityContext.ATTRIBUTE_NO_BINDING, Identifiers.validateAttribute],
 ]);
 
 /**
@@ -37,6 +38,8 @@ const trustedValueFns = new Map<SecurityContext, o.ExternalReference>([
  */
 export function resolveSanitizers(job: CompilationJob): void {
   for (const unit of job.units) {
+    const elements = createOpXrefMap(unit);
+
     // For normal element bindings we create trusted values for security sensitive constant
     // attributes. However, for host bindings we skip this step (this matches what
     // TemplateDefinitionBuilder does).
@@ -56,79 +59,76 @@ export function resolveSanitizers(job: CompilationJob): void {
         case ir.OpKind.Property:
         case ir.OpKind.Attribute:
         case ir.OpKind.DomProperty:
-        case ir.OpKind.TwoWayProperty:
           let sanitizerFn: o.ExternalReference | null = null;
           if (
             Array.isArray(op.securityContext) &&
-            hasCompositeUrlSecurityContext(op.securityContext)
+            op.securityContext.length === 2 &&
+            op.securityContext.indexOf(SecurityContext.URL) > -1 &&
+            op.securityContext.indexOf(SecurityContext.RESOURCE_URL) > -1
           ) {
-            // When the host element isn't known, attributes such as `href`, `src`, `data`,
-            // `action`, and `codebase` may be part of multiple security contexts. In this case we
-            // use a special sanitization function and select the actual behavior at runtime based
-            // on the concrete host element.
+            // When the host element isn't known, some URL attributes (such as "src" and "href") may
+            // be part of multiple different security contexts. In this case we use special
+            // sanitization function and select the actual sanitizer at runtime based on a tag name
+            // that is provided while invoking sanitization function.
             sanitizerFn = Identifiers.sanitizeUrlOrResourceUrl;
           } else {
             sanitizerFn = sanitizerFns.get(getOnlySecurityContext(op.securityContext)) ?? null;
           }
-
           op.sanitizer = sanitizerFn !== null ? o.importExpr(sanitizerFn) : null;
 
+          // If there was no sanitization function found based on the security context of an
+          // attribute/property, check whether this attribute/property is one of the
+          // security-sensitive <iframe> attributes (and that the current element is actually an
+          // <iframe>).
+          if (op.sanitizer === null) {
+            let isIframe = false;
+            if (job.kind === CompilationJobKind.Host || op.kind === ir.OpKind.DomProperty) {
+              // Note: for host bindings defined on a directive, we do not try to find all
+              // possible places where it can be matched, so we can not determine whether
+              // the host element is an <iframe>. In this case, we just assume it is and append a
+              // validation function, which is invoked at runtime and would have access to the
+              // underlying DOM element to check if it's an <iframe> and if so - run extra checks.
+              isIframe = true;
+            } else {
+              // For a normal binding we can just check if the element its on is an iframe.
+              const ownerOp = elements.get(op.target);
+              if (ownerOp === undefined || !ir.isElementOrContainerOp(ownerOp)) {
+                throw Error('Property should have an element-like owner');
+              }
+              isIframe = isIframeElement(ownerOp);
+            }
+            if (isIframe && isIframeSecuritySensitiveAttr(op.name)) {
+              op.sanitizer = o.importExpr(Identifiers.validateIframeAttribute);
+            }
+          }
           break;
       }
     }
   }
 }
 
-function hasCompositeUrlSecurityContext(securityContext: SecurityContext[]): boolean {
-  let hasUrlContext = false;
-  let hasResourceUrlContext = false;
-  let hasNoneContext = false;
-
-  for (const context of securityContext) {
-    switch (context) {
-      case SecurityContext.URL:
-        hasUrlContext = true;
-        break;
-      case SecurityContext.RESOURCE_URL:
-        hasResourceUrlContext = true;
-        break;
-      case SecurityContext.NONE:
-        hasNoneContext = true;
-        break;
-      default:
-        return false;
-    }
-  }
-
-  return (
-    ((hasUrlContext || hasResourceUrlContext) && hasNoneContext) ||
-    (hasUrlContext && hasResourceUrlContext)
-  );
+/**
+ * Checks whether the given op represents an iframe element.
+ */
+function isIframeElement(op: ir.ElementOrContainerOps): boolean {
+  return op.kind === ir.OpKind.ElementStart && op.tag?.toLowerCase() === 'iframe';
 }
 
 /**
- * Asserts that there is only a single non-NONE security context and returns it.
+ * Asserts that there is only a single security context and returns it.
  */
 function getOnlySecurityContext(
   securityContext: SecurityContext | SecurityContext[],
 ): SecurityContext {
-  if (!Array.isArray(securityContext)) {
-    return securityContext;
+  if (Array.isArray(securityContext)) {
+    if (securityContext.length > 1) {
+      // TODO: What should we do here? TDB just took the first one, but this feels like something we
+      // would want to know about and create a special case for like we did for Url/ResourceUrl. My
+      // guess is that, outside of the Url/ResourceUrl case, this never actually happens. If there
+      // do turn out to be other cases, throwing an error until we can address it feels safer.
+      throw Error(`AssertionError: Ambiguous security context`);
+    }
+    return securityContext[0] || SecurityContext.NONE;
   }
-
-  if (securityContext.length < 2) {
-    return securityContext[0] ?? SecurityContext.NONE;
-  }
-
-  const nonNoneSecurityContexts = securityContext.filter(
-    (context) => context !== SecurityContext.NONE,
-  );
-  if (nonNoneSecurityContexts.length > 1) {
-    // TODO: What should we do here? TDB just took the first one, but this feels like something we
-    // would want to know about and create a special case for like we did for Url/ResourceUrl. My
-    // guess is that, outside of the Url/ResourceUrl case, this never actually happens. If there
-    // do turn out to be other cases, throwing an error until we can address it feels safer.
-    throw Error(`AssertionError: Ambiguous security context`);
-  }
-  return nonNoneSecurityContexts[0] ?? SecurityContext.NONE;
+  return securityContext;
 }

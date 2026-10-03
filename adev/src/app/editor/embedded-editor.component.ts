@@ -8,6 +8,7 @@
 
 import {isPlatformBrowser} from '@angular/common';
 import {
+  ChangeDetectionStrategy,
   Component,
   DestroyRef,
   ElementRef,
@@ -20,8 +21,10 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import {toSignal} from '@angular/core/rxjs-interop';
 import {IconComponent, TutorialType} from '@angular/docs';
-import {MatTab, MatTabGroup, MatTabLabel} from '@angular/material/tabs';
+import {MatTabGroup, MatTabsModule} from '@angular/material/tabs';
+import {map} from 'rxjs';
 
 import {MAX_RECOMMENDED_WEBCONTAINERS_INSTANCES} from './alert-manager.service';
 
@@ -37,21 +40,13 @@ import {TerminalType} from './terminal/terminal-handler.service';
 import {Terminal} from './terminal/terminal.component';
 
 export const EMBEDDED_EDITOR_SELECTOR = 'embedded-editor';
-const LARGE_EDITOR_WIDTH_BREAKPOINT = 950;
-const LARGE_EDITOR_HEIGHT_BREAKPOINT = 550;
+export const LARGE_EDITOR_WIDTH_BREAKPOINT = 950;
+export const LARGE_EDITOR_HEIGHT_BREAKPOINT = 550;
 
 @Component({
   selector: EMBEDDED_EDITOR_SELECTOR,
-  imports: [
-    AngularSplitModule,
-    CodeEditor,
-    Preview,
-    Terminal,
-    MatTab,
-    MatTabGroup,
-    MatTabLabel,
-    IconComponent,
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [AngularSplitModule, CodeEditor, Preview, Terminal, MatTabsModule, IconComponent],
   templateUrl: './embedded-editor.component.html',
   styleUrls: ['./embedded-editor.component.scss'],
   providers: [EditorUiState],
@@ -91,9 +86,10 @@ export class EmbeddedEditor {
       !this.nodeRuntimeState.isResetting(),
   );
 
-  protected readonly errorsCount = computed(
-    () => this.diagnosticsState.diagnostics().filter((item) => item.severity === 'error').length,
+  private readonly errorsCount$ = this.diagnosticsState.diagnostics$.pipe(
+    map((diagnosticsItem) => diagnosticsItem.filter((item) => item.severity === 'error').length),
   );
+  protected readonly errorsCount = toSignal(this.errorsCount$, {initialValue: 0});
 
   constructor() {
     if (!isPlatformBrowser(this.platformId)) {

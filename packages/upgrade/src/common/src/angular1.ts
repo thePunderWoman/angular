@@ -275,7 +275,7 @@ let angular: {
 };
 
 try {
-  if (Object.hasOwn(window, 'angular')) {
+  if (window.hasOwnProperty('angular')) {
     angular = (<any>window).angular;
   }
 } catch {

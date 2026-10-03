@@ -7,7 +7,7 @@
  */
 
 import {HttpClient} from '@angular/common/http';
-import {ChangeDetectionStrategy, Component, OnInit} from '@angular/core';
+import {Component, OnInit} from '@angular/core';
 
 @Component({
   selector: 'transfer-state-http',
@@ -16,7 +16,6 @@ import {ChangeDetectionStrategy, Component, OnInit} from '@angular/core';
     <div class="two">{{ responseTwo }}</div>
   `,
   standalone: false,
-  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class TransferStateComponent implements OnInit {
   responseOne: string = '';

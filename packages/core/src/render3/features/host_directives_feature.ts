@@ -8,6 +8,7 @@
 import {resolveForwardRef} from '../../di';
 import {RuntimeError, RuntimeErrorCode} from '../../errors';
 import {assertEqual} from '../../util/assert';
+import {EMPTY_OBJ} from '../../util/empty';
 import {getComponentDef, getDirectiveDef} from '../def_getters';
 import {isComponentDef} from '../interfaces/type_checks';
 import type {
@@ -93,7 +94,7 @@ function resolveHostDirectives(matches: DirectiveDef<unknown>[]): HostDirectiveR
       hostDirectiveRanges ??= new Map();
 
       // TODO(pk): probably could return matches instead of taking in an array to fill in?
-      findHostDirectiveDefs(def, allDirectiveDefs, hostDirectiveDefs, matches);
+      findHostDirectiveDefs(def, allDirectiveDefs, hostDirectiveDefs);
 
       // Note that these indexes are within the offset by `directiveStart`. We can't do the
       // offsetting here, because `directiveStart` hasn't been initialized on the TNode yet.
@@ -112,14 +113,6 @@ function resolveHostDirectives(matches: DirectiveDef<unknown>[]): HostDirectiveR
     allDirectiveDefs.push(matches[i]);
   }
 
-  // We need to patch the `declaredInputs` so that `ngOnChanges` can map the properties correctly.
-  // Note that we do this at the end so that all host directive inputs have been merged.
-  if (hostDirectiveDefs !== null) {
-    hostDirectiveDefs.forEach((def, hostDirectiveDef) => {
-      patchDeclaredInputs(hostDirectiveDef.declaredInputs, def.inputs);
-    });
-  }
-
   return [allDirectiveDefs, hostDirectiveDefs, hostDirectiveRanges];
 }
 
@@ -127,22 +120,16 @@ function findHostDirectiveDefs(
   currentDef: DirectiveDef<unknown>,
   matchedDefs: DirectiveDef<unknown>[],
   hostDirectiveDefs: HostDirectiveDefs,
-  templateMatches: readonly DirectiveDef<unknown>[],
 ): void {
   if (currentDef.hostDirectives !== null) {
     for (const configOrFn of currentDef.hostDirectives) {
       if (typeof configOrFn === 'function') {
         const resolved = configOrFn();
         for (const config of resolved) {
-          trackHostDirectiveDef(
-            createHostDirectiveDef(config),
-            matchedDefs,
-            hostDirectiveDefs,
-            templateMatches,
-          );
+          trackHostDirectiveDef(createHostDirectiveDef(config), matchedDefs, hostDirectiveDefs);
         }
       } else {
-        trackHostDirectiveDef(configOrFn, matchedDefs, hostDirectiveDefs, templateMatches);
+        trackHostDirectiveDef(configOrFn, matchedDefs, hostDirectiveDefs);
       }
     }
   }
@@ -151,9 +138,8 @@ function findHostDirectiveDefs(
 /** Tracks a single host directive during directive matching. */
 function trackHostDirectiveDef(
   def: HostDirectiveDef,
-  finalMatches: DirectiveDef<unknown>[],
+  matchedDefs: DirectiveDef<unknown>[],
   hostDirectiveDefs: HostDirectiveDefs,
-  templateMatches: readonly DirectiveDef<unknown>[],
 ) {
   const hostDirectiveDef = getDirectiveDef(def.directive)!;
 
@@ -161,46 +147,20 @@ function trackHostDirectiveDef(
     validateHostDirective(def, hostDirectiveDef);
   }
 
+  // We need to patch the `declaredInputs` so that
+  // `ngOnChanges` can map the properties correctly.
+  patchDeclaredInputs(hostDirectiveDef.declaredInputs, def.inputs);
+
   // Host directives execute before the host so that its host bindings can be overwritten.
-  findHostDirectiveDefs(hostDirectiveDef, finalMatches, hostDirectiveDefs, templateMatches);
-
-  if (hostDirectiveDefs.has(hostDirectiveDef)) {
-    const existing = hostDirectiveDefs.get(hostDirectiveDef)!;
-    mergeBindingMaps(existing, def.inputs, 'input');
-    mergeBindingMaps(existing, def.outputs, 'output');
-  } else if (!templateMatches.includes(hostDirectiveDef)) {
-    hostDirectiveDefs.set(hostDirectiveDef, def);
-    finalMatches.push(hostDirectiveDef);
-  }
-}
-
-function mergeBindingMaps(
-  existingDef: HostDirectiveDef,
-  newMap: HostDirectiveBindingMap,
-  kind: 'input' | 'output',
-) {
-  // Note: we don't do something like `existingDef[kind]` to avoid property renaming issues.
-  const targetMap = kind === 'input' ? existingDef.inputs : existingDef.outputs;
-
-  Object.keys(newMap).forEach((publicName) => {
-    const alias = newMap[publicName];
-
-    if (!Object.hasOwn(targetMap, publicName) || targetMap[publicName] === alias) {
-      targetMap[publicName] = alias;
-    } else if (typeof ngDevMode === 'undefined' || ngDevMode) {
-      const message =
-        `${kind === 'input' ? 'Input' : 'Output'} "${publicName}" from ${existingDef.directive.name} ` +
-        `is exposed under the following conflicting names: "${targetMap[publicName]}" and "${alias}". ` +
-        `An ${kind} can only be exposed under a single name.`;
-      throw new RuntimeError(RuntimeErrorCode.HOST_DIRECTIVE_CONFLICTING_ALIAS, message);
-    }
-  });
+  findHostDirectiveDefs(hostDirectiveDef, matchedDefs, hostDirectiveDefs);
+  hostDirectiveDefs.set(hostDirectiveDef, def);
+  matchedDefs.push(hostDirectiveDef);
 }
 
 /** Creates a `HostDirectiveDef` from a used-defined host directive configuration. */
 function createHostDirectiveDef(config: HostDirectiveConfig): HostDirectiveDef {
   return typeof config === 'function'
-    ? {directive: resolveForwardRef(config), inputs: {}, outputs: {}}
+    ? {directive: resolveForwardRef(config), inputs: EMPTY_OBJ, outputs: EMPTY_OBJ}
     : {
         directive: resolveForwardRef(config.directive),
         inputs: bindingArrayToMap(config.inputs),
@@ -213,12 +173,14 @@ function createHostDirectiveDef(config: HostDirectiveConfig): HostDirectiveDef {
  * a map in the form of `{publicName: 'alias', otherPublicName: 'otherAlias'}`.
  */
 function bindingArrayToMap(bindings: string[] | undefined): HostDirectiveBindingMap {
+  if (bindings === undefined || bindings.length === 0) {
+    return EMPTY_OBJ;
+  }
+
   const result: HostDirectiveBindingMap = {};
 
-  if (bindings !== undefined && bindings.length > 0) {
-    for (let i = 0; i < bindings.length; i += 2) {
-      result[bindings[i]] = bindings[i + 1];
-    }
+  for (let i = 0; i < bindings.length; i += 2) {
+    result[bindings[i]] = bindings[i + 1];
   }
 
   return result;
@@ -248,7 +210,7 @@ function patchDeclaredInputs(
   exposedInputs: HostDirectiveBindingMap,
 ): void {
   for (const publicName in exposedInputs) {
-    if (Object.hasOwn(exposedInputs, publicName)) {
+    if (exposedInputs.hasOwnProperty(publicName)) {
       const remappedPublicName = exposedInputs[publicName];
       const privateName = declaredInputs[publicName];
 
@@ -258,7 +220,7 @@ function patchDeclaredInputs(
       // with the wrong name so we have a non-user-friendly assertion here just in case.
       if (
         (typeof ngDevMode === 'undefined' || ngDevMode) &&
-        Object.hasOwn(declaredInputs, remappedPublicName)
+        declaredInputs.hasOwnProperty(remappedPublicName)
       ) {
         assertEqual(
           declaredInputs[remappedPublicName],
@@ -324,8 +286,8 @@ function validateMappings<T>(
   const bindings = bindingType === 'input' ? def.inputs : def.outputs;
 
   for (const publicName in hostDirectiveBindings) {
-    if (Object.hasOwn(hostDirectiveBindings, publicName)) {
-      if (!Object.hasOwn(bindings, publicName)) {
+    if (hostDirectiveBindings.hasOwnProperty(publicName)) {
+      if (!bindings.hasOwnProperty(publicName)) {
         throw new RuntimeError(
           RuntimeErrorCode.HOST_DIRECTIVE_UNDEFINED_BINDING,
           `Directive ${className} does not have an ${bindingType} with a public name of ${publicName}.`,
@@ -334,7 +296,7 @@ function validateMappings<T>(
 
       const remappedPublicName = hostDirectiveBindings[publicName];
 
-      if (Object.hasOwn(bindings, remappedPublicName) && remappedPublicName !== publicName) {
+      if (bindings.hasOwnProperty(remappedPublicName) && remappedPublicName !== publicName) {
         throw new RuntimeError(
           RuntimeErrorCode.HOST_DIRECTIVE_CONFLICTING_ALIAS,
           `Cannot alias ${bindingType} ${publicName} of host directive ${className} to ${remappedPublicName}, because it already has a different ${bindingType} with the same public name.`,

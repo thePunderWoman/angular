@@ -1,13 +1,11 @@
 @use '@angular/docs/styles/media-queries' as mq;
 
-$columns-breakpoint: 600px;
-
 .adev-footer-columns {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 2rem;
 
-  @container footer (max-width: #{$columns-breakpoint}) {
+  @container footer (max-width: 600px) {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 }
@@ -22,12 +20,8 @@ $columns-breakpoint: 600px;
   transition: background-color 0.3s ease;
 
   // this accounts for absolutely positioned TOC on the right
-  @include mq.for-large-desktop-up {
-    width: calc(100% - 16rem - var(--layout-padding) * 3);
-  }
-
-  @include mq.for-extra-large-desktop-up {
-    width: calc(100% - 25rem - var(--layout-padding) * 3);
+  @include mq.for-large-desktop-up{   
+   width: calc(100% - 195px - var(--layout-padding) * 3);
   }
 
   h2 {
@@ -35,10 +29,6 @@ $columns-breakpoint: 600px;
     font-weight: 600;
     margin-block-end: 1.75rem;
     letter-spacing: -0.00875rem;
-
-    @container footer (min-width: #{$columns-breakpoint + 1px}) {
-      white-space: nowrap;
-    }
   }
 
   ul {

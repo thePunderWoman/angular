@@ -6,19 +6,18 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-/// <reference path="../../../../goog.d.ts" /> // 3p-only
+/// <reference path="../../../../goog.d.ts" />
 
 import {assertDefined} from '../../util/assert';
 import {global} from '../../util/global';
 import {setupFrameworkInjectorProfiler} from '../debug/framework_injector_profiler';
 import {setProfiler} from '../profiler';
-import {Signal, isSignal} from '../reactivity/api';
+import {isSignal} from '../reactivity/api';
 
 import {applyChanges} from './change_detection_utils';
-import {getControlFlowBlocks} from './control_flow';
+import {getDeferBlocks} from './defer';
 import {
   DirectiveDebugMetadata,
-  Listener,
   getComponent,
   getContext,
   getDirectiveMetadata,
@@ -35,21 +34,10 @@ import {
   getInjectorProviders,
   getInjectorResolutionPath,
 } from './injector_discovery_utils';
-import {getSignalGraph, toggleWatchSignal} from './signal_debug';
+import {getSignalGraph} from './signal_debug';
 
-import {
-  enableProfiling,
-  getComponentInstanceDeepLinkId,
-} from '../debug/chrome_dev_tools_performance';
+import {enableProfiling} from '../debug/chrome_dev_tools_performance';
 import {getTransferState} from './transfer_state_utils';
-import {InjectionToken} from '../../di/injection_token';
-import {Injector} from '../../di/injector';
-import {InjectedService, ProviderRecord} from '../debug/injector_profiler';
-
-import {Type} from '../../interface/type';
-import {RElement} from '../interfaces/renderer_dom';
-import type {DebugSignalGraph, Profiler} from '../../../primitives/devtools';
-import {ControlFlowBlock} from './control_flow_types';
 
 /**
  * This file introduces series of globally accessible debug tools
@@ -69,77 +57,15 @@ import {ControlFlowBlock} from './control_flow_types';
 export const GLOBAL_PUBLISH_EXPANDO_KEY = 'ng';
 
 // Typing for externally published global util functions
-interface NonCoreGlobalUtils {
+// Ideally we should be able to use `NgGlobalPublishUtils` using declaration merging but that doesn't work with API extractor yet.
+// Have included the typings to have type safety when working with editors that support it (VSCode).
+export interface ExternalGlobalUtils {
   ɵgetLoadedRoutes(route: any): any;
   ɵnavigateByUrl(router: any, url: string): any;
   ɵgetRouterInstance(injector: any): any;
 }
 
-/**
- * A type of the internal (meaning inside google3) global utils. This definition needs to exist
- * in a place where it can be used by DevTools and also synced into google3 and consumed internally.
- *
- * Since versioning in google3 works differently, we do not have the same constraint as
- * {@link ExternalCoreGlobalUtils}. We can change these definitions more or less as much as we want
- * without fear of breaking applications on older framework versions (note that http://go/build-horizon
- * does technically apply). The trade-off is that external Angular developers cannot use such APIs,
- * as they would be broken whenever the APIs changed.
- *
- * `InternalCoreGlobalUtils` serves as a "beta" channel for new APIs which can be implemented and supported
- * in DevTools. We can then iterate and change these APIs, landing whatever breaking changes necessary,
- * and update DevTools accordingly without actually breaking any users. Once a given function's design
- * fully validated, we can move it to {@link ExternalCoreGlobalUtils} and ship the function externally in
- * Angular. This allows fast iteration on new global utils and only applies Angular's long-lived
- * versioning constraint when we are ready to accept it.
- */
-interface InternalCoreGlobalUtils {
-  toggleWatchSignal(id: string): void;
-}
-
-/**
- * The set of external (meaning outside google3) global utils implemented by `@angular/core`.
- * Other packages may provided their own global utilities with their own types. Any functions
- * which have *ever* been in this set exist in long-lived public Angular versions which DevTools
- * needs to support.
- */
-export interface ExternalCoreGlobalUtils {
-  ɵgetDependenciesFromInjectable<T>(
-    injector: Injector,
-    token: Type<T> | InjectionToken<T>,
-  ): {instance: T; dependencies: Omit<InjectedService, 'injectedIn'>[]} | undefined;
-  ɵgetInjectorProviders(injector: Injector): ProviderRecord[];
-  ɵgetInjectorResolutionPath(injector: Injector): Injector[];
-  ɵgetInjectorMetadata(
-    injector: Injector,
-  ):
-    | {type: 'element'; source: RElement}
-    | {type: 'environment'; source: string | null}
-    | {type: 'null'; source: null}
-    | null;
-  ɵsetProfiler(profiler: Profiler | null): () => void;
-  ɵgetSignalGraph(injector: Injector): DebugSignalGraph;
-  ɵgetControlFlowBlocks(node: Node): ControlFlowBlock[];
-  ɵgetTransferState(injector: Injector): Record<string, unknown>;
-  ɵgetComponentInstanceDeepLinkId(instance: unknown): number | undefined;
-  getDirectiveMetadata(directiveOrComponentInstance: any): DirectiveDebugMetadata | null;
-  getComponent<T>(element: Element): T | null;
-  getContext<T extends {}>(element: Element): T | null;
-  getListeners(element: Element): Listener[];
-  getOwningComponent<T>(elementOrDir: Element | {}): T | null;
-  getHostElement(componentOrDirective: {}): Element;
-  getInjector(elementOrDir: Element | {}): Injector;
-  getRootComponents(elementOrDir: Element | {}): {}[];
-  getDirectives(node: Node): {}[];
-  applyChanges(component: {}): void;
-  isSignal(value: unknown): value is Signal<unknown>;
-  enableProfiling(): void;
-}
-
-const internalCoreGlobalUtils: InternalCoreGlobalUtils = {
-  toggleWatchSignal,
-};
-
-const externalCoreGlobalUtils: ExternalCoreGlobalUtils = {
+const globalUtilsFunctions = {
   /**
    * Warning: functions that start with `ɵ` are considered *INTERNAL* and should not be relied upon
    * in application's code. The contract of those functions might be changed in any release and/or a
@@ -151,24 +77,24 @@ const externalCoreGlobalUtils: ExternalCoreGlobalUtils = {
   'ɵgetInjectorMetadata': getInjectorMetadata,
   'ɵsetProfiler': setProfiler,
   'ɵgetSignalGraph': getSignalGraph,
-  'ɵgetControlFlowBlocks': getControlFlowBlocks,
+  'ɵgetDeferBlocks': getDeferBlocks,
   'ɵgetTransferState': getTransferState,
-  'ɵgetComponentInstanceDeepLinkId': getComponentInstanceDeepLinkId,
 
-  getDirectiveMetadata,
-  getComponent,
-  getContext,
-  getListeners,
-  getOwningComponent,
-  getHostElement,
-  getInjector,
-  getRootComponents,
-  getDirectives,
-  applyChanges,
-  isSignal,
+  'getDirectiveMetadata': getDirectiveMetadata,
+  'getComponent': getComponent,
+  'getContext': getContext,
+  'getListeners': getListeners,
+  'getOwningComponent': getOwningComponent,
+  'getHostElement': getHostElement,
+  'getInjector': getInjector,
+  'getRootComponents': getRootComponents,
+  'getDirectives': getDirectives,
+  'applyChanges': applyChanges,
+  'isSignal': isSignal,
 
-  enableProfiling,
+  'enableProfiling': enableProfiling,
 };
+type CoreGlobalUtilsFunctions = keyof typeof globalUtilsFunctions;
 
 let _published = false;
 /**
@@ -186,43 +112,52 @@ export function publishDefaultGlobalUtils() {
       setupFrameworkInjectorProfiler();
     }
 
-    for (const [methodName, method] of Object.entries(externalCoreGlobalUtils)) {
-      publishGlobalUtil(methodName as keyof ExternalCoreGlobalUtils, method);
-    }
-
-    for (const [methodName, method] of Object.entries(internalCoreGlobalUtils)) {
-      publishGlobalUtil(methodName as keyof InternalCoreGlobalUtils, method);
+    for (const [methodName, method] of Object.entries(globalUtilsFunctions)) {
+      publishGlobalUtil(methodName as CoreGlobalUtilsFunctions, method);
     }
   }
 }
 
 /**
+ * Default debug tools available under `window.ng`.
+ */
+export type GlobalDevModeUtils = {
+  [GLOBAL_PUBLISH_EXPANDO_KEY]: typeof globalUtilsFunctions;
+};
+
+/**
  * Publishes the given function to `window.ng` so that it can be
  * used from the browser console when an application is not in production.
  */
-export function publishGlobalUtil<
-  K extends keyof InternalCoreGlobalUtils | keyof ExternalCoreGlobalUtils,
->(name: K, fn: (InternalCoreGlobalUtils & ExternalCoreGlobalUtils)[K]): void {
+export function publishGlobalUtil<K extends CoreGlobalUtilsFunctions>(
+  name: K,
+  fn: (typeof globalUtilsFunctions)[K],
+): void {
   publishUtil(name, fn);
 }
 
 /**
  * Defines the framework-agnostic `ng` global type, not just the `@angular/core` implementation.
  *
- * ExternalCoreGlobalUtils is specifically the `@angular/core` implementation, so we
- * overwrite some properties to make them more framework-agnostic.
+ * `typeof globalUtilsFunctions` is specifically the `@angular/core` implementation, so we
+ * overwrite some properties to make them more framework-agnostic. Longer term, we should define
+ * the `ng` global type as an interface implemented by `globalUtilsFunctions` rather than a type
+ * derived from it.
  */
-export type FrameworkAgnosticGlobalUtils = ExternalCoreGlobalUtils &
-  InternalCoreGlobalUtils &
-  NonCoreGlobalUtils;
+export type FrameworkAgnosticGlobalUtils = Omit<
+  typeof globalUtilsFunctions,
+  'getDirectiveMetadata'
+> & {
+  getDirectiveMetadata(directiveOrComponentInstance: any): DirectiveDebugMetadata | null;
+} & ExternalGlobalUtils;
 
 /**
  * Publishes the given function to `window.ng` from package other than @angular/core
  * So that it can be used from the browser console when an application is not in production.
  */
-export function publishNonCoreGlobalUtil<K extends keyof NonCoreGlobalUtils>(
+export function publishExternalGlobalUtil<K extends keyof ExternalGlobalUtils>(
   name: K,
-  fn: NonCoreGlobalUtils[K],
+  fn: ExternalGlobalUtils[K],
 ): void {
   publishUtil(name, fn);
 }

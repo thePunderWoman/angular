@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
-    "lib": ["es2018", "dom"],
+    "lib": [
+      "es2018",
+      "dom"
+    ],
     "declaration": true,
     "module": "commonjs",
     "moduleResolution": "node",
@@ -16,9 +19,17 @@
     "skipDefaultLibCheck": true,
     "skipLibCheck": true,
     "sourceMap": true,
+    "strictNullChecks": true,
     "target": "es6",
-    "types": ["jasmine", "node"]
+    "types": [
+      "jasmine",
+      "node"
+    ]
   },
-  "include": ["schematics/**/*"],
-  "exclude": ["schematics/*/files/**/*"]
+  "include": [
+    "schematics/**/*"
+  ],
+  "exclude": [
+    "schematics/*/files/**/*"
+  ]
 }

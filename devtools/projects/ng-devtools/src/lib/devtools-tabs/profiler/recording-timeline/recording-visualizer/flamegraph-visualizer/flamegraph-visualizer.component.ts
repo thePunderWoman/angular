@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {Component, computed, inject, input, output} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, inject, input, output} from '@angular/core';
 import {NgxFlamegraphModule, FlamegraphColor, RawData} from 'ngx-flamegraph';
 import {ProfilerFrame} from '../../../../../../../../protocol';
 
@@ -25,12 +25,13 @@ import {SelectedDirective, SelectedEntry} from '../recording-visualizer-types';
   templateUrl: './flamegraph-visualizer.component.html',
   styleUrls: ['./flamegraph-visualizer.component.scss'],
   imports: [NgxFlamegraphModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FlamegraphVisualizerComponent {
   public themeService = inject(ThemeService);
   readonly profilerBars = computed(() => {
     return [
-      this.formatter.formatFrame(
+      this._formatter.formatFrame(
         this.frame(),
         this.changeDetection(),
         this.themeService.currentTheme(),
@@ -39,19 +40,19 @@ export class FlamegraphVisualizerComponent {
   });
   view: [number, number] = [235, 200];
 
-  private readonly formatter = new FlamegraphFormatter();
+  private readonly _formatter = new FlamegraphFormatter();
   readonly colors = computed<FlamegraphColor>(() => {
-    // Represent `dynamic-blue-02` and `dynamic-orange-01`
+    // Represent `dynamic-blue-02` and `dynamic-green-01`
     return this.themeService.currentTheme() === 'dark'
       ? {
-          red: [75, 255],
-          green: [162, 150],
-          blue: [255, 73],
+          hue: [211, 123],
+          saturation: [100, 31],
+          lightness: [65, 49],
         }
       : {
-          red: [19, 236],
-          green: [113, 118],
-          blue: [234, 33],
+          hue: [214, 125],
+          saturation: [85, 37],
+          lightness: [50, 41],
         };
   });
 

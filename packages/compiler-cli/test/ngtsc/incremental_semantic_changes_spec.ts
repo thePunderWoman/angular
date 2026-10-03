@@ -20,7 +20,7 @@ runInEachFileSystem(() => {
     beforeEach(() => {
       env = NgtscTestEnvironment.setup(testFiles);
       env.enableMultipleCompilations();
-      env.tsconfig({strictTemplates: false});
+      env.tsconfig();
     });
 
     function expectToHaveWritten(files: string[]): void {

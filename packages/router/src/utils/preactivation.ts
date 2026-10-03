@@ -6,15 +6,9 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {
-  Injector,
-  ProviderToken,
-  ɵisInjectable as isInjectable,
-  EnvironmentInjector,
-  runInInjectionContext,
-} from '@angular/core';
-import {RunGuardsAndResolvers} from '../models';
+import {Injector, ProviderToken, ɵisInjectable as isInjectable} from '@angular/core';
 
+import {RunGuardsAndResolvers} from '../models';
 import {ChildrenOutletContexts, OutletContext} from '../router_outlet_context';
 import {
   ActivatedRouteSnapshot,
@@ -101,7 +95,7 @@ function getChildRouteGuards(
 
   // Process any children left from the current route (not active for the future route)
   Object.entries(prevChildren).forEach(([k, v]: [string, TreeNode<ActivatedRouteSnapshot>]) =>
-    deactivateRouteAndItsChildren(v, contexts!.getContext(k), contexts, checks),
+    deactivateRouteAndItsChildren(v, contexts!.getContext(k), checks),
   );
 
   return checks;
@@ -156,7 +150,7 @@ function getRouteGuards(
     }
   } else {
     if (curr) {
-      deactivateRouteAndItsChildren(currNode, context, parentContexts, checks);
+      deactivateRouteAndItsChildren(currNode, context, checks);
     }
 
     checks.canActivateChecks.push(new CanActivate(futurePath));
@@ -179,7 +173,7 @@ function shouldRunGuardsAndResolvers(
   mode: RunGuardsAndResolvers | undefined,
 ): boolean {
   if (typeof mode === 'function') {
-    return runInInjectionContext(future._environmentInjector, () => mode(curr, future));
+    return mode(curr, future);
   }
   switch (mode) {
     case 'pathParamsChange':
@@ -208,7 +202,6 @@ function shouldRunGuardsAndResolvers(
 function deactivateRouteAndItsChildren(
   route: TreeNode<ActivatedRouteSnapshot>,
   context: OutletContext | null,
-  parentContexts: ChildrenOutletContexts | null,
   checks: Checks,
 ): void {
   const children = nodeChildrenAsMap(route);
@@ -216,24 +209,11 @@ function deactivateRouteAndItsChildren(
 
   Object.entries(children).forEach(([childName, node]) => {
     if (!r.component) {
-      // For componentless routes, children share the parent's outlet contexts. Look up each
-      // child by its outlet name in parentContexts rather than passing the same context
-      // (which was derived from the componentless route's own outlet and may be null or wrong).
-      deactivateRouteAndItsChildren(
-        node,
-        parentContexts ? parentContexts.getContext(childName) : null,
-        parentContexts,
-        checks,
-      );
+      deactivateRouteAndItsChildren(node, context, checks);
     } else if (context) {
-      deactivateRouteAndItsChildren(
-        node,
-        context.children.getContext(childName),
-        context.children,
-        checks,
-      );
+      deactivateRouteAndItsChildren(node, context.children.getContext(childName), checks);
     } else {
-      deactivateRouteAndItsChildren(node, null, null, checks);
+      deactivateRouteAndItsChildren(node, null, checks);
     }
   });
 

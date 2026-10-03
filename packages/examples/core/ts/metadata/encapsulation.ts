@@ -30,6 +30,7 @@ import {Component, ViewEncapsulation} from '@angular/core';
     `,
   ],
   encapsulation: ViewEncapsulation.ShadowDom,
+  standalone: false,
 })
-export class MyApp {}
+class MyApp {}
 // #enddocregion

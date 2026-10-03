@@ -1,19 +1,11 @@
-import * as webdriver from 'selenium-webdriver';
+import {browser, logging} from 'protractor';
 import {AppPage} from './app.po';
-import {createWebDriver, verifyNoBrowserErrors} from './driver-util';
 
-describe('trusted-types App', () => {
-  let driver: webdriver.WebDriver;
+describe('workspace-project App', () => {
   let page: AppPage;
-  const baseUrl = process.env['E2E_BASE_URL'] || 'http://localhost:4213';
 
-  beforeAll(() => {
-    driver = createWebDriver();
-    page = new AppPage(driver, baseUrl);
-  });
-
-  afterAll(async () => {
-    await driver.quit();
+  beforeEach(() => {
+    page = new AppPage();
   });
 
   it('should display welcome message', async () => {
@@ -40,27 +32,36 @@ describe('trusted-types App', () => {
 
   it('should load iframe', async () => {
     await page.navigateTo();
+    await browser.waitForAngularEnabled(false);
     await page.switchToIframe();
     expect(await page.getHeaderText()).toEqual('Hello from iframe');
-    await page.switchToDefaultContent();
   });
 
   it('should load embed', async () => {
     await page.navigateTo();
+    await browser.waitForAngularEnabled(false);
     await page.switchToEmbed();
     expect(await page.getHeaderText()).toEqual('Hello from embed');
-    await page.switchToDefaultContent();
   });
 
   it('should load object', async () => {
     await page.navigateTo();
+    await browser.waitForAngularEnabled(false);
     await page.switchToObject();
     expect(await page.getHeaderText()).toEqual('Hello from object');
-    await page.switchToDefaultContent();
   });
 
   afterEach(async () => {
+    // Re-enable waiting for Angular in case we disabled it to navigate to a
+    // non-Angular page
+    await browser.waitForAngularEnabled(true);
+
     // Assert that there are no errors emitted from the browser
-    await verifyNoBrowserErrors(driver);
+    const logs = await browser.manage().logs().get(logging.Type.BROWSER);
+    expect(logs).not.toContain(
+      jasmine.objectContaining({
+        level: logging.Level.SEVERE,
+      } as logging.Entry),
+    );
   });
 });

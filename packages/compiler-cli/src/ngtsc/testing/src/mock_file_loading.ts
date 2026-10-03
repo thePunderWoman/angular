@@ -50,8 +50,7 @@ const rxjsFolder = new CachedFolder(() =>
 export function loadStandardTestFiles({
   fakeCommon = false,
   rxjs = false,
-  forms = false,
-}: {fakeCommon?: boolean; rxjs?: boolean; forms?: boolean} = {}): Folder {
+}: {fakeCommon?: boolean; rxjs?: boolean} = {}): Folder {
   const tmpFs = new MockFileSystemPosix(true);
   const basePath = '/' as AbsoluteFsPath;
 
@@ -67,10 +66,6 @@ export function loadStandardTestFiles({
 
   if (rxjs) {
     tmpFs.mount(tmpFs.resolve('/node_modules/rxjs'), rxjsFolder.get());
-  }
-
-  if (forms) {
-    loadAngularForms(tmpFs, basePath);
   }
 
   return tmpFs.dump();
@@ -97,14 +92,6 @@ export function loadAngularCore(fs: FileSystem, basePath: string = '/') {
     fs,
     resolveFromRunfiles('_main/packages/core/npm_package'),
     fs.resolve(basePath, 'node_modules/@angular/core'),
-  );
-}
-
-export function loadAngularForms(fs: FileSystem, basePath: string = '/') {
-  loadTestDirectory(
-    fs,
-    resolveFromRunfiles('_main/packages/forms/npm_package'),
-    fs.resolve(basePath, 'node_modules/@angular/forms'),
   );
 }
 

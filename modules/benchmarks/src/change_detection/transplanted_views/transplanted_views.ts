@@ -52,7 +52,6 @@ export class InsertionComponent {
     <insertion-component [template]="template" [viewCount]="viewCount"></insertion-component>
   `,
   standalone: false,
-  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class DeclarationComponent {
   @Input() viewCount = 1;

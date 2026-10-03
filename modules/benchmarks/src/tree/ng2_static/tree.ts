@@ -6,13 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {
-  ChangeDetectionStrategy,
-  Component,
-  Input,
-  NgModule,
-  provideZoneChangeDetection,
-} from '@angular/core';
+import {Component, Input, NgModule, provideZoneChangeDetection} from '@angular/core';
 import {BrowserModule, DomSanitizer, SafeStyle} from '@angular/platform-browser';
 
 import {emptyTree, getMaxDepth, TreeNode} from '../util';
@@ -32,7 +26,6 @@ function createTreeComponent(level: number, isLeaf: boolean) {
     template: template,
     standalone: false,
     jit: true,
-    changeDetection: ChangeDetectionStrategy.Eager,
   })
   class TreeComponent {
     @Input() data!: TreeNode;
@@ -49,7 +42,6 @@ function createTreeComponent(level: number, isLeaf: boolean) {
   template: `<tree0 *ngIf="data.left != null" [data]="data"></tree0>`,
   standalone: false,
   jit: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class RootTreeComponent {
   @Input() data: TreeNode = emptyTree;

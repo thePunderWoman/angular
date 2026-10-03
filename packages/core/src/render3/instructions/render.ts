@@ -22,7 +22,7 @@ import {
   TView,
 } from '../interfaces/view';
 import {profiler} from '../profiler';
-import {ProfilerEvent} from '../../../primitives/devtools';
+import {ProfilerEvent} from '../profiler_types';
 import {executeViewQueryFn, refreshContentQueries} from '../queries/query_execution';
 import {enterView, leaveView} from '../state';
 import {getComponentLViewByIndex, isCreationMode} from '../util/view_utils';
@@ -43,11 +43,9 @@ export function renderComponent(hostLView: LView, componentHostIdx: number) {
 
   profiler(ProfilerEvent.ComponentStart);
 
-  try {
-    renderView(componentTView, componentView, componentView[CONTEXT]);
-  } finally {
-    profiler(ProfilerEvent.ComponentEnd, componentView[CONTEXT] as any as {});
-  }
+  renderView(componentTView, componentView, componentView[CONTEXT]);
+
+  profiler(ProfilerEvent.ComponentEnd, componentView[CONTEXT] as any as {});
 }
 
 /**

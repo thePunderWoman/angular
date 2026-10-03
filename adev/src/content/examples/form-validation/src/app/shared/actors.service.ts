@@ -1,10 +1,10 @@
-import {Service} from '@angular/core';
+import {Injectable} from '@angular/core';
 import {Observable, of} from 'rxjs';
 import {delay} from 'rxjs/operators';
 
 const ROLES = ['Hamlet', 'Ophelia', 'Romeo', 'Juliet'];
 
-@Service()
+@Injectable({providedIn: 'root'})
 export class ActorsService {
   isRoleTaken(role: string): Observable<boolean> {
     const isTaken = ROLES.includes(role);

@@ -12,17 +12,17 @@ The Angular Router emits navigation events that you can subscribe to in order to
 | [`RoutesRecognized`](api/router/RoutesRecognized)   | Occurs after the router determines which route matches the URL and contains the route state information. |
 | [`GuardsCheckStart`](api/router/GuardsCheckStart)   | Begins the route guard phase. The router evaluates route guards like `canActivate` and `canDeactivate`.  |
 | [`GuardsCheckEnd`](api/router/GuardsCheckEnd)       | Signals completion of guard evaluation. Contains the result (allowed/denied).                            |
-| [`ResolveStart`](api/router/ResolveStart)           | Begins the data resolution phase. Route resolvers and resources start fetching data.                     |
-| [`ResolveEnd`](api/router/ResolveEnd)               | Data resolution completes. All required data and blocking resources become available.                    |
+| [`ResolveStart`](api/router/ResolveStart)           | Begins the data resolution phase. Route resolvers start fetching data.                                   |
+| [`ResolveEnd`](api/router/ResolveEnd)               | Data resolution completes. All required data becomes available.                                          |
 | [`NavigationEnd`](api/router/NavigationEnd)         | Final event when navigation completes successfully. The router updates the URL.                          |
 | [`NavigationSkipped`](api/router/NavigationSkipped) | Occurs when the router skips navigation (e.g., same URL navigation).                                     |
 
 The following are common error events:
 
-| Event                                             | Description                                                                                                    |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| [`NavigationCancel`](api/router/NavigationCancel) | Occurs when the router cancels navigation. Often due to a guard returning false.                               |
-| [`NavigationError`](api/router/NavigationError)   | Occurs when navigation fails. Could be due to invalid routes, resolver errors, or rejected blocking resources. |
+| Event                                             | Description                                                                      |
+| ------------------------------------------------- | -------------------------------------------------------------------------------- |
+| [`NavigationCancel`](api/router/NavigationCancel) | Occurs when the router cancels navigation. Often due to a guard returning false. |
+| [`NavigationError`](api/router/NavigationError)   | Occurs when navigation fails. Could be due to invalid routes or resolver errors. |
 
 For a list of all lifecycle events, check out the [complete table of this guide](#all-router-events).
 
@@ -32,13 +32,13 @@ When you want to run code during specific navigation lifecycle events, you can d
 
 ```ts
 // Example of subscribing to router events
-import {Component, inject, signal, effect} from '@angular/core';
-import {Event, Router, NavigationStart, NavigationEnd} from '@angular/router';
+import { Component, inject, signal, effect } from '@angular/core';
+import { Event, Router, NavigationStart, NavigationEnd } from '@angular/router';
 
-@Component(/* ... */)
-export class RouterEvents {
+@Component({ ... })
+export class RouterEventsComponent {
   private readonly router = inject(Router);
-
+  
   constructor() {
     // Subscribe to router events and react to events
     this.router.events.pipe(takeUntilDestroyed()).subscribe((event: Event) => {
@@ -55,7 +55,7 @@ export class RouterEvents {
 }
 ```
 
-NOTE: The [`Event`](api/router/Event) type from `@angular/router` is named the same as the regular global [`Event`](https://developer.mozilla.org/en-US/docs/Web/API/Event) type, but it is different from the [`RouterEvent`](api/router/RouterEvent) type.
+Note: The [`Event`](api/router/Event) type from `@angular/router` is named the same as the regular global [`Event`](https://developer.mozilla.org/en-US/docs/Web/API/Event) type, but it is different from the [`RouterEvent`](api/router/RouterEvent) type.
 
 ## How to debug routing events
 
@@ -64,12 +64,16 @@ Debugging router navigation issues can be challenging without visibility into th
 When you need to inspect a Router event sequence, you can enable logging for internal navigation events for debugging. You can configure this by passing a configuration option (`withDebugTracing()`) that enables detailed console logging of all routing events.
 
 ```ts
-import {provideRouter, withDebugTracing} from '@angular/router';
+import { provideRouter, withDebugTracing } from '@angular/router';
 
 const appRoutes: Routes = [];
-bootstrapApplication(App, {
-  providers: [provideRouter(appRoutes, withDebugTracing())],
-});
+bootstrapApplication(AppComponent,
+  {
+    providers: [
+      provideRouter(appRoutes, withDebugTracing())
+    ]
+  }
+);
 ```
 
 For more information, check out the official docs on [`withDebugTracing`](api/router/withDebugTracing).
@@ -83,21 +87,28 @@ Router events enable many practical features in real-world applications. Here ar
 Show loading indicators during navigation:
 
 ```angular-ts
-import {Component, inject} from '@angular/core';
-import {Router} from '@angular/router';
+import { Component, inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs/operators';
 
 @Component({
-  selector: 'app-root',
+  selector: 'app-loading',
   template: `
-    @if (isNavigating()) {
-      <div class="loading-bar">Loading...</div>
+    @if (loading()) {
+      <div class="loading-spinner">Loading...</div>
     }
-    <router-outlet />
-  `,
+  `
 })
-export class App {
+export class AppComponent {
   private router = inject(Router);
-  isNavigating = computed(() => !!this.router.currentNavigation());
+  
+  readonly loading = toSignal(
+    this.router.events.pipe(
+      map(() => !!this.router.getCurrentNavigation())
+    ),
+    { initialValue: false }
+  );
 }
 ```
 
@@ -105,30 +116,30 @@ export class App {
 
 Track page views for analytics:
 
-```ts
-import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
-import {inject, DestroyRef, Service} from '@angular/core';
-import {Router, NavigationEnd} from '@angular/router';
+```typescript
+import { Component, inject, signal, effect } from '@angular/core';
+import { Router, NavigationEnd } from '@angular/router';
 
-@Service()
+@Injectable({ providedIn: 'root' })
 export class AnalyticsService {
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
 
   startTracking() {
-    this.router.events.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((event) => {
-      // Track page views when URL changes
-      if (event instanceof NavigationEnd) {
-        // Send page view to analytics
-        this.analytics.trackPageView(event.url);
-      }
-    });
+    this.router.events.pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(event => {
+        // Track page views when URL changes
+        if (event instanceof NavigationEnd) {
+           // Send page view to analytics
+          this.analytics.trackPageView(url);
+        }
+      });
   }
 
   private analytics = {
     trackPageView: (url: string) => {
       console.log('Page view tracked:', url);
-    },
+    }
   };
 }
 ```
@@ -138,15 +149,8 @@ export class AnalyticsService {
 Handle navigation errors gracefully and provide user feedback:
 
 ```angular-ts
-import {Component, inject, signal} from '@angular/core';
-import {
-  Router,
-  NavigationStart,
-  NavigationError,
-  NavigationCancel,
-  NavigationCancellationCode,
-} from '@angular/router';
-import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
+import { Component, inject, signal } from '@angular/core';
+import { Router, NavigationStart, NavigationError, NavigationCancel, NavigationCancellationCode } from '@angular/router';
 
 @Component({
   selector: 'app-error-handler',
@@ -157,14 +161,14 @@ import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
         <button (click)="dismissError()">Dismiss</button>
       </div>
     }
-  `,
+  `
 })
-export class ErrorHandler {
+export class ErrorHandlerComponent {
   private router = inject(Router);
   readonly errorMessage = signal('');
 
   constructor() {
-    this.router.events.pipe(takeUntilDestroyed()).subscribe((event) => {
+    this.router.events.pipe(takeUntilDestroyed()).subscribe(event => {
       if (event instanceof NavigationStart) {
         this.errorMessage.set('');
       } else if (event instanceof NavigationError) {
@@ -172,7 +176,7 @@ export class ErrorHandler {
         this.errorMessage.set('Failed to load page. Please try again.');
       } else if (event instanceof NavigationCancel) {
         console.warn('Navigation cancelled:', event.reason);
-        if (event.code === NavigationCancellationCode.GuardRejected) {
+        if (event.reason === NavigationCancellationCode.GuardRejected) {
           this.errorMessage.set('Access denied. Please check your permissions.');
         }
       }
@@ -236,4 +240,4 @@ There is one additional event that occurs outside the main navigation lifecycle,
 
 ## Next steps
 
-Learn more about [route guards](/guide/routing/route-guards), [data fetching with resources](/guide/routing/data-fetching-with-resources), and [common router tasks](/guide/routing/common-router-tasks).
+Learn more about [route guards](/guide/routing/route-guards) and [common router tasks](/guide/routing/common-router-tasks).

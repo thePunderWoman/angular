@@ -7,14 +7,13 @@
  */
 
 import ts from 'typescript';
+import {runInEachFileSystem} from '../../../../../file_system/testing';
+import {factory as uninvokedFunctionInTextInterpolationFactory} from '../../../checks/uninvoked_function_in_text_interpolation';
 import {ErrorCode, ExtendedTemplateDiagnosticName, ngErrorCode} from '../../../../../diagnostics';
 import {absoluteFrom, getSourceFileOrError} from '../../../../../file_system';
-import {runInEachFileSystem} from '../../../../../file_system/testing';
-import {getSourceCodeForDiagnostic} from '../../../../../testing';
 import {getClass, setup} from '../../../../testing';
-import {formatExtendedError} from '../../../api/format-extended-error';
-import {factory as uninvokedFunctionInTextInterpolationFactory} from '../../../checks/uninvoked_function_in_text_interpolation';
 import {ExtendedTemplateCheckerImpl} from '../../../src/extended_template_checker';
+import {getSourceCodeForDiagnostic} from '../../../../../testing';
 
 runInEachFileSystem(() => {
   describe('UninvokedFunctionInTextInterpolationFactoryCheck', () => {
@@ -87,7 +86,7 @@ runInEachFileSystem(() => {
       expect(diags.length).toBe(1);
       expect(diags[0].category).toBe(ts.DiagnosticCategory.Warning);
       expect(diags[0].code).toBe(ngErrorCode(ErrorCode.UNINVOKED_FUNCTION_IN_TEXT_INTERPOLATION));
-      expect(diags[0].messageText).toBe(generateDiagnosticText('firstName()'));
+      expect(diags[0].messageText).toContain('firstName()');
       expect(getSourceCodeForDiagnostic(diags[0])).toBe('firstName');
     });
 
@@ -127,12 +126,11 @@ runInEachFileSystem(() => {
         {
           fileName,
           templates: {
-            'TestCmp': `<p> {{ myObj.firstName }} - {{ otherObj?.lastName }}</p>`,
+            'TestCmp': `<p> {{ myObj.firstName }} - {{ myObj?.lastName }}</p>`,
           },
           source: `
           export class TestCmp {
-            myObj = { firstName: () => "Gordon"} 
-            otherObj?:{lastName: () => string } = { lastName: () => "Freeman" };
+            myObj = { firstName: () => "Gordon", lastName: () => "Freeman" };
           }`,
         },
       ]);
@@ -149,15 +147,8 @@ runInEachFileSystem(() => {
       expect(diags.length).toBe(1);
       expect(diags[0].category).toBe(ts.DiagnosticCategory.Warning);
       expect(diags[0].code).toBe(ngErrorCode(ErrorCode.UNINVOKED_FUNCTION_IN_TEXT_INTERPOLATION));
-      expect(diags[0].messageText).toBe(generateDiagnosticText('firstName()'));
+      expect(diags[0].messageText).toContain('firstName()');
       expect(getSourceCodeForDiagnostic(diags[0])).toBe('firstName');
     });
   });
 });
-
-function generateDiagnosticText(text: string): string {
-  return formatExtendedError(
-    ErrorCode.UNINVOKED_FUNCTION_IN_TEXT_INTERPOLATION,
-    `Function in text interpolation should be invoked: ${text}`,
-  );
-}

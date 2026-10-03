@@ -5,80 +5,90 @@
     {
       "type": "extensionHost",
       "request": "launch",
-      "name": "VSCE: Launch Dev Client",
+      "name": "Launch Dev Client",
       "runtimeExecutable": "${execPath}",
       "args": [
         "--disable-extensions",
-        "--extensionDevelopmentPath=${workspaceFolder}/vscode-ng-language-service"
+        "--extensionDevelopmentPath=${workspaceFolder}"
       ],
-      "preLaunchTask": "VSCE: watch bundles"
+      "outFiles": [
+        "${workspaceFolder}/dist/bin/vscode-ng-language-service/client/src/*.js"
+      ],
+      "preLaunchTask": {
+        "type": "npm",
+        "script": "vscode:watch"
+      }
     },
     {
       "type": "extensionHost",
       "request": "launch",
-      "name": "VSCE: Launch Prod Client",
+      "name": "Launch Prod Client",
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/dist/bin/vscode-ng-language-service/npm"
+      ],
+      "sourceMaps": false,
+      "preLaunchTask": "build vsix"
+    },
+    {
+      "type": "node",
+      "request": "attach",
+      "name": "Attach to Server",
+      "port": 6009,
+      "restart": true,
+      "outFiles": [
+        "${workspaceFolder}/dist/bin/vscode-ng-language-service/server/src/*.js"
+      ]
+    },
+    {
+      "type": "node",
+      "request": "attach",
+      "name": "Attach to Jasmine",
+      "port": 9229,
+      "restart": true,
+      "outFiles": [
+        "${workspaceFolder}/dist/bin/vscode-ng-language-service/**/*.js"
+      ],
+    },
+    {
+      "name": "Integration test: Attach to server",
+      "port": 9330,
+      "request": "attach",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/dist/bin/vscode-ng-language-service/integration/lsp/*.js"
+      ],
+      "type": "node"
+    },
+    {
+      "name": "E2E Test",
+      "type": "extensionHost",
+      "request": "launch",
       "runtimeExecutable": "${execPath}",
       "args": [
         "--disable-extensions",
-        "--extensionDevelopmentPath=${workspaceFolder}/dist/bin/vscode-ng-language-service/development_package"
+        "--extensionDevelopmentPath=${workspaceFolder}/dist/bin/vscode-ng-language-service/npm",
+        "--extensionTestsPath=${workspaceFolder}/dist/bin/vscode-ng-language-service/integration/e2e/jasmine",
+        "${workspaceFolder}/vscode-ng-language-service/integration/project"
       ],
-      "preLaunchTask": "VSCE: package"
-    },
-    {
-      "name": "VSCE: Attach to Server",
-      "type": "node",
-      "request": "attach",
-      "port": 6009,
-      "restart": true,
-      "sourceMaps": true,
-      "skipFiles": ["<node_internals>/**"],
-      "sourceMapPathOverrides": {
-        "?:*/bin/*": "${workspaceFolder}/*"
-      },
-      "resolveSourceMapLocations": ["!**/node_modules/**"]
-    },
-    {
-      "name": "DEBUG: Attach to bazel test",
-      "type": "node",
-      "request": "attach",
-      "port": 9229,
-      "restart": true,
-      "timeout": 600000,
-      "sourceMaps": true,
-      "skipFiles": ["<node_internals>/**"],
-      "sourceMapPathOverrides": {
-        "?:*/bin/*": "${workspaceFolder}/*"
-      },
-      "resolveSourceMapLocations": ["!**/node_modules/**"]
-    },
-    {
-      "name": "DEBUG: Run bazel test (Custom Target)",
-      "type": "node",
-      "request": "launch",
-      "restart": true,
-      "timeout": 600000,
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["bazel", "test", "${input:bazelTarget}", "--config=debug"],
-      "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}"
+      "outFiles": [
+        "${workspaceFolder}/dist/bin/vscode-ng-language-service/integration/e2e/*.js"
+      ],
+      "preLaunchTask": {
+        "type": "npm",
+        "script": "compile:integration"
+      }
     }
   ],
   "compounds": [
     {
-      "name": "VSCE: Dev Client + Attach to Server",
-      "configurations": ["VSCE: Launch Dev Client", "VSCE: Attach to Server"]
-    },
-    {
-      "name": "DEBUG: Run bazel test (Custom Target) + Attach",
-      "configurations": ["DEBUG: Attach to bazel test", "DEBUG: Run bazel test (Custom Target)"]
-    }
-  ],
-  "inputs": [
-    {
-      "id": "bazelTarget",
-      "type": "promptString",
-      "description": "Enter the Bazel test target (e.g., //path/to/my:unit_test)",
-      "default": "//packages/..."
+      "name": "Dev Client + Server",
+      "configurations": [
+        "Launch Dev Client",
+        "Attach to Server"
+      ]
     }
   ]
 }

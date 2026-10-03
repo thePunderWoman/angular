@@ -30,10 +30,7 @@ export function checkTypeDeclarations(fs: FileSystem, emittedFiles: AbsoluteFsPa
       expectedFile: {name: expectedFilename, content: fs.readFile(expectedFilename)},
       generatedFile: {name: generatedFilename, content: fs.readFile(generatedFilename)},
     }))
-    .find(
-      ({expectedFile, generatedFile}) =>
-        expectedFile.content.trim() !== generatedFile.content.trim(),
-    );
+    .find(({expectedFile, generatedFile}) => expectedFile.content !== generatedFile.content);
 
   if (diff) {
     throw new Error(

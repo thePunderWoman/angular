@@ -15,7 +15,7 @@ Add `resource` to your existing imports and import the fake API function.
 // Add resource to existing imports
 import {Component, signal, computed, resource, ChangeDetectionStrategy} from '@angular/core';
 // Import mock API function
-import {getUserData} from './user-api';
+import {loadUser} from './user-api';
 ```
 
 </docs-step>
@@ -27,8 +27,8 @@ Add a property in the component class that creates a resource to load user data 
 userId = signal(1);
 
 userResource = resource({
-  params: () => ({id: this.userId()}),
-  loader: (params) => getUserData(params.params.id),
+  params: () => ({ id: this.userId() }),
+  loader: (params) => loadUser(params.params.id)
 });
 ```
 
@@ -75,7 +75,7 @@ Part 1. **Add click handlers to the buttons:**
 
 Part 2. **Replace the placeholder with resource state handling:**
 
-```angular-html
+```html
 @if (isLoading()) {
   <p>Loading user...</p>
 } @else if (hasError()) {

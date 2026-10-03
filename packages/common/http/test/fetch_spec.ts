@@ -6,10 +6,10 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
+import {HttpEvent, HttpEventType, HttpRequest, HttpResponse} from '../index';
 import {TestBed} from '@angular/core/testing';
 import {Observable, of, Subject} from 'rxjs';
 import {catchError, retry, scan, skip, take, toArray} from 'rxjs/operators';
-import {HttpEvent, HttpEventType, HttpRequest, HttpResponse} from '../index';
 
 import {
   HttpClient,
@@ -19,9 +19,9 @@ import {
   HttpParams,
   HttpStatusCode,
   provideHttpClient,
+  withFetch,
 } from '../public_api';
-import {RuntimeErrorCode} from '../src/errors';
-import {FetchBackend, FetchFactory, HTTP_FETCH_MAX_RESPONSE_SIZE} from '../src/fetch';
+import {FetchBackend, FetchFactory} from '../src/fetch';
 
 function trackEvents(obs: Observable<any>): Promise<any[]> {
   return obs
@@ -52,7 +52,7 @@ const TEST_POST_WITH_JSON_BODY = new HttpRequest(
 
 const XSSI_PREFIX = ")]}'\n";
 
-describe('FetchBackend', () => {
+describe('FetchBackend', async () => {
   let fetchMock: MockFetchFactory = null!;
   let backend: FetchBackend = null!;
   let fetchSpy: jasmine.Spy<typeof fetch>;
@@ -182,45 +182,6 @@ describe('FetchBackend', () => {
     expect(res.statusText).toBe('OK');
   });
 
-  it('handles a text response with iso-8859-1 charset', async () => {
-    const promise = trackEvents(backend.handle(TEST_POST));
-    // "café" encoded in ISO-8859-1 (0x63, 0x61, 0x66, 0xE9)
-    const isoBytes = new Uint8Array([0x63, 0x61, 0x66, 0xe9]);
-    fetchMock.mockFlush(HttpStatusCode.Ok, 'OK', isoBytes, {
-      'Content-Type': 'text/html; charset=iso-8859-1',
-    });
-    const events = await promise;
-    expect(events.length).toBe(2);
-    const res = events[1] as HttpResponse<string>;
-    expect(res.body).toBe('café');
-  });
-
-  it('handles a text response with windows-1252 charset in quotes', async () => {
-    const promise = trackEvents(backend.handle(TEST_POST));
-    // "€" encoded in Windows-1252 (0x80)
-    const windowsBytes = new Uint8Array([0x80]);
-    fetchMock.mockFlush(HttpStatusCode.Ok, 'OK', windowsBytes, {
-      'Content-Type': 'text/plain; charset="windows-1252"',
-    });
-    const events = await promise;
-    expect(events.length).toBe(2);
-    const res = events[1] as HttpResponse<string>;
-    expect(res.body).toBe('€');
-  });
-
-  it('falls back to default utf-8 when given an invalid charset', async () => {
-    const promise = trackEvents(backend.handle(TEST_POST));
-    // "café" encoded in UTF-8
-    const utf8Bytes = new Uint8Array([0x63, 0x61, 0x66, 0xc3, 0xa9]);
-    fetchMock.mockFlush(HttpStatusCode.Ok, 'OK', utf8Bytes, {
-      'Content-Type': 'text/plain; charset=invalid-encoding-label',
-    });
-    const events = await promise;
-    expect(events.length).toBe(2);
-    const res = events[1] as HttpResponse<string>;
-    expect(res.body).toBe('café');
-  });
-
   it('handles a json response', async () => {
     const promise = trackEvents(backend.handle(TEST_POST.clone({responseType: 'json'})));
     fetchMock.mockFlush(HttpStatusCode.Ok, 'OK', JSON.stringify({data: 'some data'}));
@@ -228,16 +189,6 @@ describe('FetchBackend', () => {
     expect(events.length).toBe(2);
     const res = events[1] as HttpResponse<{data: string}>;
     expect(res.body!.data).toBe('some data');
-  });
-
-  it('decodes a json response as UTF-8 regardless of its declared charset', async () => {
-    const promise = trackEvents(backend.handle(TEST_POST.clone({responseType: 'json'})));
-    fetchMock.mockFlush(HttpStatusCode.Ok, 'OK', JSON.stringify({data: 'café'}), {
-      'Content-Type': 'application/json; charset=windows-1251',
-    });
-    const events = await promise;
-    const res = events[1] as HttpResponse<{data: string}>;
-    expect(res.body!.data).toBe('café');
   });
 
   it('handles a blank json response', async () => {
@@ -405,20 +356,6 @@ describe('FetchBackend', () => {
     fetchMock.mockFlush(HttpStatusCode.Ok, 'OK');
   });
 
-  it('should pass referrerPolicy option to fetch', () => {
-    const req = new HttpRequest('GET', '/test', {referrerPolicy: 'no-referrer'});
-    backend.handle(req).subscribe();
-
-    expect(fetchSpy).toHaveBeenCalledWith(
-      '/test',
-      jasmine.objectContaining({
-        referrerPolicy: 'no-referrer',
-      }),
-    );
-
-    fetchMock.mockFlush(HttpStatusCode.Ok, 'OK');
-  });
-
   it('emits an error when a request times out', (done) => {
     backend.handle(TEST_POST).subscribe({
       error: (err: HttpErrorResponse) => {
@@ -534,34 +471,6 @@ describe('FetchBackend', () => {
       fetchMock.mockFlush(HttpStatusCode.Ok, 'OK', 'downloaded');
     });
 
-    it('are emitted when only download progress is requested', (done) => {
-      backend
-        .handle(TEST_POST.clone({reportDownloadProgress: true}))
-        .pipe(toArray())
-        .subscribe((events) => {
-          expect(events.map((event) => event.type)).toEqual([
-            HttpEventType.Sent,
-            HttpEventType.ResponseHeader,
-            HttpEventType.DownloadProgress,
-            HttpEventType.DownloadProgress,
-            HttpEventType.Response,
-          ]);
-          done();
-        });
-      fetchMock.mockProgressEvent(4);
-      fetchMock.mockFlush(HttpStatusCode.Ok, 'OK', 'downloaded');
-    });
-
-    it('errors when upload progress is requested', (done) => {
-      backend.handle(TEST_POST.clone({reportUploadProgress: true})).subscribe({
-        error: (error: HttpErrorResponse) => {
-          expect(error.error.code).toBe(RuntimeErrorCode.FETCH_UPLOAD_PROGRESS_NOT_SUPPORTED);
-          expect(error.error.message).toContain('does not support upload progress reporting');
-          done();
-        },
-      });
-    });
-
     it('include ResponseHeader with headers and status', (done) => {
       backend
         .handle(TEST_POST.clone({reportProgress: true}))
@@ -585,7 +494,7 @@ describe('FetchBackend', () => {
       fetchMock.mockFlush(HttpStatusCode.Ok, 'OK', 'Done');
     });
   });
-  describe('gets response URL', () => {
+  describe('gets response URL', async () => {
     it('from the response URL', (done) => {
       backend
         .handle(TEST_POST)
@@ -615,7 +524,7 @@ describe('FetchBackend', () => {
       fetchMock.mockFlush(HttpStatusCode.Ok, 'OK', 'Test');
     });
   });
-  describe('corrects for quirks', () => {
+  describe('corrects for quirks', async () => {
     it('by normalizing 0 status to 200 if a body is present', (done) => {
       backend
         .handle(TEST_POST)
@@ -647,7 +556,7 @@ describe('FetchBackend', () => {
     beforeEach(() => {
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
-        providers: [provideHttpClient()],
+        providers: [provideHttpClient(withFetch())],
       });
     });
 
@@ -679,100 +588,20 @@ describe('FetchBackend', () => {
       }
     });
   });
-
-  describe('response buffering limits', () => {
-    let infiniteStreamFactory: InfiniteStreamFetchFactory = null!;
-
-    beforeEach(() => {
-      TestBed.resetTestingModule();
-      TestBed.configureTestingModule({
-        providers: [
-          {provide: FetchFactory, useClass: InfiniteStreamFetchFactory},
-          {provide: HTTP_FETCH_MAX_RESPONSE_SIZE, useValue: 2048},
-          FetchBackend,
-        ],
-      });
-
-      backend = TestBed.inject(FetchBackend);
-      infiniteStreamFactory = TestBed.inject(FetchFactory) as InfiniteStreamFetchFactory;
-    });
-
-    it('aborts a never-ending response stream once the configured size limit is exceeded', async () => {
-      const req = new HttpRequest('GET', '/test', {responseType: 'text'});
-      const events = await trackEvents(backend.handle(req));
-      const error = events[1] as HttpErrorResponse;
-
-      expect(events.length).toBe(2);
-      expect(error instanceof HttpErrorResponse).toBeTrue();
-      expect(error.error.code).toBe(RuntimeErrorCode.FETCH_RESPONSE_BODY_TOO_LARGE);
-      expect(infiniteStreamFactory.cancelCount).toBe(1);
-    });
-
-    it('cancels an unread response stream when the declared size exceeds the limit', async () => {
-      infiniteStreamFactory.declaredContentLength = 2049;
-
-      const req = new HttpRequest('GET', '/test', {responseType: 'text'});
-      const events = await trackEvents(backend.handle(req));
-      const error = events[1] as HttpErrorResponse;
-
-      expect(events.length).toBe(2);
-      expect(error instanceof HttpErrorResponse).toBeTrue();
-      expect(error.error.code).toBe(RuntimeErrorCode.FETCH_RESPONSE_BODY_TOO_LARGE);
-      expect(infiniteStreamFactory.cancelCount).toBe(1);
-    });
-
-    it('allows disabling the size limit via dependency injection', async () => {
-      TestBed.resetTestingModule();
-      TestBed.configureTestingModule({
-        providers: [
-          {provide: FetchFactory, useClass: FiniteChunkFetchFactory},
-          {provide: HTTP_FETCH_MAX_RESPONSE_SIZE, useValue: null},
-          FetchBackend,
-        ],
-      });
-
-      backend = TestBed.inject(FetchBackend);
-
-      const req = new HttpRequest('GET', '/test', {responseType: 'text'});
-      const events = await trackEvents(backend.handle(req));
-
-      expect(events.length).toBe(2);
-      expect(events[1].type).toBe(HttpEventType.Response);
-      expect((events[1] as HttpResponse<string>).body).toBe('ok');
-    });
-  });
-
-  describe('cancellation behavior', () => {
-    it('should not abort signal when the request completes successfully', async () => {
-      const req = new HttpRequest('GET', '/test', {responseType: 'text'});
-      const promise = trackEvents(backend.handle(req));
-      fetchMock.mockFlush(HttpStatusCode.Ok, 'OK', 'ok');
-      const events = await promise;
-
-      expect(events.length).toBe(2);
-      expect(fetchMock.request.signal?.aborted).toBeFalse();
-    });
-
-    it('should abort signal when unsubscribed before request completion', () => {
-      const req = new HttpRequest('GET', '/test', {responseType: 'text'});
-      const sub = backend.handle(req).subscribe();
-      expect(fetchMock.request.signal?.aborted).toBeFalse();
-
-      sub.unsubscribe();
-      expect(fetchMock.request.signal?.aborted).toBeTrue();
-    });
-  });
 });
 
 export class MockFetchFactory extends FetchFactory {
   public readonly response = new MockFetchResponse();
   public readonly request = new MockFetchRequest();
-  private resolve!: (value: Response | PromiseLike<Response>) => void;
-  private reject!: (reason?: any) => void;
+  private resolve!: Function;
+  private reject!: Function;
 
   private clearWarningTimeout?: VoidFunction;
 
-  private promise = this.createFetchPromise();
+  private promise = new Promise<Response>((resolve, reject) => {
+    this.resolve = resolve;
+    this.reject = reject;
+  });
 
   override fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     this.request.method = init?.method;
@@ -780,7 +609,6 @@ export class MockFetchFactory extends FetchFactory {
     this.request.body = init?.body;
     this.request.headers = init?.headers;
     this.request.credentials = init?.credentials;
-    this.request.signal = init?.signal;
 
     if (init?.signal) {
       init?.signal.addEventListener('abort', () => {
@@ -804,7 +632,7 @@ export class MockFetchFactory extends FetchFactory {
   mockFlush(
     status: number,
     statusText: string,
-    body?: string | Blob | Uint8Array,
+    body?: string | Blob,
     headers?: Record<string, string>,
   ): void {
     this.clearWarningTimeout?.();
@@ -846,14 +674,10 @@ export class MockFetchFactory extends FetchFactory {
   }
 
   resetFetchPromise() {
-    this.promise = this.createFetchPromise();
-  }
-
-  private createFetchPromise(): Promise<Response> {
-    const {promise, resolve, reject} = Promise.withResolvers<Response>();
-    this.resolve = resolve;
-    this.reject = reject;
-    return promise;
+    this.promise = new Promise<Response>((resolve, reject) => {
+      this.resolve = resolve;
+      this.reject = reject;
+    });
   }
 }
 
@@ -863,51 +687,6 @@ class MockFetchRequest {
   public body: any;
   public credentials?: RequestCredentials;
   public headers?: HeadersInit;
-  public signal?: AbortSignal | null;
-}
-
-class InfiniteStreamFetchFactory extends FetchFactory {
-  public cancelCount = 0;
-  public declaredContentLength?: number;
-
-  override fetch = async (_input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
-    const stream = new ReadableStream<Uint8Array>({
-      pull: (controller) => {
-        controller.enqueue(new Uint8Array(1024));
-      },
-      cancel: () => {
-        this.cancelCount++;
-      },
-    });
-
-    return new Response(stream, {
-      status: HttpStatusCode.Ok,
-      statusText: 'OK',
-      headers: {
-        'Content-Type': 'text/plain',
-        ...(this.declaredContentLength === undefined
-          ? {}
-          : {'Content-Length': `${this.declaredContentLength}`}),
-      },
-    });
-  };
-}
-
-class FiniteChunkFetchFactory extends FetchFactory {
-  override fetch = async (_input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
-    const stream = new ReadableStream<Uint8Array>({
-      start: (controller) => {
-        controller.enqueue(new TextEncoder().encode('ok'));
-        controller.close();
-      },
-    });
-
-    return new Response(stream, {
-      status: HttpStatusCode.Ok,
-      statusText: 'OK',
-      headers: {'Content-Type': 'text/plain', 'Content-Length': '2'},
-    });
-  };
 }
 
 class MockFetchResponse {
@@ -921,7 +700,7 @@ class MockFetchResponse {
     start: (controller) => {
       this.sub$.subscribe({
         next: (val) => {
-          controller.enqueue(val instanceof Uint8Array ? val : new TextEncoder().encode(val));
+          controller.enqueue(new TextEncoder().encode(val));
         },
         complete: () => {
           controller.close();

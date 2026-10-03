@@ -23,7 +23,6 @@ import {PartialNgModuleLinkerVersion1} from './partial_ng_module_linker_1';
 import {PartialPipeLinkerVersion1} from './partial_pipe_linker_1';
 import {PLACEHOLDER_VERSION} from './util';
 import {AbsoluteFsPath} from '../../../../src/ngtsc/file_system/src/types';
-import {PartialServiceLinkerVersion1} from './partial_service_linker_1';
 
 export const ɵɵngDeclareDirective = 'ɵɵngDeclareDirective';
 export const ɵɵngDeclareClassMetadata = 'ɵɵngDeclareClassMetadata';
@@ -34,7 +33,6 @@ export const ɵɵngDeclareInjector = 'ɵɵngDeclareInjector';
 export const ɵɵngDeclareNgModule = 'ɵɵngDeclareNgModule';
 export const ɵɵngDeclarePipe = 'ɵɵngDeclarePipe';
 export const ɵɵngDeclareClassMetadataAsync = 'ɵɵngDeclareClassMetadataAsync';
-export const ɵɵngDeclareService = 'ɵɵngDeclareService';
 export const declarationFunctions = [
   ɵɵngDeclareDirective,
   ɵɵngDeclareClassMetadata,
@@ -45,7 +43,6 @@ export const declarationFunctions = [
   ɵɵngDeclareNgModule,
   ɵɵngDeclarePipe,
   ɵɵngDeclareClassMetadataAsync,
-  ɵɵngDeclareService,
 ];
 
 export interface LinkerRange<TExpression> {
@@ -77,8 +74,8 @@ export interface LinkerRange<TExpression> {
  * `minVersion` of the partial-declaration should be updated, the new linker implementation should
  * be added to the end of the collection, and the version of the previous linker should be updated.
  */
-export function createLinkerMap<TStatement, TExpression, TType>(
-  environment: LinkerEnvironment<TStatement, TExpression, TType>,
+export function createLinkerMap<TStatement, TExpression>(
+  environment: LinkerEnvironment<TStatement, TExpression>,
   sourceUrl: AbsoluteFsPath,
   code: string,
 ): Map<string, LinkerRange<TExpression>[]> {
@@ -121,9 +118,6 @@ export function createLinkerMap<TStatement, TExpression, TType>(
   ]);
   linkers.set(ɵɵngDeclarePipe, [
     {range: LATEST_VERSION_RANGE, linker: new PartialPipeLinkerVersion1()},
-  ]);
-  linkers.set(ɵɵngDeclareService, [
-    {range: LATEST_VERSION_RANGE, linker: new PartialServiceLinkerVersion1()},
   ]);
 
   return linkers;

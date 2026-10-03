@@ -17,12 +17,11 @@ export class HostBindingLinkDir {
   host: {
     '[innerHtml]': 'evil',
     '[attr.style]': 'evil',
-    '[src]': 'nonEvil',
+    '[src]': 'evil',
   },
 })
 export class HostBindingImageDir {
   evil = 'evil';
-  nonEvil = 'nonEvil';
 }
 
 @Directive({
@@ -32,50 +31,8 @@ export class HostBindingImageDir {
     '[attr.style]': 'evil',
     '[src]': 'evil',
     '[sandbox]': 'evil',
-    '[attr.attributeName]': 'nonEvil',
   },
 })
 export class HostBindingIframeDir {
-  evil = 'evil';
-  nonEvil = 'nonEvil';
-}
-
-@Directive({
-  selector: 'animateMotion[hostBindingSvgAnimateDir]',
-  host: {
-    '[attr.attributeName]': 'evil',
-  },
-})
-export class HostBindingSvgAnimateDir {
-  evil = 'evil';
-}
-
-@Directive({
-  selector: 'safe-srcdoc-carrier',
-  host: {
-    '[attr.srcdoc]': 'evil',
-  },
-})
-export class HostBindingCustomSrcdocDir {
-  evil = 'evil';
-}
-
-@Directive({
-  selector: 'safe-src-carrier',
-  host: {
-    '[attr.src]': 'evil',
-  },
-})
-export class HostBindingCustomSrcDir {
-  evil = 'evil';
-}
-
-@Directive({
-  selector: 'safe-data-carrier',
-  host: {
-    '[attr.data]': 'evil',
-  },
-})
-export class HostBindingCustomDataDir {
   evil = 'evil';
 }

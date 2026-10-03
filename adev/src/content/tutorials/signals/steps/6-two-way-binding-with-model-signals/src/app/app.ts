@@ -1,5 +1,5 @@
 // TODO: Import model from @angular/core
-import {Component} from '@angular/core';
+import {Component, ChangeDetectionStrategy} from '@angular/core';
 import {CustomCheckbox} from './custom-checkbox';
 
 @Component({
@@ -24,13 +24,11 @@ import {CustomCheckbox} from './custom-checkbox';
         -->
 
         <div class="controls">
-          <p>
-            Terms agreed:
+          <p>Terms agreed:
             <!-- TODO: Replace with @if block using agreedToTerms() -->
             ???
           </p>
-          <p>
-            Notifications:
+          <p>Notifications:
             <!-- TODO: Replace with @if block using enableNotifications() -->
             ???
           </p>
@@ -42,6 +40,7 @@ import {CustomCheckbox} from './custom-checkbox';
     </div>
   `,
   styleUrl: './app.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class App {
   // TODO: Add parent signal models

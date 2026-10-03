@@ -6,9 +6,8 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {DestroyRef, effect, inject, signal, Service} from '@angular/core';
+import {DestroyRef, effect, inject, Injectable, signal} from '@angular/core';
 import {FileSystemTree, WebContainer, WebContainerProcess} from '@webcontainer/api';
-import {setupErrorFilenameHandler} from './error-filename-handler';
 import {BehaviorSubject, filter, map, Subject} from 'rxjs';
 
 import {type FileAndContent, TutorialType, checkFilesInDirectory} from '@angular/docs';
@@ -38,7 +37,7 @@ export const PACKAGE_MANAGER = 'npm';
  * It boots the WebContainer, loads the project files into the WebContainer
  * filesystem, install the project dependencies and starts the dev server.
  */
-@Service()
+@Injectable({providedIn: 'root'})
 export class NodeRuntimeSandbox {
   private readonly _createdFile$ = new Subject<string>();
   readonly createdFile$ = this._createdFile$.asObservable();
@@ -158,6 +157,7 @@ export class NodeRuntimeSandbox {
       '.angular',
       'dist',
       'BUILD.bazel',
+      'idx',
       'package.json.template',
       'config.json',
     ];
@@ -274,17 +274,7 @@ export class NodeRuntimeSandbox {
     try {
       await webContainer.fs.rename(oldPath, newPath);
     } catch (err: any) {
-      if (err.message.startsWith('ENOENT')) {
-        const directory = newPath.split('/').slice(0, -1).join('/');
-
-        await webContainer.fs.mkdir(directory, {
-          recursive: true,
-        });
-
-        await webContainer.fs.rename(oldPath, newPath);
-      } else {
-        throw err;
-      }
+      throw err;
     }
   }
 
@@ -398,8 +388,6 @@ export class NodeRuntimeSandbox {
 
       this.setErrorState(message, ErrorType.UNKNOWN);
     });
-
-    await setupErrorFilenameHandler(webContainer);
   }
 
   private checkForOutOfMemoryError(message: string): boolean {

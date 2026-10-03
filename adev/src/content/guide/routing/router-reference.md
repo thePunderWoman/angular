@@ -38,11 +38,11 @@ Here are the key `Router` terms and their meanings:
 | `provideRouter`       | provides the necessary service providers for navigating through application views.                                                                                                                                                        |
 | `RouterModule`        | A separate NgModule that provides the necessary service providers and directives for navigating through application views.                                                                                                                |
 | `Routes`              | Defines an array of Routes, each mapping a URL path to a component.                                                                                                                                                                       |
-| `Route`               | Defines how the router should navigate to a component based on a URL pattern. Routes can include paths, components, child routes, guards, resolvers, and resources.                                                                       |
+| `Route`               | Defines how the router should navigate to a component based on a URL pattern. Most routes consist of a path and a component type.                                                                                                         |
 | `RouterOutlet`        | The directive \(`<router-outlet>`\) that marks where the router displays a view.                                                                                                                                                          |
 | `RouterLink`          | The directive for binding a clickable HTML element to a route. Clicking an element with a `routerLink` directive that's bound to a _string_ or a _link parameters array_ triggers a navigation.                                           |
 | `RouterLinkActive`    | The directive for adding/removing classes from an HTML element when an associated `routerLink` contained on or inside the element becomes active/inactive. It can also set the `aria-current` of an active link for better accessibility. |
-| `ActivatedRoute`      | A service that's provided to each route component that contains route specific information such as route parameters, static data, resolve data, route resources, global query parameters, and the global fragment.                        |
+| `ActivatedRoute`      | A service that's provided to each route component that contains route specific information such as route parameters, static data, resolve data, global query parameters, and the global fragment.                                         |
 | `RouterState`         | The current state of the router including a tree of the currently activated routes together with convenience methods for traversing the route tree.                                                                                       |
 | Link parameters array | An array that the router interprets as a routing instruction. You can bind that array to a `RouterLink` or pass the array as an argument to the `Router.navigate` method.                                                                 |
 | Routing component     | An Angular component with a `RouterOutlet` that displays views based on router navigations.                                                                                                                                               |
@@ -56,7 +56,7 @@ The in-application URLs can be indistinguishable from server URLs.
 Modern HTML5 browsers were the first to support `pushState` which is why many people refer to these URLs as "HTML5 style" URLs.
 
 HELPFUL: HTML5 style navigation is the router default.
-In the [LocationStrategy and browser URL styles](guide/routing/common-router-tasks#locationstrategy-and-browser-url-styles) section, learn why HTML5 style is preferable, how to adjust its behavior, and how to switch to the older hash \(`#`\) style, if necessary.
+In the [LocationStrategy and browser URL styles](#locationstrategy-and-browser-url-styles) section, learn why HTML5 style is preferable, how to adjust its behavior, and how to switch to the older hash \(`#`\) style, if necessary.
 
 You must add a [`<base href>` element](https://developer.mozilla.org/docs/Web/HTML/Element/base 'base href') to the application's `index.html` for `pushState` routing to work.
 The browser uses the `<base href>` value to prefix relative URLs when referencing CSS files, scripts, and images.
@@ -64,28 +64,26 @@ The browser uses the `<base href>` value to prefix relative URLs when referencin
 Add the `<base>` element just after the `<head>` tag.
 If the `app` folder is the application root, as it is for this application, set the `href` value in `index.html` as shown here.
 
-```html
-<base href="/" />
-```
+<docs-code header="src/index.html (base-href)" path="adev/src/content/examples/router/src/index.html" visibleRegion="base-href"/>
 
 ### HTML5 URLs and the `<base href>`
 
 The guidelines that follow will refer to different parts of a URL.
 This diagram outlines what those parts refer to:
 
-```text {hideCopy}
+<docs-code hideCopy language="text">
 foo://example.com:8042/over/there?name=ferret#nose
 \_/   \______________/\_________/ \_________/ \__/
  |           |            |            |        |
 scheme    authority      path        query   fragment
-```
+</docs-code>
 
 While the router uses the [HTML5 pushState](https://developer.mozilla.org/docs/Web/API/History_API#Adding_and_modifying_history_entries 'Browser history push-state') style by default, you must configure that strategy with a `<base href>`.
 
 The preferred way to configure the strategy is to add a [`<base href>` element](https://developer.mozilla.org/docs/Web/HTML/Element/base 'base href') tag in the `<head>` of the `index.html`.
 
 ```angular-html
-<base href="/" />
+<base href="/">
 ```
 
 Without that tag, the browser might not be able to load resources \(images, CSS, scripts\) when "deep linking" into the application.
@@ -96,6 +94,7 @@ Those developers can still use HTML5 URLs by taking the following two steps:
 
 1. Provide the router with an appropriate `APP_BASE_HREF` value.
 1. Use root URLs \(URLs with an `authority`\) for all web resources: CSS, images, scripts, and template HTML files.
+
    - The `<base href>` `path` should end with a "/", as browsers ignore characters in the `path` that follow the right-most "`/`"
    - If the `<base href>` includes a `query` part, the `query` is only used if the `path` of a link in the page is empty and has no `query`.
      This means that a `query` in the `<base href>` is only included when using `HashLocationStrategy`.
@@ -112,7 +111,9 @@ For more complete information on how `<base href>` is used to construct target U
 Use `HashLocationStrategy` by providing the `useHash: true` in an object as the second argument of the `RouterModule.forRoot()` in the `AppModule`.
 
 ```ts
-providers: [provideRouter(appRoutes, withHashLocation())];
+providers: [
+  provideRouter(appRoutes, withHashLocation())
+]
 ```
 
 When using `RouterModule.forRoot`, this is configured with the `useHash: true` in the second argument: `RouterModule.forRoot(routes, {useHash: true})`.

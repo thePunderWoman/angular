@@ -52,9 +52,7 @@ export function resolveDeferTargetNames(job: ComponentCompilationJob): void {
     op: ir.DeferOnOp,
     placeholderView: ir.XrefId | null,
   ): void {
-    const triggerKind = op.trigger.kind;
-
-    switch (triggerKind) {
+    switch (op.trigger.kind) {
       case ir.DeferTriggerKind.Idle:
       case ir.DeferTriggerKind.Never:
       case ir.DeferTriggerKind.Immediate:
@@ -108,11 +106,8 @@ export function resolveDeferTargetNames(job: ComponentCompilationJob): void {
           step++;
         }
         break;
-      default: {
-        const unhandledTriggerKind: never = triggerKind;
-
-        throw new Error(`Trigger kind ${unhandledTriggerKind} not handled`);
-      }
+      default:
+        throw new Error(`Trigger kind ${(op.trigger as any).kind} not handled`);
     }
   }
 

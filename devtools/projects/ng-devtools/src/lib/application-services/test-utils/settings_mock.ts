@@ -12,8 +12,10 @@ import {SettingsStore} from '../settings_store';
 import {ThemePreference} from '../theme_types';
 
 export class SettingsMock extends Settings {
+  routerGraphEnabled = signal(false);
   showCommentNodes = signal(false);
-  performanceTrack = signal(false);
+  signalGraphEnabled = signal(false);
+  timingAPIEnabled = signal(false);
   theme = signal<ThemePreference>('system');
   activeTab = signal('Components');
 }

@@ -8,9 +8,10 @@
 
 import {createInjectorWithoutInjectorInstances} from '../di/create_injector';
 import {Injector} from '../di/injector';
-import {EnvironmentProviders, Provider} from '../di/interface/provider';
+import {EnvironmentProviders, Provider, StaticProvider} from '../di/interface/provider';
 import {EnvironmentInjector, getNullInjector, R3Injector} from '../di/r3_injector';
 import {Type} from '../interface/type';
+import {ComponentFactoryResolver as viewEngine_ComponentFactoryResolver} from '../linker/component_factory_resolver';
 import {
   InternalNgModuleRef,
   NgModuleFactory as viewEngine_NgModuleFactory,
@@ -19,6 +20,7 @@ import {
 import {assertDefined} from '../util/assert';
 import {stringify} from '../util/stringify';
 
+import {ComponentFactoryResolver} from './component_ref';
 import {getNgModuleDef} from './def_getters';
 import {maybeUnwrapFn} from './util/misc_utils';
 
@@ -38,6 +40,14 @@ export function createNgModule<T>(
 ): viewEngine_NgModuleRef<T> {
   return new NgModuleRef<T>(ngModule, parentInjector ?? null, []);
 }
+
+/**
+ * The `createNgModule` function alias for backwards-compatibility.
+ * Please avoid using it directly and use `createNgModule` instead.
+ *
+ * @deprecated Use `createNgModule` instead.
+ */
+export const createNgModuleRef = createNgModule;
 export class NgModuleRef<T> extends viewEngine_NgModuleRef<T> implements InternalNgModuleRef<T> {
   // tslint:disable-next-line:require-internal-with-underscore
   _bootstrapComponents: Type<any>[] = [];
@@ -45,10 +55,19 @@ export class NgModuleRef<T> extends viewEngine_NgModuleRef<T> implements Interna
   override instance!: T;
   destroyCbs: (() => void)[] | null = [];
 
+  // When bootstrapping a module we have a dependency graph that looks like this:
+  // ApplicationRef -> ComponentFactoryResolver -> NgModuleRef. The problem is that if the
+  // module being resolved tries to inject the ComponentFactoryResolver, it'll create a
+  // circular dependency which will result in a runtime error, because the injector doesn't
+  // exist yet. We work around the issue by creating the ComponentFactoryResolver ourselves
+  // and providing it, rather than letting the injector resolve it.
+  override readonly componentFactoryResolver: ComponentFactoryResolver =
+    new ComponentFactoryResolver(this);
+
   constructor(
     private readonly ngModuleType: Type<T>,
     public _parent: Injector | null,
-    additionalProviders: Array<Provider | EnvironmentProviders>,
+    additionalProviders: StaticProvider[],
     runInjectorInitializers = true,
   ) {
     super();
@@ -63,7 +82,14 @@ export class NgModuleRef<T> extends viewEngine_NgModuleRef<T> implements Interna
     this._r3Injector = createInjectorWithoutInjectorInstances(
       ngModuleType,
       _parent,
-      [{provide: viewEngine_NgModuleRef, useValue: this}, ...additionalProviders],
+      [
+        {provide: viewEngine_NgModuleRef, useValue: this},
+        {
+          provide: viewEngine_ComponentFactoryResolver,
+          useValue: this.componentFactoryResolver,
+        },
+        ...additionalProviders,
+      ],
       stringify(ngModuleType),
       new Set(['environment']),
     ) as R3Injector;
@@ -111,13 +137,15 @@ export class NgModuleFactory<T> extends viewEngine_NgModuleFactory<T> {
 export function createNgModuleRefWithProviders<T>(
   moduleType: Type<T>,
   parentInjector: Injector | null,
-  additionalProviders: Array<Provider | EnvironmentProviders>,
+  additionalProviders: StaticProvider[],
 ): InternalNgModuleRef<T> {
   return new NgModuleRef(moduleType, parentInjector, additionalProviders, false);
 }
 
 export class EnvironmentNgModuleRefAdapter extends viewEngine_NgModuleRef<null> {
   override readonly injector: R3Injector;
+  override readonly componentFactoryResolver: ComponentFactoryResolver =
+    new ComponentFactoryResolver(this);
   override readonly instance = null;
 
   constructor(config: {
@@ -128,7 +156,11 @@ export class EnvironmentNgModuleRefAdapter extends viewEngine_NgModuleRef<null> 
   }) {
     super();
     const injector = new R3Injector(
-      [...config.providers, {provide: viewEngine_NgModuleRef, useValue: this}],
+      [
+        ...config.providers,
+        {provide: viewEngine_NgModuleRef, useValue: this},
+        {provide: viewEngine_ComponentFactoryResolver, useValue: this.componentFactoryResolver},
+      ],
       config.parent || getNullInjector(),
       config.debugName,
       new Set(['environment']),

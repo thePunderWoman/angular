@@ -1231,7 +1231,7 @@ export function useAnimation(
  * Tokens can be merged into a combined query selector string. For example:
  *
  * ```ts
- *  query('@subTrigger, :self, .record:enter, .record:leave', [...])
+ *  query(':self, .record:enter, .record:leave, @subTrigger', [...])
  * ```
  *
  * The `query()` function collects multiple elements and works internally by using

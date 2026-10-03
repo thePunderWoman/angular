@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {Service} from '@angular/core';
+import {Injectable} from '@angular/core';
 
 export const ALLOWED_COMMAND_PREFIXES = [
   'ng serve',
@@ -25,7 +25,7 @@ export const ALLOWED_COMMAND_PREFIXES = [
   'ng new',
 ];
 
-@Service()
+@Injectable({providedIn: 'root'})
 export class CommandValidator {
   // Method return true when the provided command is allowed to execute, otherwise return false.
   validate(command: string): boolean {

@@ -6,19 +6,17 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {ɵRuntimeError as RuntimeError} from '@angular/core';
-import {RuntimeErrorCode} from '../errors';
-import {signalErrorsToValidationErrors} from '../compat/validation_errors';
-
 import {
   ControlValueAccessor,
   Validators,
   type AbstractControl,
   type FormControlStatus,
+  type NgControl,
   type ValidationErrors,
   type ValidatorFn,
 } from '@angular/forms';
-import type {ReadonlyFieldState} from '../api/types';
+import {REQUIRED} from '../api/property';
+import type {FieldState} from '../api/types';
 
 // TODO: Also consider supporting (if possible):
 // - hasError
@@ -29,45 +27,39 @@ import type {ReadonlyFieldState} from '../api/types';
 // - markAs[Touched,Dirty,etc.]
 
 /**
- * Represents a combination of `NgControl` and `AbstractControl`.
- *
- * Note: We have this separate interface, rather than implementing the relevant parts of the two
- * controls with something like `InteropNgControl implements Pick<NgControl, ...>, Pick<AbstractControl, ...>`
- * because it confuses the internal JS minifier which can cause collisions in field names.
+ * Properties of both NgControl & AbstractControl that are supported by the InteropNgControl.
  */
-interface CombinedControl {
-  value: unknown;
-  valid: boolean;
-  invalid: boolean;
-  touched: boolean;
-  untouched: boolean;
-  disabled: boolean;
-  enabled: boolean;
-  errors: ValidationErrors | null;
-  pristine: boolean;
-  dirty: boolean;
-  status: FormControlStatus;
-  control: AbstractControl<any, any>;
-  valueAccessor: ControlValueAccessor | null;
-  hasValidator(validator: ValidatorFn): boolean;
-  updateValueAndValidity(): void;
-}
+export type InteropSharedKeys =
+  | 'value'
+  | 'valid'
+  | 'invalid'
+  | 'touched'
+  | 'untouched'
+  | 'disabled'
+  | 'enabled'
+  | 'errors'
+  | 'pristine'
+  | 'dirty'
+  | 'status';
 
 /**
- * A fake version of `NgControl` provided by the `Field` directive. This allows interoperability
+ * A fake version of `NgControl` provided by the `Control` directive. This allows interoperability
  * with a wider range of components designed to work with reactive forms, in particular ones that
  * inject the `NgControl`. The interop control does not implement *all* properties and methods of
  * the real `NgControl`, but does implement some of the most commonly used ones that have a clear
  * equivalent in signal forms.
  */
-export class InteropNgControl implements CombinedControl {
-  constructor(protected field: () => ReadonlyFieldState<unknown>) {}
+export class InteropNgControl
+  implements
+    Pick<NgControl, InteropSharedKeys | 'control' | 'valueAccessor'>,
+    Pick<AbstractControl<unknown>, InteropSharedKeys | 'hasValidator'>
+{
+  constructor(protected field: () => FieldState<unknown>) {}
 
   readonly control: AbstractControl<any, any> = this as unknown as AbstractControl<any, any>;
 
-  get value(): unknown {
-    // CVA controls are not aware of user debouncing and will expect `NgControl.value` to reflect their latest writes.
-    return this.field().controlValue();
+  get value(): any {
+    return this.field().value();
   }
 
   get valid(): boolean {
@@ -91,7 +83,15 @@ export class InteropNgControl implements CombinedControl {
   }
 
   get errors(): ValidationErrors | null {
-    return signalErrorsToValidationErrors(this.field().errors());
+    const errors = this.field().errors();
+    if (errors.length === 0) {
+      return null;
+    }
+    const errObj: ValidationErrors = {};
+    for (const error of errors) {
+      errObj[error.kind] = error;
+    }
+    return errObj;
   }
 
   get pristine(): boolean {
@@ -123,10 +123,7 @@ export class InteropNgControl implements CombinedControl {
     if (this.field().pending()) {
       return 'PENDING';
     }
-    throw new RuntimeError(
-      RuntimeErrorCode.UNKNOWN_STATUS,
-      ngDevMode && 'Unknown form control status',
-    );
+    throw Error('AssertionError: unknown form control status');
   }
 
   valueAccessor: ControlValueAccessor | null = null;
@@ -135,7 +132,7 @@ export class InteropNgControl implements CombinedControl {
     // This addresses a common case where users look for the presence of `Validators.required` to
     // determine whether or not to show a required "*" indicator in the UI.
     if (validator === Validators.required) {
-      return this.field().required();
+      return this.field().property(REQUIRED)();
     }
     return false;
   }

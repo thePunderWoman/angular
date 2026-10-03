@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {registerLocaleData, PercentPipe} from '@angular/common';
+import {registerLocaleData} from '@angular/common';
 import {Component} from '@angular/core';
 // we need to import data for the french locale
 import localeFr from './locale-fr';
@@ -17,7 +17,6 @@ registerLocaleData(localeFr);
 // #docregion PercentPipe
 @Component({
   selector: 'percent-pipe',
-  imports: [PercentPipe],
   template: `<div>
     <!--output '26%'-->
     <p>A: {{ a | percent }}</p>
@@ -28,6 +27,7 @@ registerLocaleData(localeFr);
     <!--output '0 134,950 %'-->
     <p>B: {{ b | percent: '4.3-5' : 'fr' }}</p>
   </div>`,
+  standalone: false,
 })
 export class PercentPipeComponent {
   a: number = 0.259;

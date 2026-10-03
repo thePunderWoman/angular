@@ -8,7 +8,6 @@
 import {resolveForwardRef} from '../forward_ref';
 import {ɵɵinject, ɵɵinvalidFactoryDep} from '../injector_compatibility';
 import {ɵɵdefineInjectable, ɵɵdefineInjector} from '../interface/defs';
-import {ɵɵdefineService} from '../interface/service';
 
 /**
  * A mapping of the @angular/core API surface used in generated expressions to the actual symbols.
@@ -18,7 +17,6 @@ import {ɵɵdefineService} from '../interface/service';
 export const angularCoreDiEnv: {[name: string]: Function} = {
   'ɵɵdefineInjectable': ɵɵdefineInjectable,
   'ɵɵdefineInjector': ɵɵdefineInjector,
-  'ɵɵdefineService': ɵɵdefineService,
   'ɵɵinject': ɵɵinject,
   'ɵɵinvalidFactoryDep': ɵɵinvalidFactoryDep,
   'resolveForwardRef': resolveForwardRef,

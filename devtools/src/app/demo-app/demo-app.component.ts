@@ -12,13 +12,10 @@ import {
   computed,
   CUSTOM_ELEMENTS_SCHEMA,
   Directive,
-  effect,
   ElementRef,
   inject,
   input,
-  linkedSignal,
   output,
-  resource,
   signal,
   TemplateRef,
   viewChild,
@@ -26,11 +23,11 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 
-import {RouterModule, RouterOutlet} from '@angular/router';
-import {CookieRecipe} from './cookies.component';
+import {ZippyComponent} from './zippy.component';
 import {HeavyComponent} from './heavy.component';
 import {SamplePropertiesComponent} from './sample-properties.component';
-import {ZippyComponent} from './zippy.component';
+import {RouterOutlet} from '@angular/router';
+import {CookieRecipe} from './cookies.component';
 
 // structual directive example
 @Directive({
@@ -60,7 +57,6 @@ export class StructuralDirective {
     HeavyComponent,
     SamplePropertiesComponent,
     RouterOutlet,
-    RouterModule,
     CookieRecipe,
   ],
 })
@@ -81,15 +77,6 @@ export class DemoAppComponent {
     const original = this.objectSignal();
     return {...original, age: original.age + 1};
   });
-  linkedPrimitive = linkedSignal({
-    source: this.primitiveSignal,
-    computation: (value) => value * 2,
-  });
-
-  demoRsrc = resource({
-    defaultValue: 'default_value',
-    loader: () => new Promise((res) => setTimeout(() => res('loaded_value'), 5000)),
-  });
 
   getTitle(): '► Click to expand' | '▼ Click to collapse' {
     if (!this.zippy() || !this.zippy()?.visible) {
@@ -101,10 +88,6 @@ export class DemoAppComponent {
   constructor() {
     afterRenderEffect(() => {
       this.zippy();
-    });
-
-    effect(() => {
-      this.demoRsrc.isLoading();
     });
   }
 }

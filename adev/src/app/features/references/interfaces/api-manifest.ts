@@ -10,7 +10,6 @@ import {ApiItemType} from './api-item-type';
 
 export interface ApiManifestEntry {
   name: string;
-  aliases?: string[];
   type: ApiItemType;
   category: string | undefined;
   deprecated: {version: string | undefined} | undefined;

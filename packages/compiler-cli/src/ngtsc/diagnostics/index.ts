@@ -6,6 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
+export {COMPILER_ERRORS_WITH_GUIDES} from './src/docs';
 export {
   addDiagnosticChain,
   FatalDiagnosticError,
@@ -16,12 +17,6 @@ export {
   makeRelatedInformation,
 } from './src/error';
 export {ErrorCode} from './src/error_code';
-export {ERROR_DETAILS_PAGE_BASE_URL, DOC_PAGE_BASE_URL} from './src/error_details_base_url';
+export {ERROR_DETAILS_PAGE_BASE_URL} from './src/error_details_base_url';
 export {ExtendedTemplateDiagnosticName} from './src/extended_template_diagnostic_name';
-export {
-  addDiagnosticDetails,
-  errorCodeWithGuideFromDiagnosticCode,
-  formatCompilerErrorCode,
-  ngErrorCode,
-  replaceTsWithNgInErrors,
-} from './src/util';
+export {ngErrorCode, replaceTsWithNgInErrors} from './src/util';

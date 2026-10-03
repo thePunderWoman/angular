@@ -41,10 +41,16 @@ export interface I18nMessageFactory {
  * Returns a function converting html nodes to an i18n Message
  */
 export function createI18nMessageFactory(
+  containerBlocks: Set<string>,
   retainEmptyTokens: boolean,
   preserveExpressionWhitespace: boolean,
 ): I18nMessageFactory {
-  const visitor = new _I18nVisitor(_expParser, retainEmptyTokens, preserveExpressionWhitespace);
+  const visitor = new _I18nVisitor(
+    _expParser,
+    containerBlocks,
+    retainEmptyTokens,
+    preserveExpressionWhitespace,
+  );
   return (nodes, meaning, description, customId, visitNodeFn) =>
     visitor.toI18nMessage(nodes, meaning, description, customId, visitNodeFn);
 }
@@ -65,6 +71,7 @@ function noopVisitNodeFn(_html: html.Node, i18n: i18n.Node): i18n.Node {
 class _I18nVisitor implements html.Visitor {
   constructor(
     private _expressionParser: ExpressionParser,
+    private _containerBlocks: Set<string>,
     private readonly _retainEmptyTokens: boolean,
     private readonly _preserveExpressionWhitespace: boolean,
   ) {}
@@ -160,7 +167,7 @@ class _I18nVisitor implements html.Visitor {
     }
 
     // Else returns a placeholder
-    // ICU placeholders should not be replaced with their original content but with their
+    // ICU placeholders should not be replaced with their original content but with the their
     // translations.
     // TODO(vicb): add a html.Node -> i18n.Message cache to avoid having to re-create the msg
     const phName = context.placeholderRegistry.getPlaceholderName('ICU', icu.sourceSpan.toString());
@@ -176,7 +183,7 @@ class _I18nVisitor implements html.Visitor {
   visitBlock(block: html.Block, context: I18nMessageVisitorContext) {
     const children = html.visitAll(this, block.children, context);
 
-    if (block.name === 'switch') {
+    if (this._containerBlocks.has(block.name)) {
       return new i18n.Container(children, block.sourceSpan);
     }
 

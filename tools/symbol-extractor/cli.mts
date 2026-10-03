@@ -86,10 +86,8 @@ function main(argv: [string, string, string] | [string, string]): boolean {
   if (doUpdate) {
     const newGolden: GoldenFile = {
       chunks: {
-        // Ensure stability of symbol lists, we need to make sure we resort the lists for because
-        // the ordering of glob results for the bundle files isn't guaranteed.
-        main: eagerlyLoadedSymbols.sort(),
-        lazy: lazySymbols.sort(),
+        main: eagerlyLoadedSymbols,
+        lazy: lazySymbols,
       },
     };
 

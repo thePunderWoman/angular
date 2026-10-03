@@ -34,17 +34,16 @@ export function replaceKeywordFromShikiHtml(
   shikiHtml: string,
   replaceWith: string,
 ): string {
-  const keywordElement = `<[^>]*>(?:${keyword})<\\/\\w+>`;
-
   return (
     shikiHtml
-      // Linking an identifier causes Shiki to emit the space before it as a separate element.
-      .replace(new RegExp(`(${keywordElement})<[^>]*>\\s+<\\/\\w+>`, 'g'), '$1')
-      // Without a link, Shiki includes the space in the identifier's element instead.
-      .replace(new RegExp(`(${keywordElement}<[^>]*>)\\s+(?=[^<\\s]+<\\/\\w+>)`, 'g'), '$1')
+      // remove the leading space of the element after the keyword
+      .replace(
+        new RegExp(`(<[^>]*>(?:${keyword})<\\/\\w+><[^>]*>)(\\s)(\\w+<\\/\\w+>)`, 'g'),
+        '$1$3',
+      )
       // Shiki requires the keywords (eg. function,interface) for highlighting signatures
       // here we are replacing it
-      .replace(new RegExp(keywordElement, 'g'), replaceWith)
+      .replace(new RegExp(`<[^>]*>(?:${keyword})<\\/\\w+>`, 'g'), replaceWith)
   );
 }
 

@@ -14,7 +14,6 @@ import {
   Pipe,
   PipeTransform,
 } from '@angular/core';
-import {warnIfSignal} from './utils';
 
 function makeKeyValuePair<K, V>(key: K, value: V): KeyValue<K, V> {
   return {key: key, value: value};
@@ -50,8 +49,6 @@ export interface KeyValue<K, V> {
  *
  * {@example common/pipes/ts/keyvalue_pipe.ts region='KeyValuePipe'}
  *
- * @see [Built-in Pipes](guide/templates/pipes#built-in-pipes)
- *
  * @publicApi
  */
 @Pipe({
@@ -75,23 +72,14 @@ export class KeyValuePipe implements PipeTransform {
     input: ReadonlyMap<K, V>,
     compareFn?: ((a: KeyValue<K, V>, b: KeyValue<K, V>) => number) | null,
   ): Array<KeyValue<K, V>>;
-  // TypeScript tries overloads top-to-bottom and stops at the first match. A
-  // plain object with string-literal keys (e.g. `Record<'a' | 'b', V>`) also
-  // happens to satisfy the more general `K extends number` overload below once
-  // inference falls back to its constraint — so if that overload is checked
-  // first, it wins by accident and silently widens `key` from `'a' | 'b'` to
-  // plain `string`. Putting the string overload first means it claims
-  // string-keyed input before the number overload ever gets a chance, while
-  // genuinely numeric-keyed input (which fails `K extends string`) still falls
-  // through to the number overload exactly as before.
-  transform<K extends string, V>(
-    input: Record<K, V> | ReadonlyMap<K, V>,
-    compareFn?: ((a: KeyValue<K, V>, b: KeyValue<K, V>) => number) | null,
-  ): Array<KeyValue<K, V>>;
   transform<K extends number, V>(
     input: Record<K, V>,
     compareFn?: ((a: KeyValue<string, V>, b: KeyValue<string, V>) => number) | null,
   ): Array<KeyValue<string, V>>;
+  transform<K extends string, V>(
+    input: Record<K, V> | ReadonlyMap<K, V>,
+    compareFn?: ((a: KeyValue<K, V>, b: KeyValue<K, V>) => number) | null,
+  ): Array<KeyValue<K, V>>;
   transform(
     input: null | undefined,
     compareFn?: ((a: KeyValue<unknown, unknown>, b: KeyValue<unknown, unknown>) => number) | null,
@@ -100,27 +88,18 @@ export class KeyValuePipe implements PipeTransform {
     input: ReadonlyMap<K, V> | null | undefined,
     compareFn?: ((a: KeyValue<K, V>, b: KeyValue<K, V>) => number) | null,
   ): Array<KeyValue<K, V>> | null;
-  transform<K extends string, V>(
-    input: Record<K, V> | ReadonlyMap<K, V> | null | undefined,
-    compareFn?: ((a: KeyValue<K, V>, b: KeyValue<K, V>) => number) | null,
-  ): Array<KeyValue<K, V>> | null;
-
   transform<K extends number, V>(
     input: Record<K, V> | null | undefined,
     compareFn?: ((a: KeyValue<string, V>, b: KeyValue<string, V>) => number) | null,
   ): Array<KeyValue<string, V>> | null;
-
-  transform<T>(
-    input: T,
-    compareFn?: T extends object ? (a: T[keyof T], b: T[keyof T]) => number : never,
-  ): T extends object ? Array<KeyValue<keyof T, T[keyof T]>> : null;
-
+  transform<K extends string, V>(
+    input: Record<K, V> | ReadonlyMap<K, V> | null | undefined,
+    compareFn?: ((a: KeyValue<K, V>, b: KeyValue<K, V>) => number) | null,
+  ): Array<KeyValue<K, V>> | null;
   transform<K, V>(
     input: undefined | null | {[key: string]: V; [key: number]: V} | ReadonlyMap<K, V>,
     compareFn: ((a: KeyValue<K, V>, b: KeyValue<K, V>) => number) | null = defaultComparator,
   ): Array<KeyValue<K, V>> | null {
-    ngDevMode && warnIfSignal('KeyValuePipe', input);
-
     if (!input || (!(input instanceof Map) && typeof input !== 'object')) {
       return null;
     }

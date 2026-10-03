@@ -52,16 +52,7 @@ export class By {
 }
 
 // @public
-export function createApplication(options?: ApplicationConfig, context?: BootstrapContext): Promise<ApplicationRef>;
-
-// @public
-export class CssVarNamespacer {
-    namespace(name: string): string;
-    // (undocumented)
-    static ɵfac: i0.ɵɵFactoryDeclaration<CssVarNamespacer, never>;
-    // (undocumented)
-    static ɵprov: i0.ɵɵInjectableDeclaration<any>;
-}
+export function createApplication(options?: ApplicationConfig): Promise<ApplicationRef>;
 
 // @public
 export function disableDebugTools(): void;
@@ -77,7 +68,7 @@ export abstract class DomSanitizer implements Sanitizer {
     // (undocumented)
     static ɵfac: i0.ɵɵFactoryDeclaration<DomSanitizer, never>;
     // (undocumented)
-    static ɵprov: i0.ɵɵInjectableDeclaration<any>;
+    static ɵprov: i0.ɵɵInjectableDeclaration<DomSanitizer>;
 }
 
 // @public
@@ -94,7 +85,7 @@ export class EventManager {
     // (undocumented)
     static ɵfac: i0.ɵɵFactoryDeclaration<EventManager, never>;
     // (undocumented)
-    static ɵprov: i0.ɵɵInjectableDeclaration<any>;
+    static ɵprov: i0.ɵɵInjectableDeclaration<EventManager>;
 }
 
 // @public
@@ -104,6 +95,48 @@ export abstract class EventManagerPlugin {
     // (undocumented)
     manager: EventManager;
     abstract supports(eventName: string): boolean;
+}
+
+// @public @deprecated
+export const HAMMER_GESTURE_CONFIG: InjectionToken<HammerGestureConfig>;
+
+// @public @deprecated
+export const HAMMER_LOADER: InjectionToken<HammerLoader>;
+
+// @public @deprecated
+export class HammerGestureConfig {
+    buildHammer(element: HTMLElement): HammerInstance;
+    events: string[];
+    options?: {
+        cssProps?: any;
+        domEvents?: boolean;
+        enable?: boolean | ((manager: any) => boolean);
+        preset?: any[];
+        touchAction?: string;
+        recognizers?: any[];
+        inputClass?: any;
+        inputTarget?: EventTarget;
+    };
+    overrides: {
+        [key: string]: Object;
+    };
+    // (undocumented)
+    static ɵfac: i0.ɵɵFactoryDeclaration<HammerGestureConfig, never>;
+    // (undocumented)
+    static ɵprov: i0.ɵɵInjectableDeclaration<HammerGestureConfig>;
+}
+
+// @public @deprecated
+export type HammerLoader = () => Promise<void>;
+
+// @public @deprecated
+export class HammerModule {
+    // (undocumented)
+    static ɵfac: i0.ɵɵFactoryDeclaration<HammerModule, never>;
+    // (undocumented)
+    static ɵinj: i0.ɵɵInjectorDeclaration<HammerModule>;
+    // (undocumented)
+    static ɵmod: i0.ɵɵNgModuleDeclaration<HammerModule, never, never, never>;
 }
 
 // @public
@@ -125,13 +158,12 @@ export enum HydrationFeatureKind {
     // (undocumented)
     IncrementalHydration = 4,
     // (undocumented)
-    NoHttpTransferCache = 0,
-    // (undocumented)
-    NoIncrementalHydration = 5
+    NoHttpTransferCache = 0
 }
 
 // @public
 export class Meta {
+    constructor(_doc: any);
     addTag(tag: MetaDefinition, forceCreation?: boolean): HTMLMetaElement | null;
     addTags(tags: MetaDefinition[], forceCreation?: boolean): HTMLMetaElement[];
     getTag(attrSelector: string): HTMLMetaElement | null;
@@ -142,7 +174,7 @@ export class Meta {
     // (undocumented)
     static ɵfac: i0.ɵɵFactoryDeclaration<Meta, never>;
     // (undocumented)
-    static ɵprov: i0.ɵɵInjectableDeclaration<any>;
+    static ɵprov: i0.ɵɵInjectableDeclaration<Meta>;
 }
 
 // @public
@@ -167,12 +199,7 @@ export const platformBrowser: (extraProviders?: StaticProvider[]) => PlatformRef
 export function provideClientHydration(...features: HydrationFeature<HydrationFeatureKind>[]): EnvironmentProviders;
 
 // @public
-export function provideCssVarNamespacing(namespace?: string): EnvironmentProviders;
-
-// @public
-export function provideProtractorTestingSupport(options?: {
-    usePendingTasksForStability?: boolean;
-}): Provider[];
+export function provideProtractorTestingSupport(): Provider[];
 
 // @public
 export const REMOVE_STYLES_ON_COMPONENT_DESTROY: InjectionToken<boolean>;
@@ -209,7 +236,7 @@ export class Title {
     // (undocumented)
     static ɵfac: i0.ɵɵFactoryDeclaration<Title, never>;
     // (undocumented)
-    static ɵprov: i0.ɵɵInjectableDeclaration<any>;
+    static ɵprov: i0.ɵɵInjectableDeclaration<Title>;
 }
 
 // @public (undocumented)
@@ -224,14 +251,11 @@ export function withHttpTransferCacheOptions(options: HttpTransferCacheOptions):
 // @public
 export function withI18nSupport(): HydrationFeature<HydrationFeatureKind.I18nSupport>;
 
-// @public @deprecated
+// @public
 export function withIncrementalHydration(): HydrationFeature<HydrationFeatureKind.IncrementalHydration>;
 
 // @public
 export function withNoHttpTransferCache(): HydrationFeature<HydrationFeatureKind.NoHttpTransferCache>;
-
-// @public
-export function withNoIncrementalHydration(): HydrationFeature<HydrationFeatureKind.NoIncrementalHydration>;
 
 // (No @packageDocumentation comment for this package)
 

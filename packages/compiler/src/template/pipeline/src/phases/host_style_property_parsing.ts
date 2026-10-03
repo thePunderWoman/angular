@@ -9,7 +9,6 @@
 import * as ir from '../../ir';
 
 import type {CompilationJob} from '../compilation';
-import {namespaceCssVariable} from '../../../../util';
 
 const STYLE_DOT = 'style.';
 const CLASS_DOT = 'class.';
@@ -41,8 +40,6 @@ export function parseHostStyleProperties(job: CompilationJob): void {
 
       if (!isCssCustomProperty(op.name)) {
         op.name = hyphenate(op.name);
-      } else {
-        op.name = namespaceCssVariable(op.name);
       }
 
       const {property, suffix} = parseProperty(op.name);

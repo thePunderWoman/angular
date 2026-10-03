@@ -3,9 +3,15 @@
     "moduleResolution": "bundler",
     "experimentalDecorators": true,
     "target": "es2015",
-    "typeRoots": ["node_modules/@types"],
+    "strict": true,
+    "typeRoots": [
+      "node_modules/@types"
+    ],
+    "baseUrl": ".",
     "paths": {
-      "post": ["./dist/post"]
+      "post": [
+        "dist/post"
+      ]
     }
   },
   "angularCompilerOptions": {

@@ -15,9 +15,6 @@ import {ComponentFactory} from './component_ref';
 import {getComponentDef} from './def_getters';
 import {Binding, DirectiveWithBindings} from './dynamic_bindings';
 import {assertComponentDef} from './errors';
-import {ON_ERROR} from './interfaces/view';
-import {ErrorDetails} from '../error_handler';
-import {ViewRef as R3ViewRef} from './view_ref';
 
 /**
  * Creates a `ComponentRef` instance based on provided component type and a set of options.
@@ -77,12 +74,7 @@ import {ViewRef as R3ViewRef} from './view_ref';
  * and `element3` into a separate `<ng-content>`.
  *  * `directives` (optional): Directives that should be applied to the component.
  *  * `bindings` (optional): Bindings to apply to the root component.
- *  * `onError` (optional): A callback that will be invoked when an error occurs during the component's change detection or lifecycle hooks.
- *                        Note that this will not catch errors thrown during the component's construction.
  * @returns ComponentRef instance that represents a given Component.
- *
- * @see [Host view using `ViewContainerRef.createComponent`](guide/components/programmatic-rendering#host-view-using-viewcontainerrefcreatecomponent)
- * @see [Popup attached to `document.body` with `createComponent` + `hostElement`](guide/components/programmatic-rendering#popup-attached-to-documentbody-with-createcomponent--hostelement)
  *
  * @publicApi
  */
@@ -95,14 +87,13 @@ export function createComponent<C>(
     projectableNodes?: Node[][];
     directives?: (Type<unknown> | DirectiveWithBindings<unknown>)[];
     bindings?: Binding[];
-    onError?: (error: Error, details: ErrorDetails) => void;
   },
 ): ComponentRef<C> {
   ngDevMode && assertComponentDef(component);
   const componentDef = getComponentDef(component)!;
   const elementInjector = options.elementInjector || getNullInjector();
   const factory = new ComponentFactory<C>(componentDef);
-  const componentRef = factory.create(
+  return factory.create(
     elementInjector,
     options.projectableNodes,
     options.hostElement,
@@ -110,10 +101,6 @@ export function createComponent<C>(
     options.directives,
     options.bindings,
   );
-  if (options.onError) {
-    (componentRef.hostView as R3ViewRef<any>)._lView![ON_ERROR] = options.onError;
-  }
-  return componentRef;
 }
 
 /**

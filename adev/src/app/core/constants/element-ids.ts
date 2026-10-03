@@ -8,4 +8,3 @@
 
 export const PRIMARY_NAV_ID = 'primaryNav';
 export const SECONDARY_NAV_ID = 'secondaryNav';
-export const SEARCH_DIALOG_ID = 'docsSearchDialog';

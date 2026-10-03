@@ -7,14 +7,9 @@
  */
 
 import {ASTWithName, TmplAstElement} from '@angular/compiler';
-import {
-  ErrorCode as NgCompilerErrorCode,
-  ngErrorCode,
-  PotentialDirective,
-  PotentialPipe,
-} from '@angular/compiler-cli';
-
-import type ts from 'typescript';
+import {ErrorCode as NgCompilerErrorCode, ngErrorCode} from '@angular/compiler-cli';
+import {PotentialDirective, PotentialPipe} from '@angular/compiler-cli/src/ngtsc/typecheck/api';
+import ts from 'typescript';
 
 import {getTargetAtPosition, TargetNodeKind} from '../template_target';
 import {
@@ -95,7 +90,6 @@ function getCodeActions({typeCheckInfo, start, compiler, tsLs, preferences}: Cod
         currMatch,
         tsLs,
         preferences.includeCompletionsForModuleExports,
-        preferences,
       ) ?? [];
 
     codeActions.push(

@@ -215,7 +215,7 @@ export class AnimationAstBuilderVisitor implements AnimationDslVisitor {
         if (style instanceof Map) {
           style.forEach((value) => {
             extractStyleParams(value).forEach((sub) => {
-              if (!Object.hasOwn(params, sub)) {
+              if (!params.hasOwnProperty(sub)) {
                 missingSubs.add(sub);
               }
             });
@@ -650,7 +650,7 @@ function consumeOffset(styles: OffsetStyles | Array<OffsetStyles>): number | nul
 }
 
 function constructTimingAst(value: string | number | AnimateTimings, errors: Error[]) {
-  if (typeof value === 'object' && value !== null && Object.hasOwn(value, 'duration')) {
+  if (value.hasOwnProperty('duration')) {
     return value as AnimateTimings;
   }
 

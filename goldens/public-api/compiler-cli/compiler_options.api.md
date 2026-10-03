@@ -7,11 +7,9 @@
 // @public
 export interface BazelAndG3Options {
     annotateForClosureCompiler?: boolean;
-    enableTemplateSourceLocations?: boolean;
     _experimentalAllowEmitDeclarationOnly?: boolean;
     generateDeepReexports?: boolean;
     generateExtraImportsInLocalMode?: boolean;
-    legacyOptionalChaining?: boolean;
     onlyExplicitDeferDependencyImports?: boolean;
     onlyPublishPublicTypingsForNgModules?: boolean;
 }
@@ -52,6 +50,8 @@ export interface LegacyNgcOptions {
     allowEmptyCodegenFiles?: boolean;
     flatModuleId?: string;
     flatModuleOutFile?: string;
+    // @deprecated
+    fullTemplateTypeCheck?: boolean;
     preserveWhitespaces?: boolean;
     strictInjectionParameters?: boolean;
 }
@@ -81,7 +81,6 @@ export interface TypeCheckingOptions {
     strictOutputEventTypes?: boolean;
     strictSafeNavigationTypes?: boolean;
     strictTemplates?: boolean;
-    strictUnclaimedEventNames?: boolean;
     typeCheckHostBindings?: boolean;
 }
 

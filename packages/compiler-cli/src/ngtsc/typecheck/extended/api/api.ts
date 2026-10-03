@@ -7,18 +7,11 @@
  */
 
 import {
-  AbsoluteSourceSpan,
   AST,
   CombinedRecursiveAstVisitor,
   ParseSourceSpan,
   TmplAstNode,
   TmplAstTemplate,
-  KeyedRead,
-  SafePropertyRead,
-  SafeKeyedRead,
-  SafeCall,
-  ParenthesizedExpression,
-  NonNullAssert,
 } from '@angular/compiler';
 import ts from 'typescript';
 
@@ -58,19 +51,15 @@ export interface TemplateContext<Code extends ErrorCode> {
   /**
    * Creates a template diagnostic with the given information for the template being processed and
    * using the diagnostic category configured for the extended template diagnostic.
-   *
-   * @param relatedInformation Optional list of secondary related messages:
-   *   - Omit `sourceFile` when `start` and `end` offsets are locations within the template itself.
-   *   - Specify `sourceFile` only when referencing a separate file (e.g. directive class declaration).
    */
   makeTemplateDiagnostic(
-    sourceSpan: ParseSourceSpan | AbsoluteSourceSpan,
+    sourceSpan: ParseSourceSpan,
     message: string,
     relatedInformation?: {
       text: string;
       start: number;
       end: number;
-      sourceFile?: ts.SourceFile;
+      sourceFile: ts.SourceFile;
     }[],
   ): NgTemplateDiagnostic<Code>;
 }
@@ -91,9 +80,20 @@ export interface TemplateCheckFactory<
 /**
  * This abstract class provides a base implementation for the run method.
  */
-export abstract class TemplateCheckWithVisitor<
-  Code extends ErrorCode,
-> implements TemplateCheck<Code> {
+export abstract class TemplateCheckWithVisitor<Code extends ErrorCode>
+  implements TemplateCheck<Code>
+{
+  /**
+   * When extended diagnostics were first introduced, the visitor wasn't implemented correctly
+   * which meant that it wasn't visiting the `templateAttrs` of structural directives (e.g.
+   * the expression of `*ngIf`). Fixing the issue causes a lot of internal breakages and will likely
+   * need to be done in a major version to avoid external breakages. This flag is used to opt out
+   * pre-existing diagnostics from the correct behavior until the breakages have been fixed while
+   * ensuring that newly-written diagnostics are correct from the beginning.
+   * TODO(crisbeto): remove this flag and fix the internal brekages.
+   */
+  readonly canVisitStructuralAttributes: boolean = true;
+
   abstract code: Code;
 
   /**
@@ -153,8 +153,11 @@ class TemplateVisitor<Code extends ErrorCode> extends CombinedRecursiveAstVisito
 
     this.visitAllTemplateNodes(template.directives);
 
-    // `templateAttrs` aren't transferred over to the inner element so we always have to visit them.
-    this.visitAllTemplateNodes(template.templateAttrs);
+    // TODO(crisbeto): remove this condition when deleting `canVisitStructuralAttributes`.
+    if (this.check.canVisitStructuralAttributes || isInlineTemplate) {
+      // `templateAttrs` aren't transferred over to the inner element so we always have to visit them.
+      this.visitAllTemplateNodes(template.templateAttrs);
+    }
 
     this.visitAllTemplateNodes(template.variables);
     this.visitAllTemplateNodes(template.references);
@@ -166,24 +169,4 @@ class TemplateVisitor<Code extends ErrorCode> extends CombinedRecursiveAstVisito
     this.visitAllTemplateNodes(template);
     return this.diagnostics;
   }
-}
-
-/**
- * Checks if the given AST node originates from a KeyedRead (indexed access)
- * by unwrapping parentheses, non-null assertions, and traversing the receivers
- * of safe navigation operations (?. property access, ?.[] keyed access, ?.() calls).
- */
-export function isAccessFromUncheckedIndex(node: AST): boolean {
-  if (node instanceof KeyedRead) {
-    return true;
-  } else if (
-    node instanceof SafePropertyRead ||
-    node instanceof SafeKeyedRead ||
-    node instanceof SafeCall
-  ) {
-    return isAccessFromUncheckedIndex(node.receiver);
-  } else if (node instanceof ParenthesizedExpression || node instanceof NonNullAssert) {
-    return isAccessFromUncheckedIndex(node.expression);
-  }
-  return false;
 }

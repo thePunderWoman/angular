@@ -7,14 +7,14 @@
  */
 
 import {DOCUMENT} from '@angular/common';
-import {inject, Service} from '@angular/core';
+import {Injectable, inject} from '@angular/core';
 
-import {ANGULAR_DEV} from '../constants/links';
+const ANGULAR_DEV = 'https://angular.dev';
 
 /**
  * Information about the deployment of this application.
  */
-@Service()
+@Injectable({providedIn: 'root'})
 export class HeaderService {
   private readonly document = inject(DOCUMENT);
 

@@ -7,23 +7,21 @@
  */
 
 import {Fragment, h} from 'preact';
-import {
-  FunctionSignatureMetadataRenderable,
-  ParameterEntryRenderable,
-} from '../entities/renderables.mjs';
+import {FunctionSignatureMetadataRenderable, ParameterEntryRenderable} from '../entities/renderables.mjs';
 import {PARAM_KEYWORD_CLASS_NAME, REFERENCE_MEMBER_CARD_ITEM} from '../styling/css-classes.mjs';
-import {CodeSymbol} from './code-symbols';
 import {DeprecatedLabel} from './deprecated-label';
 import {Parameter} from './parameter';
 import {RawHtml} from './raw-html';
+import {CodeSymbol} from './code-symbols';
 
 /**
  * Component to render the method-specific parts of a class's API reference.
  */
 export function ClassMethodInfo(props: {
   entry: FunctionSignatureMetadataRenderable;
-  hideUsageNotes?: boolean;
-  hideDescription?: boolean;
+  options?: {
+    showUsageNotes?: boolean;
+  };
 }) {
   const entry = props.entry;
 
@@ -31,9 +29,7 @@ export function ClassMethodInfo(props: {
     <div
       className={`${REFERENCE_MEMBER_CARD_ITEM} ${entry.deprecated ? 'docs-reference-card-item-deprecated' : ''}`}
     >
-      {!props.hideDescription && (
-        <RawHtml value={entry.htmlDescription} className={'docs-function-definition'} />
-      )}
+      <RawHtml value={entry.htmlDescription} className={'docs-function-definition'} />
       {/* In case when method is overloaded we need to indicate which overload is deprecated */}
       {entry.deprecated ? (
         <div>
@@ -48,13 +44,10 @@ export function ClassMethodInfo(props: {
       <div className={'docs-return-type'}>
         <span className={PARAM_KEYWORD_CLASS_NAME}>@returns</span>
         <CodeSymbol code={entry.returnType} />
-        {entry.htmlReturnDescription && (
-          <RawHtml value={entry.htmlReturnDescription} className="docs-parameter-description" />
-        )}
       </div>
-      {entry.htmlUsageNotes && !props.hideUsageNotes ? (
+      {entry.htmlUsageNotes && props.options?.showUsageNotes ? (
         <div className={'docs-usage-notes'}>
-          <span className={'docs-usage-notes-heading'}>Usage notes</span>
+          <span className={PARAM_KEYWORD_CLASS_NAME}>Usage notes</span>
           <RawHtml value={entry.htmlUsageNotes} />
         </div>
       ) : (

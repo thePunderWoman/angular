@@ -8,14 +8,10 @@
 
 import {h} from 'preact';
 import {renderToString} from 'preact-render-to-string';
-import {HasRenderableToc} from '../entities/traits.mjs';
 import {CodeLineGroup} from './code-line-group';
+import {HasRenderableToc} from '../entities/traits.mjs';
 
-export function CodeTableOfContents(props: {
-  entry: HasRenderableToc;
-  hideCopyButton?: boolean;
-  embedded?: boolean;
-}) {
+export function CodeTableOfContents(props: {entry: HasRenderableToc}) {
   let html: string;
   // Prefer the formatted code if available
   if (props.entry.formattedCode) {
@@ -30,14 +26,5 @@ export function CodeTableOfContents(props: {
     ${props.entry.afterCodeGroups}`;
   }
 
-  return (
-    <div
-      className={
-        (props.hideCopyButton ? 'docs-no-copy' : '') +
-        (props.embedded ? ' embedded' : '') +
-        ' docs-code'
-      }
-      dangerouslySetInnerHTML={{__html: html}}
-    ></div>
-  );
+  return <div class="docs-code" dangerouslySetInnerHTML={{__html: html}}></div>;
 }

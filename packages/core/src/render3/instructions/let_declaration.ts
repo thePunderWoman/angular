@@ -1,4 +1,4 @@
-/**
+/*!
  * @license
  * Copyright Google LLC All Rights Reserved.
  *
@@ -25,7 +25,6 @@ const UNINITIALIZED_LET = {};
  * @codeGenApi
  */
 export function ɵɵdeclareLet(index: number): typeof ɵɵdeclareLet {
-  performanceMarkFeature('NgLet');
   const tView = getTView();
   const lView = getLView();
   const adjustedIndex = index + HEADER_OFFSET;
@@ -42,6 +41,7 @@ export function ɵɵdeclareLet(index: number): typeof ɵɵdeclareLet {
  * @codeGenApi
  */
 export function ɵɵstoreLet<T>(value: T): T {
+  performanceMarkFeature('NgLet');
   const tView = getTView();
   const lView = getLView();
   const index = getSelectedIndex();

@@ -14,6 +14,7 @@ import {
   inject,
   Injector,
   Input,
+  NgZone,
   provideZoneChangeDetection,
   signal,
 } from '../src/core';
@@ -154,7 +155,6 @@ describe('effects in TestBed', () => {
 
     @Component({
       template: `{{ sentinel }}`,
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class TestCmp {
       get sentinel(): string {

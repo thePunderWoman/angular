@@ -42,7 +42,7 @@ export interface SearchResult {
 }
 
 /* The hierarchy of the item */
-interface Hierarchy {
+export interface Hierarchy {
   /* It's kind of the page i.e `Docs`, `Tutorials`, `Reference` etc. */
   lvl0: string | null;
   /* Typicaly it's the content of H1 of the page */

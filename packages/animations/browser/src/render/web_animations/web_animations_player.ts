@@ -28,7 +28,8 @@ export class WebAnimationsPlayer implements AnimationPlayer {
   private _originalOnDoneFns: Function[] = [];
   private _originalOnStartFns: Function[] = [];
 
-  public domPlayer: Animation | null = null;
+  // using non-null assertion because it's re(set) by init();
+  public readonly domPlayer!: Animation;
   public time = 0;
 
   public parentPlayer: AnimationPlayer | null = null;
@@ -54,35 +55,26 @@ export class WebAnimationsPlayer implements AnimationPlayer {
   }
 
   init(): void {
-    if (!this._buildPlayer()) {
-      return;
-    }
+    this._buildPlayer();
     this._preparePlayerBeforeStart();
   }
 
-  private _buildPlayer(): Animation | null {
-    if (this._initialized) return this.domPlayer;
+  private _buildPlayer(): void {
+    if (this._initialized) return;
     this._initialized = true;
 
     const keyframes = this.keyframes;
-
-    const animation = this._triggerWebAnimation(this.element, keyframes, this.options);
-    if (!animation) {
-      this._onFinish();
-      return null;
-    }
-
-    this.domPlayer = animation;
+    // @ts-expect-error overwriting a readonly property
+    this.domPlayer = this._triggerWebAnimation(this.element, keyframes, this.options);
     this._finalKeyframe = keyframes.length ? keyframes[keyframes.length - 1] : new Map();
     const onFinish = () => this._onFinish();
-    animation.addEventListener('finish', onFinish);
+    this.domPlayer.addEventListener('finish', onFinish);
     this.onDestroy(() => {
       // We must remove the `finish` event listener once an animation has completed all its
       // iterations. This action is necessary to prevent a memory leak since the listener captures
       // `this`, creating a closure that prevents `this` from being garbage collected.
-      animation.removeEventListener('finish', onFinish);
+      this.domPlayer.removeEventListener('finish', onFinish);
     });
-    return animation;
   }
 
   private _preparePlayerBeforeStart() {
@@ -90,7 +82,7 @@ export class WebAnimationsPlayer implements AnimationPlayer {
     if (this._delay) {
       this._resetDomPlayerState();
     } else {
-      this.domPlayer?.pause();
+      this.domPlayer.pause();
     }
   }
 
@@ -107,16 +99,8 @@ export class WebAnimationsPlayer implements AnimationPlayer {
     element: HTMLElement,
     keyframes: Array<ɵStyleDataMap>,
     options: any,
-  ): Animation | null {
-    const keyframesObject = this._convertKeyframesToObject(keyframes);
-
-    // Account for `Element.animate` throwing an exception (Firefox) or returning null (Chromium) in certain
-    // conditions. See https://github.com/angular/angular/issues/64486
-    try {
-      return element.animate(keyframesObject, options);
-    } catch {
-      return null;
-    }
+  ): Animation {
+    return element.animate(this._convertKeyframesToObject(keyframes), options);
   }
 
   onStart(fn: () => void): void {
@@ -134,10 +118,7 @@ export class WebAnimationsPlayer implements AnimationPlayer {
   }
 
   play(): void {
-    const player = this._buildPlayer();
-    if (!player) {
-      return;
-    }
+    this._buildPlayer();
     if (!this.hasStarted()) {
       this._onStartFns.forEach((fn) => fn());
       this._onStartFns = [];
@@ -146,17 +127,16 @@ export class WebAnimationsPlayer implements AnimationPlayer {
         this._specialStyles.start();
       }
     }
-    player.play();
+    this.domPlayer.play();
   }
 
   pause(): void {
     this.init();
-    this.domPlayer?.pause();
+    this.domPlayer.pause();
   }
 
   finish(): void {
     this.init();
-    if (!this.domPlayer) return;
     if (this._specialStyles) {
       this._specialStyles.finish();
     }
@@ -174,7 +154,9 @@ export class WebAnimationsPlayer implements AnimationPlayer {
   }
 
   private _resetDomPlayerState() {
-    this.domPlayer?.cancel();
+    if (this.domPlayer) {
+      this.domPlayer.cancel();
+    }
   }
 
   restart(): void {
@@ -200,18 +182,13 @@ export class WebAnimationsPlayer implements AnimationPlayer {
   }
 
   setPosition(p: number): void {
-    if (!this.domPlayer) {
+    if (this.domPlayer === undefined) {
       this.init();
     }
-    if (this.domPlayer) {
-      this.domPlayer.currentTime = p * this.time;
-    }
+    this.domPlayer.currentTime = p * this.time;
   }
 
   getPosition(): number {
-    if (!this.domPlayer) {
-      return this._initialized ? 1 : 0;
-    }
     // tsc is complaining with TS2362 without the conversion to number
     return +(this.domPlayer.currentTime ?? 0) / this.time;
   }

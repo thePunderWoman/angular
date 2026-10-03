@@ -1,9 +1,9 @@
-/*!
+/**
  * @license
- * Copyright Google LLC All Rights Reserved.
+ * Copyright Google Inc. All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
- * found in the LICENSE file at https://angular.dev/license
+ * found in the LICENSE file at https://angular.io/license
  */
 
 import * as ts from 'typescript';
@@ -38,84 +38,17 @@ export function getHTMLVirtualContent(sf: ts.SourceFile): string {
       content.slice(0, region.getStart(sf) + 1) +
       documentText.slice(region.getStart(sf) + 1, region.getEnd() - 1) +
       content.slice(region.getEnd() - 1);
-
-    // Template literals may contain `${...}` substitutions, which are not part of the template
-    // text. Blank them out (preserving line breaks) so the HTML language service only sees the
-    // static parts of the template.
-    if (ts.isTemplateExpression(region)) {
-      let substitutionStart = region.head.end - 2; // position of the `${`
-      for (const span of region.templateSpans) {
-        const substitutionEnd = span.literal.getStart(sf) + 1; // position after the `}`
-        content =
-          content.slice(0, substitutionStart) +
-          documentText.slice(substitutionStart, substitutionEnd).replace(/[^\n]/g, ' ') +
-          content.slice(substitutionEnd);
-        substitutionStart = span.literal.end - 2;
-      }
-    }
   }
   return content;
-}
-
-/**
- * Takes a TS file and strips out all non-inline style content.
- *
- * @see {@link getHTMLVirtualContent}
- */
-export function getSCSSVirtualContent(sf: ts.SourceFile): string {
-  const inlineStyleNodes: ts.Node[] = findAllMatchingNodes(sf, isInlineStyleNode);
-  const documentText = sf.text;
-
-  // Create a blank document with same text length
-  let content = documentText
-    .split('\n')
-    .map((line) => {
-      return ' '.repeat(line.length);
-    })
-    .join('\n');
-
-  // add back all the inline style regions in-place
-  for (const region of inlineStyleNodes) {
-    content =
-      content.slice(0, region.getStart(sf) + 1) +
-      documentText.slice(region.getStart(sf) + 1, region.getEnd() - 1) +
-      content.slice(region.getEnd() - 1);
-  }
-  return content;
-}
-
-export function isInlineStyleNode(node: ts.Node) {
-  if (!ts.isStringLiteralLike(node)) {
-    return false;
-  }
-
-  if (isAssignmentToPropertyWithName(node, 'styles')) {
-    return true;
-  }
-
-  if (
-    node.parent &&
-    ts.isArrayLiteralExpression(node.parent) &&
-    isAssignmentToPropertyWithName(node.parent, 'styles')
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
-function isAssignmentToPropertyWithName(node: ts.Node, propertyName: 'styles' | 'template') {
-  const assignment = getPropertyAssignmentFromValue(node, propertyName);
-  return assignment !== null && getClassDeclFromDecoratorProp(assignment) !== null;
 }
 
 function isInlineTemplateNode(node: ts.Node) {
-  // Unlike styles, templates are also matched when written as a template literal with
-  // `${...}` substitutions. The substitutions themselves are blanked out when the virtual
-  // document is constructed.
-  return ts.isStringLiteralLike(node) || ts.isTemplateExpression(node)
-    ? isAssignmentToPropertyWithName(node, 'template')
-    : false;
+  const assignment = getPropertyAssignmentFromValue(node, 'template');
+  return (
+    ts.isStringLiteralLike(node) &&
+    assignment !== null &&
+    getClassDeclFromDecoratorProp(assignment) !== null
+  );
 }
 
 /**

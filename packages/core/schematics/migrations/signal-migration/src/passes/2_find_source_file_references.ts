@@ -6,12 +6,10 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {
-  ResourceLoader,
-  PartialEvaluator,
-  ReflectionHost,
-  TemplateTypeChecker,
-} from '@angular/compiler-cli/private/migrations';
+import {ResourceLoader} from '@angular/compiler-cli/src/ngtsc/annotations';
+import {PartialEvaluator} from '@angular/compiler-cli/src/ngtsc/partial_evaluator';
+import {ReflectionHost} from '@angular/compiler-cli/src/ngtsc/reflection';
+import {TemplateTypeChecker} from '@angular/compiler-cli/src/ngtsc/typecheck/api';
 import ts from 'typescript';
 import {KnownInputs} from '../input_detection/known_inputs';
 import {MigrationResult} from '../result';

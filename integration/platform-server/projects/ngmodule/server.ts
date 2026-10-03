@@ -28,21 +28,20 @@ app.use(
 );
 
 // Mock API
-app.get('/api', (req: any, res: any) => {
+app.get('/api', (req, res) => {
   res.json({data: 'API 1 response'});
 });
 
-app.get('/api-2', (req: any, res: any) => {
+app.get('/api-2', (req, res) => {
   res.json({data: 'API 2 response'});
 });
 
 // All regular routes use the Universal engine
-app.use((req: any, res: any) => {
+app.use((req, res) => {
   const {protocol, originalUrl, baseUrl, headers} = req;
 
   renderModule(AppServerModule, {
     document: indexHtml,
-    allowedHosts: ['localhost'],
     url: `${protocol}://${headers.host}${originalUrl}`,
     extraProviders: [{provide: APP_BASE_HREF, useValue: baseUrl}],
   }).then((response: string) => {

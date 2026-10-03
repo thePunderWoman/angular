@@ -24,7 +24,6 @@ import {TElementNode, TNode, TNodeProviderIndexes} from '../interfaces/node';
 import {isRootView} from '../interfaces/type_checks';
 import {CLEANUP, CONTEXT, LView, TVIEW, TViewType} from '../interfaces/view';
 
-import {Framework} from '../../../primitives/devtools';
 import {getRootContext} from './view_traversal_utils';
 import {getLViewParent, unwrapRNode} from './view_utils';
 
@@ -225,6 +224,13 @@ export function getDirectives(node: Node): {}[] {
   return context.directives === null ? [] : [...context.directives];
 }
 
+/** The framework used to author a particular application or component. */
+export enum Framework {
+  Angular = 'angular',
+  ACX = 'acx',
+  Wiz = 'wiz',
+}
+
 /** Metadata common to directives from all frameworks.  */
 export interface BaseDirectiveDebugMetadata {
   name?: string;
@@ -304,9 +310,6 @@ export type DirectiveDebugMetadata =
 export function getDirectiveMetadata(
   directiveOrComponentInstance: any,
 ): AngularComponentDebugMetadata | AngularDirectiveDebugMetadata | null {
-  if (!directiveOrComponentInstance) {
-    return null;
-  }
   const {constructor} = directiveOrComponentInstance;
   if (!constructor) {
     throw new Error('Unable to find the instance constructor');
@@ -322,7 +325,7 @@ export function getDirectiveMetadata(
       encapsulation: componentDef.encapsulation,
       changeDetection: componentDef.onPush
         ? ChangeDetectionStrategy.OnPush
-        : ChangeDetectionStrategy.Eager,
+        : ChangeDetectionStrategy.Default,
     };
   }
   const directiveDef = getDirectiveDef(constructor);
@@ -445,7 +448,7 @@ export function getListeners(element: Element): Listener[] {
   const tCleanup = tView.cleanup;
   const listeners: Listener[] = [];
   if (tCleanup && lCleanup) {
-    for (let i = 0; i < tCleanup.length;) {
+    for (let i = 0; i < tCleanup.length; ) {
       const firstParam = tCleanup[i++];
       const secondParam = tCleanup[i++];
       if (typeof firstParam === 'string') {
@@ -523,7 +526,7 @@ function extractInputDebugMetadata<T>(inputs: DirectiveDef<T>['inputs']) {
   const res: AngularDirectiveDebugMetadata['inputs'] = {};
 
   for (const key in inputs) {
-    if (Object.hasOwn(inputs, key)) {
+    if (inputs.hasOwnProperty(key)) {
       const value = inputs[key];
 
       if (value !== undefined) {

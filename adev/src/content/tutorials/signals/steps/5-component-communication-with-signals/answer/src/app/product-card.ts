@@ -1,4 +1,4 @@
-import {Component, input} from '@angular/core';
+import {Component, input, ChangeDetectionStrategy} from '@angular/core';
 
 @Component({
   selector: 'product-card',
@@ -7,7 +7,7 @@ import {Component, input} from '@angular/core';
       <h3>{{ name() }}</h3>
       <p class="price">\${{ price() }}</p>
       <p class="status">
-        Status:
+        Status: 
         @if (available()) {
           <span class="available">Available</span>
         } @else {
@@ -16,6 +16,7 @@ import {Component, input} from '@angular/core';
       </p>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProductCard {
   // Signal inputs - receive data from parent

@@ -1,9 +1,9 @@
-/*!
+/**
  * @license
- * Copyright Google LLC All Rights Reserved.
+ * Copyright Google Inc. All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
- * found in the LICENSE file at https://angular.dev/license
+ * found in the LICENSE file at https://angular.io/license
  */
 
 import {GrammarDefinition} from './types';
@@ -32,19 +32,13 @@ export const InlineTemplate: GrammarDefinition = {
     },
 
     ngTemplate: {
-      begin: /\G\s*([`'"])/,
+      begin: /\G\s*([`|'|"])/,
       beginCaptures: {1: {name: 'string'}},
       // @ts-ignore
       end: /\1/,
       endCaptures: {0: {name: 'string'}},
       contentName: 'text.html.derivative',
-      patterns: [
-        // Consume escape sequences first so that an escaped delimiter (e.g. \`)
-        // does not terminate the template string prematurely.
-        {match: /\\[\s\S]/, name: 'constant.character.escape.ts'},
-        {include: 'text.html.derivative'},
-        {include: 'template.ng'},
-      ],
+      patterns: [{include: 'text.html.derivative'}, {include: 'template.ng'}],
     },
   },
 };

@@ -7,14 +7,14 @@
  */
 
 import {Location} from '@angular/common';
-import {EnvironmentInjector, inject, Service} from '@angular/core';
+import {inject, Injectable} from '@angular/core';
 import {SubscriptionLike} from 'rxjs';
 
 import {
   BeforeActivateRoutes,
   Event,
-  isRedirectingEvent,
   NavigationCancel,
+  NavigationCancellationCode,
   NavigationEnd,
   NavigationError,
   NavigationSkipped,
@@ -23,13 +23,13 @@ import {
   PrivateRouterEvents,
   RoutesRecognized,
 } from '../events';
-import {Navigation, NavigationExtras, RestoredState} from '../navigation_transition';
+import {Navigation, RestoredState} from '../navigation_transition';
 import {ROUTER_CONFIGURATION} from '../router_config';
 import {createEmptyState, RouterState} from '../router_state';
 import {UrlHandlingStrategy} from '../url_handling_strategy';
 import {UrlSerializer, UrlTree} from '../url_tree';
 
-@Service({factory: () => inject(HistoryStateManager)})
+@Injectable({providedIn: 'root', useFactory: () => inject(HistoryStateManager)})
 export abstract class StateManager {
   protected readonly urlSerializer = inject(UrlSerializer);
   private readonly options = inject(ROUTER_CONFIGURATION, {optional: true}) || {};
@@ -39,7 +39,7 @@ export abstract class StateManager {
   protected urlHandlingStrategy = inject(UrlHandlingStrategy);
   protected urlUpdateStrategy = this.options.urlUpdateStrategy || 'deferred';
 
-  protected currentUrlTree = new UrlTree();
+  private currentUrlTree = new UrlTree();
   /**
    * Returns the currently activated `UrlTree`.
    *
@@ -53,7 +53,7 @@ export abstract class StateManager {
     return this.currentUrlTree;
   }
 
-  protected rawUrlTree = this.currentUrlTree;
+  private rawUrlTree = this.currentUrlTree;
   /**
    * Returns a `UrlTree` that is represents what the browser is actually showing.
    *
@@ -91,15 +91,6 @@ export abstract class StateManager {
     return path;
   }
 
-  protected routerUrlState(navigation?: Navigation): {
-    ɵrouterUrl?: string;
-  } {
-    if (navigation?.targetBrowserUrl === undefined || navigation?.finalUrl === undefined) {
-      return {};
-    }
-    return {ɵrouterUrl: this.urlSerializer.serialize(navigation.finalUrl)};
-  }
-
   protected commitTransition({targetRouterState, finalUrl, initialUrl}: Navigation): void {
     // If we are committing the transition after having a final URL and target state, we're updating
     // all pieces of the state. Otherwise, we likely skipped the transition (due to URL handling strategy)
@@ -113,20 +104,17 @@ export abstract class StateManager {
     }
   }
 
-  protected routerState = createEmptyState(null, inject(EnvironmentInjector));
+  private routerState = createEmptyState(null);
 
   /** Returns the current RouterState. */
   getRouterState(): RouterState {
     return this.routerState;
   }
 
-  private _stateMemento = this.createStateMemento();
-  get stateMemento() {
-    return this._stateMemento;
-  }
+  private stateMemento = this.createStateMemento();
 
   protected updateStateMemento(): void {
-    this._stateMemento = this.createStateMemento();
+    this.stateMemento = this.createStateMemento();
   }
 
   private createStateMemento() {
@@ -137,10 +125,22 @@ export abstract class StateManager {
     };
   }
 
-  /** Returns the current state stored by the browser for the current history entry. */
-  restoredState(): RestoredState | null | undefined {
-    return this.location.getState() as RestoredState | null | undefined;
+  protected resetInternalState({finalUrl}: Navigation): void {
+    this.routerState = this.stateMemento.routerState;
+    this.currentUrlTree = this.stateMemento.currentUrlTree;
+    // Note here that we use the urlHandlingStrategy to get the reset `rawUrlTree` because it may be
+    // configured to handle only part of the navigation URL. This means we would only want to reset
+    // the part of the navigation handled by the Angular router rather than the whole URL. In
+    // addition, the URLHandlingStrategy may be configured to specifically preserve parts of the URL
+    // when merging, such as the query params so they are not lost on a refresh.
+    this.rawUrlTree = this.urlHandlingStrategy.merge(
+      this.currentUrlTree,
+      finalUrl ?? this.rawUrlTree,
+    );
   }
+
+  /** Returns the current state stored by the browser for the current history entry. */
+  abstract restoredState(): RestoredState | null | undefined;
 
   /**
    * Registers a listener that is called whenever the current history entry changes by some API
@@ -152,8 +152,6 @@ export abstract class StateManager {
       url: string,
       state: RestoredState | null | undefined,
       trigger: NavigationTrigger,
-      extras: NavigationExtras,
-      hasUAVisualTransition?: boolean,
     ) => void,
   ): SubscriptionLike;
 
@@ -164,7 +162,7 @@ export abstract class StateManager {
   abstract handleRouterEvent(e: Event | PrivateRouterEvents, currentTransition: Navigation): void;
 }
 
-@Service()
+@Injectable({providedIn: 'root'})
 export class HistoryStateManager extends StateManager {
   /**
    * The id of the currently active page in the router.
@@ -176,6 +174,10 @@ export class HistoryStateManager extends StateManager {
    */
   private currentPageId: number = 0;
   private lastSuccessfulId: number = -1;
+
+  override restoredState(): RestoredState | null | undefined {
+    return this.location.getState() as RestoredState | null | undefined;
+  }
 
   /**
    * The ɵrouterPageId of whatever page is currently active in the browser history. This is
@@ -194,8 +196,6 @@ export class HistoryStateManager extends StateManager {
       url: string,
       state: RestoredState | null | undefined,
       trigger: NavigationTrigger,
-      extras: NavigationExtras,
-      hasUAVisualTransition?: boolean,
     ) => void,
   ): SubscriptionLike {
     return this.location.subscribe((event) => {
@@ -203,15 +203,7 @@ export class HistoryStateManager extends StateManager {
         // The `setTimeout` was added in #12160 and is likely to support Angular/AngularJS
         // hybrid apps.
         setTimeout(() => {
-          listener(
-            event['url']!,
-            event.state as RestoredState | null | undefined,
-            'popstate',
-            {
-              replaceUrl: true,
-            },
-            event.hasUAVisualTransition,
-          );
+          listener(event['url']!, event.state as RestoredState | null | undefined, 'popstate');
         });
       }
     });
@@ -233,7 +225,11 @@ export class HistoryStateManager extends StateManager {
       if (this.urlUpdateStrategy === 'deferred' && !currentTransition.extras.skipLocationChange) {
         this.setBrowserUrl(this.createBrowserPath(currentTransition), currentTransition);
       }
-    } else if (e instanceof NavigationCancel && !isRedirectingEvent(e)) {
+    } else if (
+      e instanceof NavigationCancel &&
+      e.code !== NavigationCancellationCode.SupersededByNewNavigation &&
+      e.code !== NavigationCancellationCode.Redirect
+    ) {
       this.restoreHistory(currentTransition);
     } else if (e instanceof NavigationError) {
       this.restoreHistory(currentTransition, true);
@@ -243,22 +239,20 @@ export class HistoryStateManager extends StateManager {
     }
   }
 
-  private setBrowserUrl(path: string, navigation: Navigation) {
-    const {extras, id} = navigation;
+  private setBrowserUrl(path: string, {extras, id}: Navigation) {
     const {replaceUrl, state} = extras;
-
     if (this.location.isCurrentPathEqualTo(path) || !!replaceUrl) {
       // replacements do not update the target page
       const currentBrowserPageId = this.browserPageId;
       const newState = {
         ...state,
-        ...this.generateNgRouterState(id, currentBrowserPageId, navigation),
+        ...this.generateNgRouterState(id, currentBrowserPageId),
       };
       this.location.replaceState(path, '', newState);
     } else {
       const newState = {
         ...state,
-        ...this.generateNgRouterState(id, this.browserPageId + 1, navigation),
+        ...this.generateNgRouterState(id, this.browserPageId + 1),
       };
       this.location.go(path, '', newState);
     }
@@ -296,20 +290,6 @@ export class HistoryStateManager extends StateManager {
     }
   }
 
-  private resetInternalState({finalUrl}: Navigation): void {
-    this.routerState = this.stateMemento.routerState;
-    this.currentUrlTree = this.stateMemento.currentUrlTree;
-    // Note here that we use the urlHandlingStrategy to get the reset `rawUrlTree` because it may be
-    // configured to handle only part of the navigation URL. This means we would only want to reset
-    // the part of the navigation handled by the Angular router rather than the whole URL. In
-    // addition, the URLHandlingStrategy may be configured to specifically preserve parts of the URL
-    // when merging, such as the query params so they are not lost on a refresh.
-    this.rawUrlTree = this.urlHandlingStrategy.merge(
-      this.currentUrlTree,
-      finalUrl ?? this.rawUrlTree,
-    );
-  }
-
   private resetUrlToCurrentUrlTree(): void {
     this.location.replaceState(
       this.urlSerializer.serialize(this.getRawUrlTree()),
@@ -318,15 +298,10 @@ export class HistoryStateManager extends StateManager {
     );
   }
 
-  private generateNgRouterState(
-    navigationId: number,
-    routerPageId: number,
-    navigation?: Navigation,
-  ) {
+  private generateNgRouterState(navigationId: number, routerPageId: number) {
     if (this.canceledNavigationResolution === 'computed') {
-      return {navigationId, ɵrouterPageId: routerPageId, ...this.routerUrlState(navigation)};
+      return {navigationId, ɵrouterPageId: routerPageId};
     }
-
-    return {navigationId, ...this.routerUrlState(navigation)};
+    return {navigationId};
   }
 }

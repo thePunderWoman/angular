@@ -19,11 +19,9 @@ import {
   TsurgeFunnelMigration,
 } from '../../utils/tsurge';
 
-import {
-  DtsMetadataReader,
-  TypeScriptReflectionHost,
-  PartialEvaluator,
-} from '@angular/compiler-cli/private/migrations';
+import {DtsMetadataReader} from '@angular/compiler-cli/src/ngtsc/metadata';
+import {TypeScriptReflectionHost} from '@angular/compiler-cli/src/ngtsc/reflection';
+import {PartialEvaluator} from '@angular/compiler-cli/private/migrations';
 import {
   getUniqueIdForProperty,
   isTargetOutputDeclaration,
@@ -477,7 +475,7 @@ function addCommentForEmptyEmit(
   if (!propertyDeclaration) return;
 
   const eventEmitterType = getEventEmitterArgumentType(propertyDeclaration);
-  if (!eventEmitterType || eventEmitterType === 'void') return;
+  if (!eventEmitterType) return;
 
   const id = getUniqueIdForProperty(info, propertyDeclaration);
   const file = projectFile(node.getSourceFile(), info);

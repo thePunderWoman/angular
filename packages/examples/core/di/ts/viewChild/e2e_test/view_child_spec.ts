@@ -6,38 +6,26 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import * as webdriver from 'selenium-webdriver';
-import {createWebDriver, verifyNoBrowserErrors, waitForAngular} from '../../../../../test-utils';
+import {browser, by, element, ElementFinder} from 'protractor';
+
+import {verifyNoBrowserErrors} from '../../../../../test-utils';
 
 describe('viewChild example', () => {
-  let driver: webdriver.WebDriver;
-  let baseUrl: string;
+  afterEach(verifyNoBrowserErrors);
+  let button: ElementFinder;
+  let result: ElementFinder;
 
-  beforeAll(async () => {
-    ({driver, baseUrl} = await createWebDriver());
+  beforeEach(() => {
+    browser.get('/di/viewChild');
+    button = element(by.css('button'));
+    result = element(by.css('div'));
   });
 
-  afterAll(async () => {
-    await driver.quit();
-  });
+  it('should query view child', () => {
+    expect(result.getText()).toEqual('Selected: 1');
 
-  afterEach(async () => {
-    await verifyNoBrowserErrors(driver);
-  });
+    button.click();
 
-  beforeEach(async () => {
-    await driver.get(`${baseUrl}/di/viewChild`);
-    await waitForAngular(driver);
-  });
-
-  it('should query view child', async () => {
-    const result = await driver.findElement(webdriver.By.css('div'));
-    expect(await result.getText()).toEqual('Selected: 1');
-
-    const button = await driver.findElement(webdriver.By.css('button'));
-    await button.click();
-    await waitForAngular(driver);
-
-    expect(await result.getText()).toEqual('Selected: 2');
+    expect(result.getText()).toEqual('Selected: 2');
   });
 });

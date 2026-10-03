@@ -6,17 +6,19 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {Service, signal} from '@angular/core';
+import {Injectable, signal} from '@angular/core';
 // This file is generated at build-time, error is expected here.
 import API_MANIFEST_JSON from '../../../../../src/assets/api/manifest.json';
 import {getApiUrl} from '../helpers/manifest.helper';
-import {ApiItem} from '../interfaces/api-item';
 import {ApiItemsGroup} from '../interfaces/api-items-group';
 import {ApiManifest} from '../interfaces/api-manifest';
+import {ApiItem} from '../interfaces/api-item';
 
 const manifest = API_MANIFEST_JSON as ApiManifest;
 
-@Service()
+@Injectable({
+  providedIn: 'root',
+})
 export class ApiReferenceManager {
   apiGroups = signal<ApiItemsGroup[]>(this.mapManifestToApiGroups());
 

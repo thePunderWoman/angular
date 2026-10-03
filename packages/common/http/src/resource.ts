@@ -7,42 +7,35 @@
  */
 
 import {
-  assertInInjectionContext,
-  computed,
-  ɵencapsulateResourceError as encapsulateResourceError,
-  inject,
   Injector,
-  linkedSignal,
-  ɵResourceImpl as ResourceImpl,
-  type ResourceParamsContext,
-  ResourceStreamItem,
   Signal,
+  ɵResourceImpl as ResourceImpl,
+  inject,
+  linkedSignal,
+  assertInInjectionContext,
   signal,
-  TransferState,
+  computed,
+  ResourceStreamItem,
   type ValueEqualityFn,
   ɵRuntimeError,
   ɵRuntimeErrorCode,
+  ɵencapsulateResourceError as encapsulateResourceError,
 } from '@angular/core';
 import type {Subscription} from 'rxjs';
 
+import {HttpRequest} from './request';
 import {HttpClient} from './client';
+import {HttpErrorResponse, HttpEventType, HttpProgressEvent, HttpResponseBase} from './response';
 import {HttpHeaders} from './headers';
 import {HttpParams} from './params';
-import {HttpRequest} from './request';
-import {HttpResourceOptions, HttpResourceRef, HttpResourceRequest} from './resource_api';
-import {HttpErrorResponse, HttpEventType, HttpProgressEvent} from './response';
-import {
-  CACHE_OPTIONS,
-  HTTP_TRANSFER_CACHE_ORIGIN_MAP,
-  retrieveStateFromCache,
-} from './transfer_cache';
+import {HttpResourceRef, HttpResourceOptions, HttpResourceRequest} from './resource_api';
 
 /**
  * Type for the `httpRequest` top-level function, which includes the call signatures for the JSON-
  * based `httpRequest` as well as sub-functions for `ArrayBuffer`, `Blob`, and `string` type
  * requests.
  *
- * @publicApi 22.0
+ * @experimental 19.2
  */
 export interface HttpResourceFn {
   /**
@@ -54,10 +47,10 @@ export interface HttpResourceFn {
    * of the `HttpClient` API. Data is parsed as JSON by default - use a sub-function of
    * `httpResource`, such as `httpResource.text()`, to parse the response differently.
    *
-   * @publicApi 22.0
+   * @experimental 19.2
    */
   <TResult = unknown>(
-    url: (ctx: ResourceParamsContext) => string | undefined,
+    url: () => string | undefined,
     options: HttpResourceOptions<TResult, unknown> & {defaultValue: NoInfer<TResult>},
   ): HttpResourceRef<TResult>;
 
@@ -70,10 +63,10 @@ export interface HttpResourceFn {
    * of the `HttpClient` API. Data is parsed as JSON by default - use a sub-function of
    * `httpResource`, such as `httpResource.text()`, to parse the response differently.
    *
-   * @publicApi 22.0
+   * @experimental 19.2
    */
   <TResult = unknown>(
-    url: (ctx: ResourceParamsContext) => string | undefined,
+    url: () => string | undefined,
     options?: HttpResourceOptions<TResult, unknown>,
   ): HttpResourceRef<TResult | undefined>;
 
@@ -86,10 +79,10 @@ export interface HttpResourceFn {
    * of the `HttpClient` API. Data is parsed as JSON by default - use a sub-function of
    * `httpResource`, such as `httpResource.text()`, to parse the response differently.
    *
-   * @publicApi 22.0
+   * @experimental 19.2
    */
   <TResult = unknown>(
-    request: (ctx: ResourceParamsContext) => HttpResourceRequest | undefined,
+    request: () => HttpResourceRequest | undefined,
     options: HttpResourceOptions<TResult, unknown> & {defaultValue: NoInfer<TResult>},
   ): HttpResourceRef<TResult>;
 
@@ -102,10 +95,10 @@ export interface HttpResourceFn {
    * of the `HttpClient` API. Data is parsed as JSON by default - use a sub-function of
    * `httpResource`, such as `httpResource.text()`, to parse the response differently.
    *
-   * @publicApi 22.0
+   * @experimental 19.2
    */
   <TResult = unknown>(
-    request: (ctx: ResourceParamsContext) => HttpResourceRequest | undefined,
+    request: () => HttpResourceRequest | undefined,
     options?: HttpResourceOptions<TResult, unknown>,
   ): HttpResourceRef<TResult | undefined>;
 
@@ -117,26 +110,26 @@ export interface HttpResourceFn {
    * Uses `HttpClient` to make requests and supports interceptors, testing, and the other features
    * of the `HttpClient` API. Data is parsed into an `ArrayBuffer`.
    *
-   * @publicApi 22.0
+   * @experimental 19.2
    */
   arrayBuffer: {
     <TResult = ArrayBuffer>(
-      url: (ctx: ResourceParamsContext) => string | undefined,
+      url: () => string | undefined,
       options: HttpResourceOptions<TResult, ArrayBuffer> & {defaultValue: NoInfer<TResult>},
     ): HttpResourceRef<TResult>;
 
     <TResult = ArrayBuffer>(
-      url: (ctx: ResourceParamsContext) => string | undefined,
+      url: () => string | undefined,
       options?: HttpResourceOptions<TResult, ArrayBuffer>,
     ): HttpResourceRef<TResult | undefined>;
 
     <TResult = ArrayBuffer>(
-      request: (ctx: ResourceParamsContext) => HttpResourceRequest | undefined,
+      request: () => HttpResourceRequest | undefined,
       options: HttpResourceOptions<TResult, ArrayBuffer> & {defaultValue: NoInfer<TResult>},
     ): HttpResourceRef<TResult>;
 
     <TResult = ArrayBuffer>(
-      request: (ctx: ResourceParamsContext) => HttpResourceRequest | undefined,
+      request: () => HttpResourceRequest | undefined,
       options?: HttpResourceOptions<TResult, ArrayBuffer>,
     ): HttpResourceRef<TResult | undefined>;
   };
@@ -149,26 +142,26 @@ export interface HttpResourceFn {
    * Uses `HttpClient` to make requests and supports interceptors, testing, and the other features
    * of the `HttpClient` API. Data is parsed into a `Blob`.
    *
-   * @publicApi 22.0
+   * @experimental 19.2
    */
   blob: {
     <TResult = Blob>(
-      url: (ctx: ResourceParamsContext) => string | undefined,
+      url: () => string | undefined,
       options: HttpResourceOptions<TResult, Blob> & {defaultValue: NoInfer<TResult>},
     ): HttpResourceRef<TResult>;
 
     <TResult = Blob>(
-      url: (ctx: ResourceParamsContext) => string | undefined,
+      url: () => string | undefined,
       options?: HttpResourceOptions<TResult, Blob>,
     ): HttpResourceRef<TResult | undefined>;
 
     <TResult = Blob>(
-      request: (ctx: ResourceParamsContext) => HttpResourceRequest | undefined,
+      request: () => HttpResourceRequest | undefined,
       options: HttpResourceOptions<TResult, Blob> & {defaultValue: NoInfer<TResult>},
     ): HttpResourceRef<TResult>;
 
     <TResult = Blob>(
-      request: (ctx: ResourceParamsContext) => HttpResourceRequest | undefined,
+      request: () => HttpResourceRequest | undefined,
       options?: HttpResourceOptions<TResult, Blob>,
     ): HttpResourceRef<TResult | undefined>;
   };
@@ -181,26 +174,26 @@ export interface HttpResourceFn {
    * Uses `HttpClient` to make requests and supports interceptors, testing, and the other features
    * of the `HttpClient` API. Data is parsed as a `string`.
    *
-   * @publicApi 22.0
+   * @experimental 19.2
    */
   text: {
     <TResult = string>(
-      url: (ctx: ResourceParamsContext) => string | undefined,
+      url: () => string | undefined,
       options: HttpResourceOptions<TResult, string> & {defaultValue: NoInfer<TResult>},
     ): HttpResourceRef<TResult>;
 
     <TResult = string>(
-      url: (ctx: ResourceParamsContext) => string | undefined,
+      url: () => string | undefined,
       options?: HttpResourceOptions<TResult, string>,
     ): HttpResourceRef<TResult | undefined>;
 
     <TResult = string>(
-      request: (ctx: ResourceParamsContext) => HttpResourceRequest | undefined,
+      request: () => HttpResourceRequest | undefined,
       options: HttpResourceOptions<TResult, string> & {defaultValue: NoInfer<TResult>},
     ): HttpResourceRef<TResult>;
 
     <TResult = string>(
-      request: (ctx: ResourceParamsContext) => HttpResourceRequest | undefined,
+      request: () => HttpResourceRequest | undefined,
       options?: HttpResourceOptions<TResult, string>,
     ): HttpResourceRef<TResult | undefined>;
   };
@@ -212,7 +205,7 @@ export interface HttpResourceFn {
  * request that expects a different kind of data, you can use a sub-constructor of `httpResource`,
  * such as `httpResource.text`.
  *
- * @publicApi 22.0
+ * @experimental 19.2
  * @initializerApiFunction
  */
 export const httpResource: HttpResourceFn = (() => {
@@ -230,9 +223,7 @@ export const httpResource: HttpResourceFn = (() => {
  * the requestee.
  */
 type ResponseType = 'arraybuffer' | 'blob' | 'json' | 'text';
-type RawRequestType =
-  | ((ctx: ResourceParamsContext) => string | undefined)
-  | ((ctx: ResourceParamsContext) => HttpResourceRequest | undefined);
+type RawRequestType = (() => string | undefined) | (() => HttpResourceRequest | undefined);
 
 function makeHttpResourceFn<TRaw>(responseType: ResponseType) {
   return function httpResource<TResult = TRaw>(
@@ -243,51 +234,21 @@ function makeHttpResourceFn<TRaw>(responseType: ResponseType) {
       assertInInjectionContext(httpResource);
     }
     const injector = options?.injector ?? inject(Injector);
-
-    const cacheOptions = injector.get(CACHE_OPTIONS, null, {optional: true});
-    const transferState = injector.get(TransferState, null, {optional: true});
-    const originMap = injector.get(HTTP_TRANSFER_CACHE_ORIGIN_MAP, null, {optional: true});
-
-    const getInitialStream = (req: HttpRequest<unknown> | undefined) => {
-      if (cacheOptions && transferState && req) {
-        const cachedResponse = retrieveStateFromCache(req, cacheOptions, transferState, originMap);
-        if (cachedResponse) {
-          try {
-            const body = cachedResponse.body as TRaw;
-            const parsed = options?.parse ? options.parse(body) : (body as unknown as TResult);
-            return signal({value: parsed});
-          } catch (e) {
-            if (typeof ngDevMode === 'undefined' || ngDevMode) {
-              console.warn(
-                `Angular detected an error while parsing the cached response for the httpResource at \`${req.url}\`. ` +
-                  `The resource will fall back to its default value and try again asynchronously.`,
-                e,
-              );
-            }
-          }
-        }
-      }
-      return undefined;
-    };
-
     return new HttpResourceImpl(
       injector,
-      (ctx: ResourceParamsContext) => normalizeRequest(ctx, request, responseType),
+      () => normalizeRequest(request, responseType),
       options?.defaultValue,
-      options?.debugName,
       options?.parse as (value: unknown) => TResult,
       options?.equal as ValueEqualityFn<unknown>,
-      getInitialStream,
     ) as HttpResourceRef<TResult>;
   };
 }
 
 function normalizeRequest(
-  ctx: ResourceParamsContext,
   request: RawRequestType,
   responseType: ResponseType,
 ): HttpRequest<unknown> | undefined {
-  let unwrappedRequest = typeof request === 'function' ? request(ctx) : request;
+  let unwrappedRequest = typeof request === 'function' ? request() : request;
   if (unwrappedRequest === undefined) {
     return undefined;
   } else if (typeof unwrappedRequest === 'string') {
@@ -299,7 +260,8 @@ function normalizeRequest(
       ? unwrappedRequest.headers
       : new HttpHeaders(
           unwrappedRequest.headers as
-            Record<string, string | number | Array<string | number>> | undefined,
+            | Record<string, string | number | Array<string | number>>
+            | undefined,
         );
 
   const params =
@@ -326,7 +288,6 @@ function normalizeRequest(
       transferCache: unwrappedRequest.transferCache,
       credentials: unwrappedRequest.credentials as RequestCredentials,
       referrer: unwrappedRequest.referrer,
-      referrerPolicy: unwrappedRequest.referrerPolicy as ReferrerPolicy,
       integrity: unwrappedRequest.integrity,
       timeout: unwrappedRequest.timeout,
     },
@@ -358,30 +319,20 @@ class HttpResourceImpl<T>
 
   constructor(
     injector: Injector,
-    request: (ctx: ResourceParamsContext) => HttpRequest<T> | undefined,
+    request: () => HttpRequest<T> | undefined,
     defaultValue: T,
-    debugName?: string,
     parse?: (value: unknown) => T,
     equal?: ValueEqualityFn<unknown>,
-    getInitialStream?: (
-      request: HttpRequest<unknown> | undefined,
-    ) => Signal<ResourceStreamItem<T>> | undefined,
   ) {
     super(
       request,
       ({params: request, abortSignal}) => {
-        let sub: Subscription | undefined;
-        // In the unlikely case the request returns synchronously we want to make sure the observable
-        // is subscribe even if it isn't initialized yet.
-        let aborted = false;
+        let sub: Subscription;
 
-        // `once: true`: calling unsubscribe() here (on abort) doesn't trigger the error/complete
-        // callbacks below, so without it this listener wouldn't get removed on the abort path.
-        const onAbort = () => {
-          aborted = true;
-          sub?.unsubscribe();
-        };
-        abortSignal.addEventListener('abort', onAbort, {once: true});
+        // Track the abort listener so it can be removed if the Observable completes (as a memory
+        // optimization).
+        const onAbort = () => sub.unsubscribe();
+        abortSignal.addEventListener('abort', onAbort);
 
         // Start off stream as undefined.
         const stream = signal<ResourceStreamItem<T>>({value: undefined as T});
@@ -433,18 +384,11 @@ class HttpResourceImpl<T>
           },
         });
 
-        if (aborted) {
-          sub.unsubscribe();
-        }
-
         return promise;
       },
       defaultValue,
       equal,
-      debugName,
       injector,
-      undefined,
-      getInitialStream,
     );
     this.client = injector.get(HttpClient);
   }

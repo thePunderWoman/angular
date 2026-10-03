@@ -6,20 +6,19 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {R3QueryMetadata} from '@angular/compiler';
+import {PartialEvaluator} from '@angular/compiler-cli/private/migrations';
 import {
-  Decorator,
-  FatalDiagnosticError,
-  PartialEvaluator,
-  ReflectionHost,
-  extractDecoratorQueryMetadata,
   getAngularDecorators,
   queryDecoratorNames,
-} from '@angular/compiler-cli/private/migrations';
+} from '@angular/compiler-cli/src/ngtsc/annotations';
+import {extractDecoratorQueryMetadata} from '@angular/compiler-cli/src/ngtsc/annotations/directive';
+import {Decorator, ReflectionHost} from '@angular/compiler-cli/src/ngtsc/reflection';
 import ts from 'typescript';
+import {R3QueryMetadata} from '@angular/compiler';
 import {ProgramInfo} from '../../utils/tsurge';
 import {ClassFieldUniqueKey} from '../signal-migration/src/passes/reference_resolution/known_fields';
 import {getUniqueIDForClassProperty} from './field_tracking';
+import {FatalDiagnosticError} from '@angular/compiler-cli/src/ngtsc/diagnostics';
 
 /** Type describing an extracted decorator query that can be migrated. */
 export interface ExtractedQuery {

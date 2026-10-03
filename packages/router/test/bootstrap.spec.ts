@@ -7,11 +7,11 @@
  */
 
 import {
-  BrowserPlatformLocation,
   DOCUMENT,
-  ɵgetDOM as getDOM,
-  ɵNullViewportScroller as NullViewportScroller,
   PlatformLocation,
+  ɵgetDOM as getDOM,
+  BrowserPlatformLocation,
+  ɵNullViewportScroller as NullViewportScroller,
   ViewportScroller,
 } from '@angular/common';
 import {MockPlatformLocation} from '@angular/common/testing';
@@ -24,10 +24,11 @@ import {
   inject,
   Injectable,
   NgModule,
+  provideZonelessChangeDetection,
 } from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {isNode} from '@angular/private/testing';
 import {BrowserModule, platformBrowser} from '@angular/platform-browser';
-import {isNode, useAutoTick} from '@angular/private/testing';
 import {
   NavigationEnd,
   provideRouter,
@@ -36,6 +37,17 @@ import {
   RouterOutlet,
   withEnabledBlockingInitialNavigation,
 } from '../index';
+import {useAutoTick} from './helpers';
+
+// This is needed, because all files under `packages/` are compiled together as part of the
+// [legacy-unit-tests-saucelabs][1] CI job, including the `lib.webworker.d.ts` typings brought in by
+// [service-worker/worker/src/service-worker.d.ts][2].
+//
+// [1]:
+// https://github.com/angular/angular/blob/ffeea63f43e6a7fd46be4a8cd5a5d254c98dea08/.circleci/config.yml#L681
+// [2]:
+// https://github.com/angular/angular/blob/316dc2f12ce8931f5ff66fa5f8da21c0d251a337/packages/service-worker/worker/src/service-worker.d.ts#L9
+declare var window: Window;
 
 describe('bootstrap', () => {
   useAutoTick();
@@ -90,10 +102,11 @@ describe('bootstrap', () => {
     doc.body.appendChild(el1);
     doc.body.appendChild(el2);
 
-    const {promise, resolve: resolveFn} = Promise.withResolvers<void>();
+    const {promise, resolveFn} = createPromise();
     navigationEndPromise = promise;
     log = [];
     testProviders = [
+      provideZonelessChangeDetection(),
       {provide: DOCUMENT, useValue: doc},
       {provide: ViewportScroller, useClass: isNode ? NullViewportScroller : ViewportScroller},
       {provide: PlatformLocation, useClass: MockPlatformLocation},
@@ -455,7 +468,7 @@ describe('bootstrap', () => {
         spyOn(router as any, 'resetRootComponentType').and.callThrough();
 
         const appRef: ApplicationRef = res.injector.get(ApplicationRef);
-        const {promise, resolve: resolveFn} = Promise.withResolvers<void>();
+        const {promise, resolveFn} = createPromise();
         appRef.components[0].onDestroy(() => {
           appRef.bootstrap(SecondRootCmp);
           expect((router as any).resetRootComponentType).toHaveBeenCalled();
@@ -472,14 +485,14 @@ describe('bootstrap', () => {
       @Component({
         selector: 'component-a',
         template: `
-          <div style="height: 3000px;"></div>
-          <div id="marker1"></div>
-          <div style="height: 3000px;"></div>
-          <div id="marker2"></div>
-          <div style="height: 3000px;"></div>
-          <a name="marker3"></a>
-          <div style="height: 3000px;"></div>
-        `,
+           <div style="height: 3000px;"></div>
+           <div id="marker1"></div>
+           <div style="height: 3000px;"></div>
+           <div id="marker2"></div>
+           <div style="height: 3000px;"></div>
+           <a name="marker3"></a>
+           <div style="height: 3000px;"></div>
+      `,
         standalone: false,
       })
       class TallComponent {}
@@ -567,6 +580,8 @@ describe('bootstrap', () => {
       const ngModuleRef = await platformBrowser().bootstrapModule(TestModule);
       ngModuleRef.destroy();
 
+      expect(window.addEventListener).toHaveBeenCalledTimes(2);
+
       expect(window.addEventListener).toHaveBeenCalledWith(
         'popstate',
         jasmine.any(Function),
@@ -628,4 +643,12 @@ function provideNavigationEndAction(fn: Function) {
       onNavigationEnd(inject(Router), fn);
     },
   };
+}
+
+function createPromise() {
+  let resolveFn: () => void;
+  const promise = new Promise<void>((r) => {
+    resolveFn = r;
+  });
+  return {resolveFn: () => resolveFn(), promise};
 }

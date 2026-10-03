@@ -8,6 +8,7 @@
 
 import {
   afterNextRender,
+  ChangeDetectionStrategy,
   Component,
   DestroyRef,
   effect,
@@ -18,13 +19,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import {
-  TreeD3Node,
-  TreeNode,
-  TreeNodeEqualityFn,
-  TreeVisualizer,
-  TreeVisualizerConfig,
-} from './tree-visualizer';
+import {TreeD3Node, TreeNode, TreeVisualizer, TreeVisualizerConfig} from './tree-visualizer';
 
 let instanceIdx = 0;
 
@@ -43,13 +38,13 @@ let instanceIdx = 0;
     </svg>
   `,
   styleUrl: 'tree-visualizer.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TreeVisualizerComponent<T extends TreeNode = TreeNode> {
   protected readonly container = viewChild.required<ElementRef>('container');
   protected readonly group = viewChild.required<ElementRef>('group');
 
   readonly root = input.required<T>();
-  protected readonly nodeEqualityFn = input<TreeNodeEqualityFn<T> | null>(null);
   protected readonly config = input<Partial<TreeVisualizerConfig<T>>>();
   protected readonly a11yTitle = input.required<string>();
   protected readonly a11yTitleId = `tree-vis-host-${++instanceIdx}`;
@@ -60,25 +55,20 @@ export class TreeVisualizerComponent<T extends TreeNode = TreeNode> {
   protected readonly nodeMouseout = output<TreeD3Node<T>>();
   protected readonly nodeMouseover = output<TreeD3Node<T>>();
 
-  readonly panning = signal(false);
-  private readonly visualizer = signal<TreeVisualizer<T> | null>(null);
+  panning = signal<boolean>(false);
 
   private initialRender: boolean = true;
+  private visualizer?: TreeVisualizer<T>;
 
   constructor() {
-    afterNextRender({
-      write: () => this.visualizer()?.cleanup(), // Cleans up the visualization DOM
-      read: () => {
-        this.visualizer.set(
-          new TreeVisualizer<T>(
-            this.container().nativeElement,
-            this.group().nativeElement,
-            this.nodeEqualityFn(),
-            this.config(),
-          ),
-        );
-        this.ready.emit();
-      },
+    afterNextRender(() => {
+      this.visualizer?.cleanup();
+      this.visualizer = new TreeVisualizer<T>(
+        this.container().nativeElement,
+        this.group().nativeElement,
+        this.config(),
+      );
+      this.ready.emit();
     });
 
     effect(() => {
@@ -86,7 +76,7 @@ export class TreeVisualizerComponent<T extends TreeNode = TreeNode> {
     });
 
     inject(DestroyRef).onDestroy(() => {
-      this.visualizer()?.dispose();
+      this.visualizer?.dispose();
     });
   }
 
@@ -95,31 +85,26 @@ export class TreeVisualizerComponent<T extends TreeNode = TreeNode> {
   }
 
   snapToRoot(scale?: number) {
-    this.visualizer()?.snapToRoot(scale);
+    this.visualizer?.snapToRoot(scale);
   }
 
   snapToNode(node: T, scale?: number) {
-    this.visualizer()?.snapToNode(node, scale);
-  }
-
-  highlightNode(node: T | null) {
-    this.visualizer()?.highlightNode(node);
+    this.visualizer?.snapToNode(node, scale);
   }
 
   getNodeById(id: string) {
-    return this.visualizer()?.getInternalNodeById(id);
+    return this.visualizer?.getInternalNodeById(id);
   }
 
   private renderGraph(root: T): void {
-    const visualizer = this.visualizer();
-    if (!visualizer) {
+    if (!this.visualizer) {
       return;
     }
 
-    visualizer.render(root);
-    visualizer.onNodeClick((_, node) => this.nodeClick.emit(node));
-    visualizer.onNodeMouseout((_, node) => this.nodeMouseout.emit(node));
-    visualizer.onNodeMouseover((_, node) => this.nodeMouseover.emit(node));
+    this.visualizer.render(root);
+    this.visualizer.onNodeClick((_, node) => this.nodeClick.emit(node));
+    this.visualizer.onNodeMouseout((_, node) => this.nodeMouseout.emit(node));
+    this.visualizer.onNodeMouseover((_, node) => this.nodeMouseover.emit(node));
 
     this.render.emit({initial: this.initialRender});
     if (this.initialRender) {

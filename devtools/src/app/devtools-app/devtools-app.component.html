@@ -1,25 +1,10 @@
-<as-split
-  unit="percent"
-  [direction]="'vertical'"
-  [gutterSize]="9"
-  (dragStart)="resizingDevtools.set(true)"
-  (dragEnd)="resizingDevtools.set(false)"
->
+<as-split unit="percent" [direction]="'vertical'" [gutterSize]="9">
   <as-split-area size="40">
-    <iframe
-      src="demo-app/todos/app"
-      id="sample-app"
-      title="todos-app"
-      [style.pointer-events]="resizingDevtools() ? 'none' : 'auto'"
-      (load)="iframeLoaded.set(true)"
-    ></iframe>
+    <iframe #ref src="demo-app/todos/app" id="sample-app" title="todos-app"></iframe>
   </as-split-area>
   <as-split-area size="60">
     <div class="devtools-wrapper">
-      @if (iframeLoaded()) {
-        <!-- We want to ensure that the extension is loaded after the client app. -->
-        <ng-devtools />
-      }
+      <ng-devtools></ng-devtools>
     </div>
   </as-split-area>
 </as-split>

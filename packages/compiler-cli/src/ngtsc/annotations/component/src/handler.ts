@@ -7,33 +7,29 @@
  */
 
 import {
+  LegacyAnimationTriggerNames,
   BoundTarget,
   compileClassDebugInfo,
+  compileHmrInitializer,
   compileComponentClassMetadata,
   compileComponentDeclareClassMetadata,
   compileComponentFromMetadata,
   compileDeclareComponentFromMetadata,
   compileDeferResolverFunction,
-  compileHmrInitializer,
   ConstantPool,
-  createHostElement,
   CssSelector,
   DeclarationListEmitMode,
   DeclareComponentTemplateInfo,
   DeferBlockDepsEmitMode,
-  DirectiveMatcher,
   DomElementSchemaRegistry,
   ExternalExpr,
   FactoryTarget,
-  LegacyAnimationTriggerNames,
   makeBindingParser,
-  MatchSource,
   outputAst as o,
   R3ComponentDeferMetadata,
   R3ComponentMetadata,
   R3DeferPerComponentDependency,
   R3DirectiveDependencyMetadata,
-  R3ForeignComponentMetadata,
   R3NgModuleDependencyMetadata,
   R3PipeDependencyMetadata,
   R3TargetBinder,
@@ -41,11 +37,11 @@ import {
   R3TemplateDependencyKind,
   R3TemplateDependencyMetadata,
   SchemaMetadata,
-  SelectorlessMatcher,
   SelectorMatcher,
   TmplAstDeferredBlock,
-  TypeCheckId,
   ViewEncapsulation,
+  DirectiveMatcher,
+  SelectorlessMatcher,
 } from '@angular/compiler';
 import ts from 'typescript';
 
@@ -73,13 +69,11 @@ import {
   SemanticDepGraphUpdater,
 } from '../../../incremental/semantic_graph';
 import {IndexingContext} from '../../../indexer';
-import {AbstractBoundTemplate} from '../../../indexer/src/api';
-
 import {
-  createForeignComponentMatcher,
   DirectiveMeta,
   extractDirectiveTypeCheckMeta,
   HostDirectivesResolver,
+  MatchSource,
   MetadataReader,
   MetadataRegistry,
   MetaKind,
@@ -94,6 +88,7 @@ import {
   ClassDeclaration,
   DeclarationNode,
   Decorator,
+  Import,
   isNamedClassDeclaration,
   ReflectionHost,
   reflectObjectLiteral,
@@ -101,9 +96,12 @@ import {
 import {
   ComponentScopeKind,
   ComponentScopeReader,
+  DtsModuleScopeResolver,
+  LocalModuleScope,
   LocalModuleScopeRegistry,
   makeNotStandaloneDiagnostic,
   makeUnknownComponentImportDiagnostic,
+  StandaloneScope,
   TypeCheckScopeRegistry,
 } from '../../../scope';
 import {
@@ -120,10 +118,11 @@ import {
   ResolveResult,
 } from '../../../transform';
 import {
-  HostBindingsContext,
-  TemplateContext,
+  TypeCheckId,
   TypeCheckableDirectiveMeta,
   TypeCheckContext,
+  TemplateContext,
+  HostBindingsContext,
 } from '../../../typecheck/api';
 import {ExtendedTemplateChecker} from '../../../typecheck/extended/api';
 import {TemplateSemanticsChecker} from '../../../typecheck/template_semantics/api/api';
@@ -136,7 +135,6 @@ import {
   compileNgFactoryDefField,
   compileResults,
   createForwardRefResolver,
-  createSourceSpan,
   extractClassDebugInfo,
   extractClassMetadata,
   extractSchemas,
@@ -156,31 +154,21 @@ import {
   ResourceLoader,
   toFactoryMetadata,
   tryUnwrapForwardRef,
-  UndecoratedMetadataExtractor,
   validateHostDirectives,
   wrapFunctionExpressionsInParens,
 } from '../../common';
 import {
   extractDirectiveMetadata,
   extractHostBindingResources,
-  getDirectiveUndecoratedMetadataExtractor,
   parseDirectiveStyles,
 } from '../../directive';
 import {createModuleWithProvidersResolver, NgModuleSymbol} from '../../ng_module';
 
-import {extractHmrMetatadata, getHmrUpdateDeclaration} from '../../../hmr';
-import {ComponentScope} from '../../../scope/src/api';
-import {getTemplateDiagnostics} from '../../../typecheck';
-import {getProjectRelativePath} from '../../../util/src/path';
-import {JitDeclarationRegistry} from '../../common/src/jit_declaration_registry';
-import {analyzeTemplateForAnimations} from './animations';
 import {checkCustomElementSelectorForErrors, makeCyclicImportInfo} from './diagnostics';
-import {analyzeForeignComponentFeatures} from './foreign_component';
 import {
   ComponentAnalysisData,
   ComponentResolutionData,
   DeferredComponentDependency,
-  ForeignComponentMeta,
 } from './metadata';
 import {
   _extractTemplateStyleUrls,
@@ -196,14 +184,18 @@ import {
   StyleUrlMeta,
   transformDecoratorResources,
 } from './resources';
-import {analyzeTemplateForSelectorless} from './selectorless';
 import {ComponentSymbol} from './symbol';
 import {
-  collectLegacyAnimationNames,
-  extractForeignImportsFromAst,
   legacyAnimationTriggerResolver,
+  collectLegacyAnimationNames,
   validateAndFlattenComponentImports,
 } from './util';
+import {getTemplateDiagnostics, createHostElement} from '../../../typecheck';
+import {JitDeclarationRegistry} from '../../common/src/jit_declaration_registry';
+import {extractHmrMetatadata, getHmrUpdateDeclaration} from '../../../hmr';
+import {getProjectRelativePath} from '../../../util/src/path';
+import {ComponentScope} from '../../../scope/src/api';
+import {analyzeTemplateForSelectorless} from './selectorless';
 
 const EMPTY_ARRAY: any[] = [];
 
@@ -236,12 +228,10 @@ const isUsedPipe = (decl: AnyUsedType): decl is UsedPipe =>
 /**
  * `DecoratorHandler` which handles the `@Component` annotation.
  */
-export class ComponentDecoratorHandler implements DecoratorHandler<
-  Decorator,
-  ComponentAnalysisData,
-  ComponentSymbol,
-  ComponentResolutionData
-> {
+export class ComponentDecoratorHandler
+  implements
+    DecoratorHandler<Decorator, ComponentAnalysisData, ComponentSymbol, ComponentResolutionData>
+{
   constructor(
     private reflector: ReflectionHost,
     private evaluator: PartialEvaluator,
@@ -289,8 +279,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
     private readonly typeCheckHostBindings: boolean,
     private readonly enableSelectorless: boolean,
     private readonly emitDeclarationOnly: boolean,
-    private readonly legacyOptionalChaining: boolean,
-    private readonly enableTemplateSourceLocations: boolean,
   ) {
     this.extractTemplateOptions = {
       enableI18nLegacyMessageIdFormat: this.enableI18nLegacyMessageIdFormat,
@@ -302,11 +290,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
       preserveSignificantWhitespace: this.i18nPreserveSignificantWhitespace,
     };
 
-    this.undecoratedMetadataExtractor = getDirectiveUndecoratedMetadataExtractor(
-      reflector,
-      importTracker,
-    );
-
     // Dependencies can't be deferred during HMR, because the HMR update module can't have
     // dynamic imports and its dependencies need to be passed in directly. If dependencies
     // are deferred, their imports will be deleted so we may lose the reference to them.
@@ -315,7 +298,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
 
   private literalCache = new Map<Decorator, ts.ObjectLiteralExpression>();
   private elementSchemaRegistry = new DomElementSchemaRegistry();
-  private readonly undecoratedMetadataExtractor: UndecoratedMetadataExtractor;
 
   /**
    * During the asynchronous preanalyze phase, it's necessary to parse the template to extract
@@ -507,7 +489,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
       this.strictStandalone,
       this.implicitStandaloneValue,
       this.emitDeclarationOnly,
-      this.legacyOptionalChaining,
     );
     // `extractDirectiveMetadata` returns `jitForced = true` when the `@Component` has
     // set `jit: true`. In this case, compilation of the decorator is skipped. Returning
@@ -516,7 +497,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
       this.jitDeclarationRegistry.jitDeclarations.add(node);
       return {};
     }
-    diagnostics = directiveResult.diagnostics;
 
     // Next, read the `@Component`-specific fields.
     const {
@@ -609,23 +589,16 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
     }
 
     let resolvedImports: Reference<ClassDeclaration>[] | null = null;
-    let foreignImports: ForeignComponentMeta[] | null = null;
     let resolvedDeferredImports: Reference<ClassDeclaration>[] | null = null;
-    let resolvedDeferredImportsByBlock: Map<string, Reference<ClassDeclaration>[]> | null = null;
 
     let rawImports: ts.Expression | null = component.get('imports') ?? null;
     let rawDeferredImports: ts.Expression | null = component.get('deferredImports') ?? null;
-    let rawForeignImports: ts.Expression | null = component.get('foreignImports') ?? null;
 
-    if ((rawImports || rawDeferredImports || rawForeignImports) && !metadata.isStandalone) {
+    if ((rawImports || rawDeferredImports) && !metadata.isStandalone) {
       if (diagnostics === undefined) {
         diagnostics = [];
       }
-      const importsField = rawImports
-        ? 'imports'
-        : rawDeferredImports
-          ? 'deferredImports'
-          : 'foreignImports';
+      const importsField = rawImports ? 'imports' : 'deferredImports';
       diagnostics.push(
         makeDiagnostic(
           ErrorCode.COMPONENT_NOT_STANDALONE,
@@ -642,49 +615,41 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
       // Poison the component so that we don't spam further template type-checking errors that
       // result from misconfigured imports.
       isPoisoned = true;
-    } else if (rawImports || rawDeferredImports || rawForeignImports) {
+    } else if (
+      this.compilationMode !== CompilationMode.LOCAL &&
+      (rawImports || rawDeferredImports)
+    ) {
+      const importResolvers = combineResolvers([
+        createModuleWithProvidersResolver(this.reflector, this.isCore),
+        createForwardRefResolver(this.isCore),
+      ]);
+
       const importDiagnostics: ts.Diagnostic[] = [];
 
-      // There's no need to extract foreign imports if we're only emitting declarations.
-      if (rawForeignImports && !this.emitDeclarationOnly) {
-        const {foreignImports: imports, diagnostics} =
-          extractForeignImportsFromAst(rawForeignImports);
+      if (rawImports) {
+        const expr = rawImports;
+        const imported = this.evaluator.evaluate(expr, importResolvers);
+        const {imports: flattened, diagnostics} = validateAndFlattenComponentImports(
+          imported,
+          expr,
+          false /* isDeferred */,
+        );
         importDiagnostics.push(...diagnostics);
-        foreignImports = imports;
+        resolvedImports = flattened;
+        rawImports = expr;
       }
 
-      if (this.compilationMode !== CompilationMode.LOCAL && (rawImports || rawDeferredImports)) {
-        const importResolvers = combineResolvers([
-          createModuleWithProvidersResolver(this.reflector, this.isCore),
-          createForwardRefResolver(this.isCore),
-        ]);
-
-        if (rawImports) {
-          const expr = rawImports;
-          const imported = this.evaluator.evaluate(expr, importResolvers);
-          const {imports: flattened, diagnostics} = validateAndFlattenComponentImports(
-            imported,
-            expr,
-            false /* isDeferred */,
-          );
-          importDiagnostics.push(...diagnostics);
-          resolvedImports = flattened;
-          rawImports = expr;
-        }
-
-        if (rawDeferredImports) {
-          const expr = rawDeferredImports;
-          const imported = this.evaluator.evaluate(expr, importResolvers);
-          const {
-            imports: flattened,
-            importsByBlock,
-            diagnostics,
-          } = validateAndFlattenComponentImports(imported, expr, true /* isDeferred */);
-          importDiagnostics.push(...diagnostics);
-          resolvedDeferredImports = flattened;
-          resolvedDeferredImportsByBlock = importsByBlock ?? null;
-          rawDeferredImports = expr;
-        }
+      if (rawDeferredImports) {
+        const expr = rawDeferredImports;
+        const imported = this.evaluator.evaluate(expr, importResolvers);
+        const {imports: flattened, diagnostics} = validateAndFlattenComponentImports(
+          imported,
+          expr,
+          true /* isDeferred */,
+        );
+        importDiagnostics.push(...diagnostics);
+        resolvedDeferredImports = flattened;
+        rawDeferredImports = expr;
       }
 
       if (importDiagnostics.length > 0) {
@@ -794,24 +759,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
         }
       }
     }
-
-    if (component.has('animations')) {
-      const {hasAnimations} = analyzeTemplateForAnimations(template.nodes);
-      if (hasAnimations) {
-        if (diagnostics === undefined) {
-          diagnostics = [];
-        }
-        diagnostics.push(
-          makeDiagnostic(
-            ErrorCode.COMPONENT_ANIMATIONS_CONFLICT,
-            component.get('animations')!,
-            `A component cannot have both the '@Component.animations' property (legacy animations) and use 'animate.enter' or 'animate.leave' in the template.`,
-          ),
-        );
-        isPoisoned = true;
-      }
-    }
-
     const templateResource: Resource = template.declaration.isInline
       ? {path: null, node: component.get('template')!}
       : {
@@ -855,14 +802,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
           ),
         );
       }
-    }
-
-    const foreignMatcher = createForeignComponentMatcher(foreignImports);
-    const foreignComponentDiagnostics = analyzeForeignComponentFeatures(template, foreignMatcher);
-    if (foreignComponentDiagnostics.length > 0) {
-      isPoisoned = true;
-      diagnostics ??= [];
-      diagnostics.push(...foreignComponentDiagnostics);
     }
 
     // Figure out the set of styles. The ordering here is important: external resources (styleUrls)
@@ -924,7 +863,7 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
 
     if (
       (encapsulation === ViewEncapsulation.ShadowDom ||
-        encapsulation === ViewEncapsulation.ExperimentalIsolatedShadowDom) &&
+        encapsulation === ViewEncapsulation.IsolatedShadowDom) &&
       metadata.selector !== null
     ) {
       const selectorError = checkCustomElementSelectorForErrors(metadata.selector);
@@ -982,36 +921,21 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
     // for the local compilation mode, since they don't require accessing/resolving symbols
     // outside of the current source file.
     let explicitlyDeferredTypes: R3DeferPerComponentDependency[] | null = null;
-    let explicitlyDeferredTypesByBlock: Map<string, R3DeferPerComponentDependency[]> | null = null;
     if (metadata.isStandalone && rawDeferredImports !== null) {
-      if (ts.isObjectLiteralExpression(rawDeferredImports)) {
-        explicitlyDeferredTypesByBlock = new Map();
-        for (const property of rawDeferredImports.properties) {
-          if (!ts.isPropertyAssignment(property)) {
-            continue;
-          }
-          let blockName: string | null = null;
-          if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) {
-            blockName = property.name.text;
-          }
-          if (blockName === null) {
-            continue;
-          }
-
-          const initializer = property.initializer;
-          if (ts.isArrayLiteralExpression(initializer)) {
-            const blockDeps = this.collectExplicitlyDeferredSymbols(node, initializer);
-            explicitlyDeferredTypesByBlock.set(blockName, blockDeps);
-            explicitlyDeferredTypes ??= [];
-            for (const dep of blockDeps) {
-              if (
-                !explicitlyDeferredTypes.some((existing) => existing.symbolName === dep.symbolName)
-              ) {
-                explicitlyDeferredTypes.push(dep);
-              }
-            }
-          }
-        }
+      const deferredTypes = this.collectExplicitlyDeferredSymbols(rawDeferredImports);
+      for (const [deferredType, importDetails] of deferredTypes) {
+        explicitlyDeferredTypes ??= [];
+        explicitlyDeferredTypes.push({
+          symbolName: importDetails.name,
+          importPath: importDetails.from,
+          isDefaultImport: isDefaultImport(importDetails.node),
+        });
+        this.deferredSymbolTracker.markAsDeferrableCandidate(
+          deferredType,
+          importDetails.node,
+          node,
+          true /* isExplicitlyDeferred */,
+        );
       }
     }
 
@@ -1032,7 +956,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
           changeDetection,
           styles,
           externalStyles,
-          legacyOptionalChaining: this.legacyOptionalChaining,
           // These will be replaced during the compilation step, after all `NgModule`s have been
           // analyzed and the full compilation scope for the component can be realized.
           animations,
@@ -1041,8 +964,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
           relativeContextFilePath,
           rawImports: rawImports !== null ? new o.WrappedNodeExpr(rawImports) : undefined,
           relativeTemplatePath,
-          foreignImports: null,
-          enableTemplateSourceLocations: this.enableTemplateSourceLocations,
         },
         typeCheckMeta: extractDirectiveTypeCheckMeta(node, inputs, this.reflector),
         classMetadata: this.includeClassMetadata
@@ -1052,7 +973,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
               this.isCore,
               this.annotateForClosureCompiler,
               (dec) => transformDecoratorResources(dec, component, styles, template),
-              this.undecoratedMetadataExtractor,
             )
           : null,
         classDebugInfo: extractClassDebugInfo(
@@ -1076,12 +996,9 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
         legacyAnimationTriggerNames: legacyAnimationTriggerNames,
         rawImports,
         resolvedImports,
-        foreignImports,
         rawDeferredImports,
         resolvedDeferredImports,
-        resolvedDeferredImportsByBlock,
         explicitlyDeferredTypes,
-        explicitlyDeferredTypesByBlock,
         schemas,
         decorator: (decorator?.node as ts.Decorator | null) ?? null,
         hostBindingNodes: directiveResult.hostBindingNodes,
@@ -1130,10 +1047,8 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
       isStandalone: analysis.meta.isStandalone,
       isSignal: analysis.meta.isSignal,
       imports: analysis.resolvedImports,
-      foreignImports: analysis.foreignImports,
       rawImports: analysis.rawImports,
       deferredImports: analysis.resolvedDeferredImports,
-      deferredImportsByBlock: analysis.resolvedDeferredImportsByBlock,
       animationTriggerNames: analysis.legacyAnimationTriggerNames,
       schemas: analysis.schemas,
       decorator: analysis.decorator,
@@ -1141,7 +1056,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
       ngContentSelectors: analysis.template.ngContentSelectors,
       preserveWhitespaces: analysis.template.preserveWhitespaces ?? false,
       isExplicitlyDeferred: false,
-      deferredBlocks: null,
       selectorlessEnabled: analysis.selectorlessEnabled,
       localReferencedSymbols: analysis.localReferencedSymbols,
     });
@@ -1160,7 +1074,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
     if (analysis.isPoisoned && !this.usePoisonedData) {
       return null;
     }
-    const typeCheckScope = this.typeCheckScopeRegistry.getTypeCheckScope(new Reference(node));
     const scope = this.scopeReader.getScopeForComponent(node);
     const selector = analysis.meta.selector;
     let matcher: DirectiveMatcher<DirectiveMeta> | null = null;
@@ -1185,42 +1098,10 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
     const binder = new R3TargetBinder<DirectiveMeta>(matcher);
     const boundTemplate = binder.bind({template: analysis.template.diagNodes});
 
-    const abstractBoundTemplate: AbstractBoundTemplate<DeclarationNode> = {
-      getDirectivesOfNode(node) {
-        return boundTemplate.getDirectivesOfNode(node);
-      },
-      getReferenceTarget(node) {
-        return boundTemplate.getReferenceTarget(node);
-      },
-      getConsumerOfBinding(binding) {
-        const consumer = boundTemplate.getConsumerOfBinding(binding);
-        if (consumer && 'ref' in consumer && consumer.ref) {
-          return {ref: {node: consumer.ref.node}};
-        }
-        return null;
-      },
-      getExpressionTarget(ast) {
-        return boundTemplate.getExpressionTarget(ast);
-      },
-      getUsedDirectives() {
-        return boundTemplate.getUsedDirectives().map((dir) => ({
-          ref: {node: dir.ref.node},
-          isComponent: dir.isComponent,
-        }));
-      },
-      getTemplateAst() {
-        return boundTemplate.target.template;
-      },
-      getPipe(name) {
-        const pipe = typeCheckScope.pipes.get(name);
-        return pipe ? {ref: {node: pipe.ref.node}} : null;
-      },
-    };
-
     context.addComponent({
       declaration: node,
       selector,
-      boundTemplate: abstractBoundTemplate,
+      boundTemplate,
       templateMeta: {
         isInline: analysis.template.declaration.isInline,
         file: analysis.template.file,
@@ -1244,10 +1125,7 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
       return;
     }
 
-    const binder = new R3TargetBinder<TypeCheckableDirectiveMeta>(
-      scope.matcher,
-      scope.foreignMatcher,
-    );
+    const binder = new R3TargetBinder<TypeCheckableDirectiveMeta>(scope.matcher);
     const templateContext: TemplateContext = {
       nodes: meta.template.diagNodes,
       pipes: scope.pipes,
@@ -1261,10 +1139,10 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
       ? createHostElement(
           'component',
           meta.meta.selector,
-          createSourceSpan(node.name),
-          meta.hostBindingNodes.hostObjectLiteralBindings,
-          meta.hostBindingNodes.hostBindingDecorators,
-          meta.hostBindingNodes.hostListenerDecorators,
+          node,
+          meta.hostBindingNodes.literal,
+          meta.hostBindingNodes.bindingDecorators,
+          meta.hostBindingNodes.listenerDecorators,
         )
       : null;
     const hostBindingsContext: HostBindingsContext | null =
@@ -1337,71 +1215,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
     let data: ComponentResolutionData;
 
     if (this.compilationMode === CompilationMode.LOCAL) {
-      const deferPerBlockDependencies = new Map<
-        TmplAstDeferredBlock,
-        DeferredComponentDependency[]
-      >();
-      let deferBlockDepsEmitMode = DeferBlockDepsEmitMode.PerComponent;
-      const hasBlockSpecificImports = analysis.explicitlyDeferredTypesByBlock != null;
-      const deferBlocks = this.locateDeferBlocksWithoutScope(analysis.template);
-
-      if (hasBlockSpecificImports) {
-        deferBlockDepsEmitMode = DeferBlockDepsEmitMode.PerBlock;
-        for (const [block] of deferBlocks) {
-          const blockName = block.definedName;
-          if (blockName === null) {
-            diagnostics.push(
-              makeDiagnostic(
-                ErrorCode.DEFER_BLOCK_MISSING_NAME_PARAMETER,
-                analysis.rawDeferredImports!,
-                `@defer block must specify a 'name' parameter (e.g. '@defer (name blockName)') when 'deferredImports' is defined.`,
-              ),
-            );
-            continue;
-          }
-
-          const depsForBlock = analysis.explicitlyDeferredTypesByBlock!.get(blockName);
-          if (depsForBlock === undefined) {
-            diagnostics.push(
-              makeDiagnostic(
-                ErrorCode.DEFER_BLOCK_UNKNOWN_NAME_PARAMETER,
-                analysis.rawDeferredImports!,
-                `The 'name' parameter references block '${blockName}' which is missing from '@Component.deferredImports'.`,
-              ),
-            );
-            continue;
-          }
-
-          const mappedDeps: DeferredComponentDependency[] = depsForBlock.map((dep) => {
-            return {
-              symbolName: dep.symbolName,
-              importPath: dep.importPath,
-              isDefaultImport: dep.isDefaultImport,
-              isDeferrable: true,
-              typeReference: new o.ExternalExpr({name: dep.symbolName, moduleName: dep.importPath}),
-              declaration: null as any,
-            };
-          });
-          deferPerBlockDependencies.set(block, mappedDeps);
-        }
-      } else {
-        for (const [block] of deferBlocks) {
-          if (block.definedName !== null) {
-            diagnostics.push(
-              makeDiagnostic(
-                ErrorCode.DEFER_BLOCK_INVALID_NAME_PARAMETER,
-                analysis.rawDeferredImports ?? node,
-                `The 'name' parameter can only be used when '@Component.deferredImports' is defined.`,
-              ),
-            );
-          }
-        }
-      }
-
-      if (diagnostics.length > 0) {
-        return {diagnostics};
-      }
-
       // Initial value in local compilation mode.
       data = {
         declarations: EMPTY_ARRAY,
@@ -1409,8 +1222,8 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
           !analysis.meta.isStandalone || analysis.rawImports !== null
             ? DeclarationListEmitMode.RuntimeResolved
             : DeclarationListEmitMode.Direct,
-        deferPerBlockDependencies,
-        deferBlockDepsEmitMode,
+        deferPerBlockDependencies: this.locateDeferBlocksWithoutScope(analysis.template),
+        deferBlockDepsEmitMode: DeferBlockDepsEmitMode.PerComponent,
         deferrableDeclToImportDecl: new Map(),
         deferPerComponentDependencies: analysis.explicitlyDeferredTypes ?? [],
         hasDirectiveDependencies: true,
@@ -1481,7 +1294,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
           data,
           analysis,
           eagerlyUsed,
-          diagnostics,
         );
         data.hasDirectiveDependencies =
           !analysis.meta.isStandalone ||
@@ -1597,12 +1409,10 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
       ? this.resolveAllDeferredDependencies(resolution)
       : null;
     const defer = this.compileDeferBlocks(resolution);
-    const foreignImports = this.resolveForeignComponentImports(analysis);
     const meta: R3ComponentMetadata<R3TemplateDependency> = {
       ...analysis.meta,
       ...resolution,
       defer,
-      foreignImports,
     };
     const fac = compileNgFactoryDefField(toFactoryMetadata(meta, FactoryTarget.Component));
 
@@ -1729,12 +1539,10 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
     const deferrableTypes = this.canDeferDeps ? analysis.explicitlyDeferredTypes : null;
 
     const defer = this.compileDeferBlocks(resolution);
-    const foreignImports = this.resolveForeignComponentImports(analysis);
     const meta = {
       ...analysis.meta,
       ...resolution,
       defer,
-      foreignImports,
     } as R3ComponentMetadata<R3TemplateDependency>;
 
     if (deferrableTypes !== null) {
@@ -1794,12 +1602,10 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
     // Create a brand-new constant pool since there shouldn't be any constant sharing.
     const pool = new ConstantPool();
     const defer = this.compileDeferBlocks(resolution);
-    const foreignImports = this.resolveForeignComponentImports(analysis);
     const meta: R3ComponentMetadata<R3TemplateDependency> = {
       ...analysis.meta,
       ...resolution,
       defer,
-      foreignImports,
     };
     const fac = compileNgFactoryDefField(toFactoryMetadata(meta, FactoryTarget.Component));
     const def = compileComponentFromMetadata(meta, pool, this.getNewBindingParser());
@@ -1923,10 +1729,7 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
     }
 
     // Set up the R3TargetBinder.
-    const binder = new R3TargetBinder(
-      createMatcherFromScope(scope, this.hostDirectivesResolver),
-      createForeignComponentMatcher(analysis.foreignImports),
-    );
+    const binder = new R3TargetBinder(createMatcherFromScope(scope, this.hostDirectivesResolver));
     let allDependencies = dependencies;
     let deferBlockBinder = binder;
 
@@ -2375,35 +2178,30 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
   }
 
   /**
-   * Collects deferrable symbols from a `@Component.deferredImports` array expression.
+   * Collects deferrable symbols from the `@Component.deferredImports` field.
    */
   private collectExplicitlyDeferredSymbols(
-    decl: ClassDeclaration,
-    rawDeferredImports: ts.ArrayLiteralExpression,
-  ): R3DeferPerComponentDependency[] {
-    const explicitlyDeferredTypes: R3DeferPerComponentDependency[] = [];
+    rawDeferredImports: ts.Expression,
+  ): Map<ts.Identifier, Import> {
+    const deferredTypes = new Map<ts.Identifier, Import>();
+    if (!ts.isArrayLiteralExpression(rawDeferredImports)) {
+      return deferredTypes;
+    }
+
     for (const element of rawDeferredImports.elements) {
       const node = tryUnwrapForwardRef(element, this.reflector) || element;
+
       if (!ts.isIdentifier(node)) {
+        // Can't defer-load non-literal references.
         continue;
       }
+
       const imp = this.reflector.getImportOfIdentifier(node);
-      if (imp === null) {
-        continue;
+      if (imp !== null) {
+        deferredTypes.set(node, imp);
       }
-      explicitlyDeferredTypes.push({
-        symbolName: imp.name,
-        importPath: imp.from,
-        isDefaultImport: isDefaultImport(imp.node),
-      });
-      this.deferredSymbolTracker.markAsDeferrableCandidate(
-        node,
-        imp.node,
-        decl,
-        true /* isExplicitlyDeferred */,
-      );
     }
-    return explicitlyDeferredTypes;
+    return deferredTypes;
   }
 
   /**
@@ -2439,28 +2237,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
   }
 
   /**
-   * Resolves imported foreign components for code generation.
-   */
-  private resolveForeignComponentImports(
-    analysis: Readonly<ComponentAnalysisData>,
-  ): R3ForeignComponentMetadata[] | null {
-    if (analysis.foreignImports === null || analysis.foreignImports.length === 0) {
-      return null;
-    }
-    return analysis.foreignImports.map((foreignMeta) => {
-      const {name, rawExpression} = foreignMeta;
-
-      // Avoid copying comments from the source file into the compiled output.
-      ts.setEmitFlags(rawExpression, ts.EmitFlags.NoComments | ts.EmitFlags.NoNestedComments);
-
-      return {
-        name,
-        component: new o.WrappedNodeExpr(rawExpression),
-      } satisfies R3ForeignComponentMetadata;
-    });
-  }
-
-  /**
    * Resolves information about defer blocks dependencies to make it
    * available for the final `compile` step.
    */
@@ -2472,13 +2248,11 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
     resolutionData: ComponentResolutionData,
     analysisData: Readonly<ComponentAnalysisData>,
     eagerlyUsedDecls: Set<ClassDeclaration>,
-    diagnostics: ts.Diagnostic[],
   ) {
     // Collect all deferred decls from all defer blocks from the entire template
     // to intersect with the information from the `imports` field of a particular
     // Component.
     const allDeferredDecls = new Set<ClassDeclaration>();
-    const hasBlockSpecificImports = analysisData.resolvedDeferredImportsByBlock != null;
 
     for (const [deferBlock, bound] of deferBlocks) {
       const usedDirectives = new Set(bound.getEagerlyUsedDirectives().map((d) => d.ref.node));
@@ -2492,96 +2266,31 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
         resolutionData.deferPerBlockDependencies.set(deferBlock, deps);
       }
 
-      const blockName = deferBlock.definedName;
-      if (hasBlockSpecificImports) {
-        if (blockName === null) {
-          diagnostics.push(
-            makeDiagnostic(
-              ErrorCode.DEFER_BLOCK_MISSING_NAME_PARAMETER,
-              analysisData.rawDeferredImports!,
-              `@defer block must specify a 'name' parameter (e.g. '@defer (name blockName)') when 'deferredImports' is defined.`,
-            ),
-          );
+      for (const decl of Array.from(deferrableDecls.values())) {
+        if (decl.kind === R3TemplateDependencyKind.NgModule) {
           continue;
         }
-
-        const blockImports = analysisData.resolvedDeferredImportsByBlock!.get(blockName);
-        if (blockImports === undefined) {
-          diagnostics.push(
-            makeDiagnostic(
-              ErrorCode.DEFER_BLOCK_UNKNOWN_NAME_PARAMETER,
-              analysisData.rawDeferredImports!,
-              `The 'name' parameter references block '${blockName}' which is missing from '@Component.deferredImports'.`,
-            ),
-          );
+        if (
+          decl.kind === R3TemplateDependencyKind.Directive &&
+          !usedDirectives.has(decl.ref.node)
+        ) {
           continue;
         }
-
-        const blockImportsSet = new Set(blockImports.map((ref) => ref.node));
-
-        for (const decl of Array.from(deferrableDecls.values())) {
-          if (decl.kind === R3TemplateDependencyKind.NgModule) {
-            continue;
-          }
-          if (!blockImportsSet.has(decl.ref.node)) {
-            continue;
-          }
-          if (
-            decl.kind === R3TemplateDependencyKind.Directive &&
-            !usedDirectives.has(decl.ref.node)
-          ) {
-            continue;
-          }
-          if (decl.kind === R3TemplateDependencyKind.Pipe && !usedPipes.has(decl.name)) {
-            continue;
-          }
-
-          deps.push({
-            typeReference: decl.type,
-            symbolName: decl.ref.node.name.text,
-            isDeferrable: false,
-            importPath: null,
-            isDefaultImport: false,
-            declaration: decl.ref,
-          });
-          allDeferredDecls.add(decl.ref.node);
-        }
-      } else {
-        if (blockName !== null) {
-          diagnostics.push(
-            makeDiagnostic(
-              ErrorCode.DEFER_BLOCK_INVALID_NAME_PARAMETER,
-              analysisData.rawDeferredImports ?? componentClassDecl,
-              `The 'name' parameter can only be used when '@Component.deferredImports' is defined.`,
-            ),
-          );
+        if (decl.kind === R3TemplateDependencyKind.Pipe && !usedPipes.has(decl.name)) {
           continue;
         }
-
-        for (const decl of Array.from(deferrableDecls.values())) {
-          if (decl.kind === R3TemplateDependencyKind.NgModule) {
-            continue;
-          }
-          if (
-            decl.kind === R3TemplateDependencyKind.Directive &&
-            !usedDirectives.has(decl.ref.node)
-          ) {
-            continue;
-          }
-          if (decl.kind === R3TemplateDependencyKind.Pipe && !usedPipes.has(decl.name)) {
-            continue;
-          }
-
-          deps.push({
-            typeReference: decl.type,
-            symbolName: decl.ref.node.name.text,
-            isDeferrable: false,
-            importPath: null,
-            isDefaultImport: false,
-            declaration: decl.ref,
-          });
-          allDeferredDecls.add(decl.ref.node);
-        }
+        // Collect initial information about this dependency.
+        // `isDeferrable`, `importPath` and `isDefaultImport` will be
+        // added later during the `compile` step.
+        deps.push({
+          typeReference: decl.type,
+          symbolName: decl.ref.node.name.text,
+          isDeferrable: false,
+          importPath: null,
+          isDefaultImport: false,
+          declaration: decl.ref,
+        });
+        allDeferredDecls.add(decl.ref.node);
       }
     }
 
@@ -2604,37 +2313,19 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
           );
         }
       }
-      if (analysisData.rawDeferredImports !== null) {
-        if (ts.isArrayLiteralExpression(analysisData.rawDeferredImports)) {
-          for (const element of analysisData.rawDeferredImports.elements) {
-            this.registerDeferrableCandidate(
-              componentClassDecl,
-              element,
-              false /* isDeferredImport */,
-              allDeferredDecls,
-              eagerlyUsedDecls,
-              resolutionData,
-            );
-          }
-        } else if (ts.isObjectLiteralExpression(analysisData.rawDeferredImports)) {
-          for (const property of analysisData.rawDeferredImports.properties) {
-            if (!ts.isPropertyAssignment(property)) {
-              continue;
-            }
-            const initializer = property.initializer;
-            if (ts.isArrayLiteralExpression(initializer)) {
-              for (const element of initializer.elements) {
-                this.registerDeferrableCandidate(
-                  componentClassDecl,
-                  element,
-                  false /* isDeferredImport */,
-                  allDeferredDecls,
-                  eagerlyUsedDecls,
-                  resolutionData,
-                );
-              }
-            }
-          }
+      if (
+        analysisData.rawDeferredImports !== null &&
+        ts.isArrayLiteralExpression(analysisData.rawDeferredImports)
+      ) {
+        for (const element of analysisData.rawDeferredImports.elements) {
+          this.registerDeferrableCandidate(
+            componentClassDecl,
+            element,
+            false /* isDeferredImport */,
+            allDeferredDecls,
+            eagerlyUsedDecls,
+            resolutionData,
+          );
         }
       }
 
@@ -2650,14 +2341,6 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
             resolutionData,
           );
         }
-      }
-    }
-
-    // Any directive or pipe used inside a defer block that wasn't deferred
-    // must be added to eager dependencies to ensure it's available at runtime.
-    for (const decl of Array.from(deferrableDecls.values())) {
-      if (decl.kind !== R3TemplateDependencyKind.NgModule && !allDeferredDecls.has(decl.ref.node)) {
-        eagerlyUsedDecls.add(decl.ref.node);
       }
     }
   }

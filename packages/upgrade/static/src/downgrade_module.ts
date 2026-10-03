@@ -13,7 +13,7 @@ import {
   PlatformRef,
   StaticProvider,
   Type,
-  ɵinternalProvideZoneChangeDetection as internalProvideZoneChangeDetection,
+  ɵsetZoneProvidersForNextBootstrap,
 } from '@angular/core';
 import {platformBrowser} from '@angular/platform-browser';
 
@@ -125,8 +125,8 @@ let moduleUid = 0;
  *   `StaticProvider`s, when creating the `PlatformRef` (e.g. via `platformBrowser` or
  *   `platformBrowserDynamic`).
  *
- * - When using {@link PlatformRef#bootstrapModule `bootstrapModule()`} or
- *   {@link PlatformRef#bootstrapModuleFactory `bootstrapModuleFactory()`} to bootstrap the
+ * - When using {@link PlatformRef#bootstrapmodule `bootstrapModule()`} or
+ *   {@link PlatformRef#bootstrapmodulefactory `bootstrapModuleFactory()`} to bootstrap the
  *   downgraded modules, each one is considered a "root" module. As a consequence, a new instance
  *   will be created for every injectable provided in `"root"` (via
  *   {@link /api/core/Injectable#providedIn providedIn}
@@ -241,8 +241,8 @@ export function downgradeModule<T>(
  *   `StaticProvider`s, when creating the `PlatformRef` (e.g. via `platformBrowser` or
  *   `platformBrowserDynamic`).
  *
- * - When using {@link PlatformRef#bootstrapModule `bootstrapModule()`} or
- *   {@link PlatformRef#bootstrapModuleFactory `bootstrapModuleFactory()`} to bootstrap the
+ * - When using {@link PlatformRef#bootstrapmodule `bootstrapModule()`} or
+ *   {@link PlatformRef#bootstrapmodulefactory `bootstrapModuleFactory()`} to bootstrap the
  *   downgraded modules, each one is considered a "root" module. As a consequence, a new instance
  *   will be created for every injectable provided in `"root"` (via
  *   {@link /api/core/Injectable#providedIn providedIn}
@@ -358,8 +358,8 @@ export function downgradeModule<T>(moduleOrBootstrapFn: NgModuleFactory<T>): str
  *   `StaticProvider`s, when creating the `PlatformRef` (e.g. via `platformBrowser` or
  *   `platformBrowserDynamic`).
  *
- * - When using {@link PlatformRef#bootstrapModule `bootstrapModule()`} or
- *   {@link PlatformRef#bootstrapModuleFactory `bootstrapModuleFactory()`} to bootstrap the
+ * - When using {@link PlatformRef#bootstrapmodule `bootstrapModule()`} or
+ *   {@link PlatformRef#bootstrapmodulefactory `bootstrapModuleFactory()`} to bootstrap the
  *   downgraded modules, each one is considered a "root" module. As a consequence, a new instance
  *   will be created for every injectable provided in `"root"` (via
  *   {@link /api/core/Injectable#providedIn providedIn}
@@ -372,7 +372,9 @@ export function downgradeModule<T>(moduleOrBootstrapFn: NgModuleFactory<T>): str
  */
 export function downgradeModule<T>(
   moduleOrBootstrapFn:
-    Type<T> | NgModuleFactory<T> | ((extraProviders: StaticProvider[]) => Promise<NgModuleRef<T>>),
+    | Type<T>
+    | NgModuleFactory<T>
+    | ((extraProviders: StaticProvider[]) => Promise<NgModuleRef<T>>),
 ): string {
   const lazyModuleName = `${ɵconstants.UPGRADE_MODULE_NAME}.lazy${++moduleUid}`;
   const lazyModuleRefKey = `${ɵconstants.LAZY_MODULE_REF}${lazyModuleName}`;
@@ -382,19 +384,20 @@ export function downgradeModule<T>(
   if (ɵutil.isNgModuleType(moduleOrBootstrapFn)) {
     // NgModule class
     bootstrapFn = (extraProviders: StaticProvider[]) =>
-      platformBrowser(extraProviders).bootstrapModule(moduleOrBootstrapFn, {
-        applicationProviders: [internalProvideZoneChangeDetection({})],
-      });
+      platformBrowser(extraProviders).bootstrapModule(moduleOrBootstrapFn);
   } else if (!ɵutil.isFunction(moduleOrBootstrapFn)) {
     // NgModule factory
     bootstrapFn = (extraProviders: StaticProvider[]) =>
-      platformBrowser(extraProviders).bootstrapModuleFactory(moduleOrBootstrapFn, {
-        applicationProviders: [internalProvideZoneChangeDetection({})],
-      });
+      platformBrowser(extraProviders).bootstrapModuleFactory(moduleOrBootstrapFn);
   } else {
     // bootstrap function
     bootstrapFn = moduleOrBootstrapFn;
   }
+
+  const wrappedBootstrapFn = (extraProviders: StaticProvider[]) => {
+    ɵsetZoneProvidersForNextBootstrap();
+    return bootstrapFn(extraProviders);
+  };
 
   let injector: Injector;
 
@@ -418,7 +421,7 @@ export function downgradeModule<T>(
       ($injector: ɵangular1.IInjectorService) => {
         setTempInjectorRef($injector);
         const result: ɵutil.LazyModuleRef = {
-          promise: bootstrapFn(angular1Providers).then((ref) => {
+          promise: wrappedBootstrapFn(angular1Providers).then((ref) => {
             injector = result.injector = new NgAdapterInjector(ref.injector);
             injector.get(ɵconstants.$INJECTOR);
 

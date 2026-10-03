@@ -21,7 +21,6 @@ export const enum TokenType {
   ENCODED_ENTITY,
   COMMENT_START,
   COMMENT_END,
-  IN_ELEMENT_COMMENT,
   CDATA_START,
   CDATA_END,
   ATTR_NAME,
@@ -51,7 +50,6 @@ export const enum TokenType {
   DIRECTIVE_NAME,
   DIRECTIVE_OPEN,
   DIRECTIVE_CLOSE,
-  PROCESSING_INSTRUCTION,
   EOF,
 }
 
@@ -66,7 +64,6 @@ export type Token =
   | EncodedEntityToken
   | CommentStartToken
   | CommentEndToken
-  | InElementCommentToken
   | CdataStartToken
   | CdataEndToken
   | AttributeNameToken
@@ -96,13 +93,14 @@ export type Token =
   | IncompleteComponentOpenToken
   | DirectiveNameToken
   | DirectiveOpenToken
-  | DirectiveCloseToken
-  | ProcessingInstructionToken;
+  | DirectiveCloseToken;
 
 export type InterpolatedTextToken = TextToken | InterpolationToken | EncodedEntityToken;
 
 export type InterpolatedAttributeToken =
-  AttributeValueTextToken | AttributeValueInterpolationToken | EncodedEntityToken;
+  | AttributeValueTextToken
+  | AttributeValueInterpolationToken
+  | EncodedEntityToken;
 
 export interface TokenBase {
   type: TokenType;
@@ -160,11 +158,6 @@ export interface CommentStartToken extends TokenBase {
 export interface CommentEndToken extends TokenBase {
   type: TokenType.COMMENT_END;
   parts: [];
-}
-
-export interface InElementCommentToken extends TokenBase {
-  type: TokenType.IN_ELEMENT_COMMENT;
-  parts: [content: string, type: 'single' | 'multi'];
 }
 
 export interface CdataStartToken extends TokenBase {
@@ -317,9 +310,4 @@ export interface DirectiveOpenToken extends TokenBase {
 export interface DirectiveCloseToken extends TokenBase {
   type: TokenType.DIRECTIVE_CLOSE;
   parts: [];
-}
-
-export interface ProcessingInstructionToken extends TokenBase {
-  type: TokenType.PROCESSING_INSTRUCTION;
-  parts: [content: string];
 }

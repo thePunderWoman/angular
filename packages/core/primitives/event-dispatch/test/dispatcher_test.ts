@@ -879,6 +879,31 @@ describe('Dispatcher', () => {
 
       expect(keydownEvent.preventDefault).toHaveBeenCalled();
     });
+
+    it('prevents default for enter key on anchor child', () => {
+      const container = getRequiredElementById('a11y-anchor-click-container');
+      const actionElement = getRequiredElementById('a11y-anchor-click-action-element');
+      const targetElement = getRequiredElementById('a11y-anchor-click-target-element');
+
+      const eventContract = createEventContract({
+        container,
+        eventTypes: ['click', 'keydown'],
+      });
+      const dispatchDelegate = createDispatchDelegateSpy();
+      createDispatcher({dispatchDelegate, eventContract, a11yClickSupport: true});
+
+      const keydownEvent = dispatchKeyboardEvent(targetElement, {key: 'Enter'});
+
+      expect(dispatchDelegate).toHaveBeenCalledTimes(1);
+      const eventInfoWrapper = dispatchDelegate.calls.mostRecent().args[0];
+      expect(eventInfoWrapper.getEventType()).toBe('click');
+      expect(eventInfoWrapper.getEvent()).toBe(keydownEvent);
+      expect(eventInfoWrapper.getTargetElement()).toBe(targetElement);
+      expect(eventInfoWrapper.getAction()?.name).toBe('handleClick');
+      expect(eventInfoWrapper.getAction()?.element).toBe(actionElement);
+
+      expect(keydownEvent.preventDefault).toHaveBeenCalled();
+    });
   });
 
   describe('non-bubbling mouse events', () => {
@@ -1128,27 +1153,5 @@ describe('Dispatcher', () => {
       expect(eventInfoWrapper.getTargetElement()).toBe(targetElement);
       expect(eventInfoWrapper.getAction()).toBeUndefined();
     });
-  });
-
-  it('action map does not resolve Object.prototype properties as actions', () => {
-    const actionElement = getRequiredElementById('click-action-element');
-    const targetElement = getRequiredElementById('click-target-element');
-    const container = getRequiredElementById('click-container');
-
-    actionElement.setAttribute('jsaction', 'click:handleClick');
-    cache.clear(actionElement);
-
-    const actionResolver = new ActionResolver();
-    const eventInfo = createEventInfo({
-      eventType: 'toString',
-      event: new Event('toString'),
-      targetElement,
-      container,
-      timestamp: 0,
-    });
-
-    actionResolver.resolveAction(eventInfo);
-
-    expect(new EventInfoWrapper(eventInfo).getAction()).toBeUndefined();
   });
 });

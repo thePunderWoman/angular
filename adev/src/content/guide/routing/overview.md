@@ -24,7 +24,6 @@ In addition, the Angular Routing library offers additional functionality such as
 - Programmatic navigation
 - Route params, queries and wildcards
 - Activated route information with `ActivatedRoute`
-- Data fetching with route resources and resolvers
 - View transition effects
 - Navigation guards
 

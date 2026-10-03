@@ -13,7 +13,7 @@ Add readonly and computed signals to make the cart state reactive in `cart-store
 
 ```ts
 // Add the computed import
-import {Service, signal, computed} from '@angular/core';
+import {Injectable, signal, computed} from '@angular/core';
 
 // Then add these signals to the class:
 
@@ -60,7 +60,7 @@ These methods read the current cart state using `cartItems()` and update quantit
 <docs-step title="Update the main app component">
 Update the main app component in `app.ts` to use the cart service and display the cart component.
 
-```angular-ts
+```ts
 import {Component, inject} from '@angular/core';
 import {CartStore} from './cart-store';
 import {CartDisplay} from './cart-display';
@@ -78,7 +78,7 @@ import {CartDisplay} from './cart-display';
       </header>
 
       <main>
-        <cart-display />
+        <cart-display></cart-display>
       </main>
     </div>
   `,

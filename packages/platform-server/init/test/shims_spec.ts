@@ -5,7 +5,7 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.dev/license
  */
-import domino from '../../third_party/domino/bundled-domino';
+import domino from '../src/bundled-domino';
 import {applyShims} from '../src/shims';
 
 describe('applyShims()', () => {
@@ -15,11 +15,11 @@ describe('applyShims()', () => {
     // Un-patch `global`.
     const currentProps = Object.keys(global);
     for (const prop of currentProps) {
-      if (['navigator', 'crypto'].includes(prop)) {
-        // These props are just a getter and cannot be changed
+      if (prop === 'crypto') {
+        // crypto is a getter and cannot be changed
         continue;
       }
-      if (Object.hasOwn(globalClone, prop)) {
+      if (globalClone.hasOwnProperty(prop)) {
         (global as any)[prop] = (globalClone as any)[prop];
       } else {
         delete (global as any)[prop];

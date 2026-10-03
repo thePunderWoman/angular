@@ -11,6 +11,7 @@ import {computeDecimalDigest, computeDigest, decimalDigest} from '../../../i18n/
 import * as i18n from '../../../i18n/i18n_ast';
 import {createI18nMessageFactory, VisitNodeFn} from '../../../i18n/i18n_parser';
 import * as html from '../../../ml_parser/ast';
+import {DEFAULT_CONTAINER_BLOCKS} from '../../../ml_parser/defaults';
 import {ParseTreeResult} from '../../../ml_parser/parser';
 import * as o from '../../../output/output_ast';
 import {isTrustedTypesSink} from '../../../schema/trusted_types_sinks';
@@ -62,6 +63,7 @@ export class I18nMetaVisitor implements html.Visitor {
   constructor(
     private keepI18nAttrs = false,
     private enableI18nLegacyMessageIdFormat = false,
+    private containerBlocks: Set<string> = DEFAULT_CONTAINER_BLOCKS,
     private readonly preserveSignificantWhitespace: boolean = true,
 
     // When dropping significant whitespace we need to retain empty tokens or
@@ -80,6 +82,7 @@ export class I18nMetaVisitor implements html.Visitor {
   ): i18n.Message {
     const {meaning, description, customId} = this._parseMetadata(meta);
     const createI18nMessage = createI18nMessageFactory(
+      this.containerBlocks,
       this.retainEmptyTokens,
       /* preserveExpressionWhitespace */ this.preserveSignificantWhitespace,
     );
@@ -208,7 +211,7 @@ export class I18nMetaVisitor implements html.Visitor {
             isTrustedType = isTrustedTypesSink(node.name, name);
           }
 
-          if (isTrustedType || isPossibleEventHandler(name)) {
+          if (isTrustedType) {
             this._reportError(
               attr,
               `Translating attribute '${name}' is disallowed for security reasons.`,
@@ -349,15 +352,4 @@ export function i18nMetaToJSDoc(meta: I18nMeta): o.JSDocComment {
     tags.push({tagName: o.JSDocTagName.Meaning, text: meta.meaning});
   }
   return o.jsDocComment(tags);
-}
-
-/**
- * Check if the propertyName is a potential event handler.
- * We consider a property to be a potential event handler if its name is longer than 2 characters and starts with 'on' (e.g. 'onclick', 'onload', etc.).
- * @param propertyName The name of the property to check.
- * @returns True if the property is a potential event handler, false otherwise.
- */
-function isPossibleEventHandler(propertyName: string): boolean {
-  const name = propertyName.toLowerCase();
-  return name.length > 2 && name !== 'only' && name.startsWith('on');
 }

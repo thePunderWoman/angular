@@ -7,43 +7,38 @@
  */
 
 import {
-  ParseSourceSpan,
+  TmplAstElement,
+  TmplAstNode,
+  TmplAstTemplate,
+  TmplAstVisitor,
   TmplAstBoundAttribute,
   TmplAstBoundEvent,
   TmplAstBoundText,
-  TmplAstComponent,
   TmplAstContent,
-  TmplAstContentBlock,
   TmplAstDeferredBlock,
   TmplAstDeferredBlockError,
   TmplAstDeferredBlockLoading,
   TmplAstDeferredBlockPlaceholder,
   TmplAstDeferredTrigger,
-  TmplAstDirective,
-  TmplAstElement,
   TmplAstForLoopBlock,
   TmplAstForLoopBlockEmpty,
   TmplAstIcu,
   TmplAstIfBlock,
   TmplAstIfBlockBranch,
   TmplAstLetDeclaration,
-  TmplAstNode,
   TmplAstReference,
   TmplAstSwitchBlock,
   TmplAstSwitchBlockCase,
-  TmplAstSwitchBlockCaseGroup,
-  TmplAstSwitchExhaustiveCheck,
-  TmplAstTemplate,
   TmplAstText,
   TmplAstTextAttribute,
   TmplAstUnknownBlock,
   TmplAstVariable,
-  TmplAstVisitor,
-  TmplAstBoundaryBlock,
-  TmplAstBoundaryErrorBlock,
+  TmplAstComponent,
+  TmplAstDirective,
+  ParseSourceSpan,
 } from '@angular/compiler';
-import {NgCompiler, PotentialDirective} from '@angular/compiler-cli';
-
+import {NgCompiler} from '@angular/compiler-cli/src/ngtsc/core';
+import {PotentialDirective} from '@angular/compiler-cli/src/ngtsc/typecheck/api';
 import ts from 'typescript';
 import {TypeCheckInfo} from './utils';
 
@@ -144,10 +139,6 @@ class ClassificationVisitor implements TmplAstVisitor {
     this.visitAll(content.children);
   }
 
-  visitContentBlock(block: TmplAstContentBlock) {
-    this.visitAll(block.children);
-  }
-
   visitVariable(variable: TmplAstVariable) {}
   visitReference(reference: TmplAstReference) {}
   visitTextAttribute(attribute: TmplAstTextAttribute) {}
@@ -179,16 +170,12 @@ class ClassificationVisitor implements TmplAstVisitor {
   visitDeferredTrigger(trigger: TmplAstDeferredTrigger) {}
 
   visitSwitchBlock(block: TmplAstSwitchBlock) {
-    this.visitAll(block.groups);
+    this.visitAll(block.cases);
   }
 
-  visitSwitchBlockCase(block: TmplAstSwitchBlockCase) {}
-
-  visitSwitchBlockCaseGroup(block: TmplAstSwitchBlockCaseGroup) {
+  visitSwitchBlockCase(block: TmplAstSwitchBlockCase) {
     this.visitAll(block.children);
   }
-
-  visitSwitchExhaustiveCheck(block: TmplAstSwitchExhaustiveCheck) {}
 
   visitForLoopBlock(block: TmplAstForLoopBlock) {
     this.visitAll(block.children);
@@ -204,15 +191,6 @@ class ClassificationVisitor implements TmplAstVisitor {
   }
 
   visitIfBlockBranch(block: TmplAstIfBlockBranch) {
-    this.visitAll(block.children);
-  }
-
-  visitBoundaryBlock(block: TmplAstBoundaryBlock) {
-    this.visitAll(block.children);
-    this.visitAll(block.errorBlocks);
-  }
-
-  visitBoundaryErrorBlock(block: TmplAstBoundaryErrorBlock) {
     this.visitAll(block.children);
   }
 

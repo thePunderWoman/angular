@@ -1,8 +1,7 @@
-load("@aspect_rules_js//js:defs.bzl", "js_library", "js_run_binary")
+load("@aspect_bazel_lib//lib:expand_template.bzl", "expand_template_rule")
+load("@aspect_rules_js//js:defs.bzl", "js_library")
 load("@aspect_rules_js//npm:defs.bzl", "npm_package")
 load("@aspect_rules_ts//ts:defs.bzl", "ts_config")
-load("@bazel_lib//lib:expand_template.bzl", "expand_template_rule")
-load("@bazel_lib//lib:write_source_files.bzl", "write_source_file")
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@npm//vscode-ng-language-service:@vscode/vsce/package_json.bzl", vsce_bin = "bin")
 
@@ -15,29 +14,19 @@ js_library(
 )
 
 ts_config(
-    name = "tsconfig_build",
+    name = "tsconfig",
     src = "tsconfig.json",
     visibility = ["//visibility:public"],
-)
-
-ts_config(
-    name = "tsconfig_test",
-    src = "tsconfig-test.json",
-    visibility = ["//visibility:public"],
-    deps = [
-        ":tsconfig_build",
-    ],
 )
 
 expand_template_rule(
     name = "package_json_expanded",
     out = "package_expanded.json",
     stamp_substitutions = {
-        "workspace:*": "{{STABLE_PROJECT_VERSION}}",
+        "0.0.0-PLACEHOLDER": "{{BUILD_SCM_VERSION}}",
     },
     substitutions = {
-        "workspace:*": "0.0.0",
-        "../dist/bin/vscode-ng-language-service/client/src/extension.js": "./index",
+        "./bazel-bin/client/src/extension": "./index",
     },
     template = "package.json",
 )
@@ -49,30 +38,20 @@ npm_package(
         "README.md",
         "angular.png",
         "package_expanded.json",
-        "schemas/tsconfig-ng.schema.json",
         "//vscode-ng-language-service/client:index.js",
-        "//vscode-ng-language-service/server:npm_package",
-        "//vscode-ng-language-service/syntaxes:json",
-        # Transitive closure of npm deps that are marked as "external" in esbuild needed for vsce;
-        # this set was determined manually by running `bazel build //:vsix` and burning down missing packages.
-        # We do this so that we don't have to run an additional `npm install` action to create a node_modules within the
-        # //:npm npm_package where the vsce build takes place.
-        ":node_modules/@angular/language-service",
-        ":node_modules/typescript",
+        "//vscode-ng-language-service/server:npm_files",
+        "//vscode-ng-language-service/syntaxes:npm_files",
     ],
     exclude_srcs_patterns = [
         "*.map",
         "**/*.map",
-        "node_modules/@angular/language-service/private_bundle.js",
-        "node_modules/@angular/language-service/private.d.ts",
-        "node_modules/@angular/language-service/src/**/*.d.ts",
     ],
     include_srcs_packages = [
         "**",
     ],
     replace_prefixes = {
         "package_expanded.json": "package.json",
-        "server/npm_package/": "server/",
+        "server/package_expanded.json": "server/package.json",
         "client/": "",
         "syntaxes/src/": "syntaxes/",
     },
@@ -88,41 +67,21 @@ vsce_bin.vsce(
         "package",
         "-o",
         "../ng-template.vsix",
+        "--no-dependencies",
         "--allow-package-env-file",
         "--allow-package-all-secrets",
     ],
     chdir = "vscode-ng-language-service/vsix_sandbox",
-    # vsce requires npm on the PATH; we can get this from the Bazel rules_nodejs but it is not
-    # included by default in rules_js binary rules so we include it here explicitly
-    include_npm = True,
 )
 
 npm_package(
-    name = "development_package",
+    name = "npm",
     srcs = [
         ":vsix",
         ":vsix_sandbox",
     ],
     root_paths = [
-        "vscode-ng-language-service/vsix_sandbox",
-        "vscode-ng-language-service",
+        "vsix_sandbox",
     ],
-    visibility = ["//vscode-ng-language-service/integration/e2e:__subpackages__"],
-)
-
-js_run_binary(
-    name = "vsix_contents_golden_file",
-    srcs = [":vsix_sandbox"],
-    outs = ["vsix_package_contents.txt"],
-    args = [
-        "$(rootpath vsix_package_contents.txt)",
-    ],
-    tool = "//vscode-ng-language-service/tools:vsix_contents_goldens",
-)
-
-write_source_file(
-    name = "vsix_contents_golden",
-    check_that_out_file_exists = False,
-    in_file = ":vsix_contents_golden_file",
-    out_file = "//goldens/vscode-extension:vsix_package_contents.txt",
+    visibility = ["//vscode-ng-language-service/integration:__subpackages__"],
 )

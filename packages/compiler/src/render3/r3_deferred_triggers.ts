@@ -7,16 +7,6 @@
  */
 
 import * as chars from '../chars';
-import {
-  AST,
-  ASTWithSource,
-  ImplicitReceiver,
-  LiteralArray,
-  LiteralMap,
-  LiteralPrimitive,
-  PropertyRead,
-  RecursiveAstVisitor,
-} from '../expression_parser/ast';
 import {Lexer, Token, TokenType} from '../expression_parser/lexer';
 import * as html from '../ml_parser/ast';
 import {ParseError, ParseSourceSpan} from '../parse_util';
@@ -49,16 +39,7 @@ enum OnTriggerType {
 }
 
 /** Function that validates the structure of a reference-based trigger. */
-type ReferenceTriggerValidator = (type: OnTriggerType, parameters: ParsedParameter[]) => void;
-
-/** Parsed information about a defer trigger parameter. */
-interface ParsedParameter {
-  /** Expression of the parameter. */
-  expression: string;
-
-  /** Index within the trigger at which the parameter starts. */
-  start: number;
-}
+type ReferenceTriggerValidator = (type: OnTriggerType, parameters: string[]) => void;
 
 /** Parses a `when` deferred trigger. */
 export function parseNeverTrigger(
@@ -127,7 +108,6 @@ export function parseWhenTrigger(
 /** Parses an `on` trigger */
 export function parseOnTrigger(
   {expression, sourceSpan}: html.BlockParameter,
-  bindingParser: BindingParser,
   triggers: t.DeferredBlockTriggers,
   errors: ParseError[],
   placeholder: t.DeferredBlockPlaceholder | null,
@@ -146,18 +126,16 @@ export function parseOnTrigger(
     errors.push(new ParseError(sourceSpan, `Could not find "on" keyword in expression`));
   } else {
     const start = getTriggerParametersStart(expression, onIndex + 1);
-    const isHydrationTrigger = expression.startsWith('hydrate');
     const parser = new OnTriggerParser(
       expression,
-      bindingParser,
       start,
       sourceSpan,
       triggers,
       errors,
-      isHydrationTrigger
+      expression.startsWith('hydrate')
         ? validateHydrateReferenceBasedTrigger
         : validatePlainReferenceBasedTrigger,
-      isHydrationTrigger,
+      placeholder,
       prefetchSpan,
       onSourceSpan,
       hydrateSpan,
@@ -186,13 +164,12 @@ class OnTriggerParser {
 
   constructor(
     private expression: string,
-    private bindingParser: BindingParser,
     private start: number,
     private span: ParseSourceSpan,
     private triggers: t.DeferredBlockTriggers,
     private errors: ParseError[],
     private validator: ReferenceTriggerValidator,
-    private isHydrationTrigger: boolean,
+    private placeholder: t.DeferredBlockPlaceholder | null,
     private prefetchSpan: ParseSourceSpan | null,
     private onSourceSpan: ParseSourceSpan,
     private hydrateSpan: ParseSourceSpan | null,
@@ -247,7 +224,7 @@ class OnTriggerParser {
     return this.tokens[Math.min(this.index, this.tokens.length - 1)];
   }
 
-  private consumeTrigger(identifier: Token, parameters: ParsedParameter[]) {
+  private consumeTrigger(identifier: Token, parameters: string[]) {
     const triggerNameStartSpan = this.span.start.moveBy(
       this.start + identifier.index - this.tokens[0].index,
     );
@@ -338,6 +315,7 @@ class OnTriggerParser {
               this.prefetchSpan,
               this.onSourceSpan,
               this.hydrateSpan,
+              this.placeholder,
               this.validator,
             ),
           );
@@ -347,9 +325,6 @@ class OnTriggerParser {
           this.trackTrigger(
             'viewport',
             createViewportTrigger(
-              this.start,
-              this.isHydrationTrigger,
-              this.bindingParser,
               parameters,
               nameSpan,
               sourceSpan,
@@ -369,8 +344,8 @@ class OnTriggerParser {
     }
   }
 
-  private consumeParameters(): ParsedParameter[] {
-    const parameters: ParsedParameter[] = [];
+  private consumeParameters(): string[] {
+    const parameters: string[] = [];
 
     if (!this.token().isCharacter(chars.$LPAREN)) {
       this.unexpectedToken(this.token());
@@ -380,7 +355,7 @@ class OnTriggerParser {
     this.advance();
 
     const commaDelimStack: number[] = [];
-    let tokens: Token[] = [];
+    let current = '';
 
     while (this.index < this.tokens.length) {
       const token = this.token();
@@ -389,8 +364,8 @@ class OnTriggerParser {
       // Note that we don't need to account for strings here since the lexer already parsed them
       // into string tokens.
       if (token.isCharacter(chars.$RPAREN) && commaDelimStack.length === 0) {
-        if (tokens.length) {
-          parameters.push({expression: this.tokenRangeText(tokens), start: tokens[0].index});
+        if (current.length) {
+          parameters.push(current);
         }
         break;
       }
@@ -414,15 +389,15 @@ class OnTriggerParser {
 
       // If we hit a comma outside of a comma-delimited syntax, it means
       // that we're at the top level and we're starting a new parameter.
-      if (commaDelimStack.length === 0 && token.isCharacter(chars.$COMMA) && tokens.length > 0) {
-        parameters.push({expression: this.tokenRangeText(tokens), start: tokens[0].index});
+      if (commaDelimStack.length === 0 && token.isCharacter(chars.$COMMA) && current.length > 0) {
+        parameters.push(current);
+        current = '';
         this.advance();
-        tokens = [];
         continue;
       }
 
       // Otherwise treat the token as a plain text character in the current parameter.
-      tokens.push(token);
+      current += this.tokenText();
       this.advance();
     }
 
@@ -440,21 +415,13 @@ class OnTriggerParser {
     return parameters;
   }
 
-  private tokenRangeText(tokens: Token[]): string {
-    if (tokens.length === 0) {
-      return '';
-    }
-
-    return this.expression.slice(
-      this.start + tokens[0].index,
-      this.start + tokens[tokens.length - 1].end,
-    );
+  private tokenText(): string {
+    // Tokens have a toString already which we could use, but for string tokens it omits the quotes.
+    // Eventually we could expose this information on the token directly.
+    return this.expression.slice(this.start + this.token().index, this.start + this.token().end);
   }
 
-  private trackTrigger<Name extends keyof t.DeferredBlockTriggers>(
-    name: Name,
-    trigger: NonNullable<t.DeferredBlockTriggers[Name]>,
-  ): void {
+  private trackTrigger(name: keyof t.DeferredBlockTriggers, trigger: t.DeferredTrigger): void {
     trackTrigger(name, this.triggers, this.errors, trigger);
   }
 
@@ -470,51 +437,36 @@ class OnTriggerParser {
 }
 
 /** Adds a trigger to a map of triggers. */
-function trackTrigger<Name extends keyof t.DeferredBlockTriggers>(
-  name: Name,
+function trackTrigger(
+  name: keyof t.DeferredBlockTriggers,
   allTriggers: t.DeferredBlockTriggers,
   errors: ParseError[],
-  trigger: NonNullable<t.DeferredBlockTriggers[Name]>,
+  trigger: t.DeferredTrigger,
 ) {
   if (allTriggers[name]) {
     errors.push(new ParseError(trigger.sourceSpan, `Duplicate "${name}" trigger is not allowed`));
   } else {
-    allTriggers[name] = trigger;
+    allTriggers[name] = trigger as any;
   }
 }
 
 function createIdleTrigger(
-  parameters: ParsedParameter[],
+  parameters: string[],
   nameSpan: ParseSourceSpan,
   sourceSpan: ParseSourceSpan,
   prefetchSpan: ParseSourceSpan | null,
   onSourceSpan: ParseSourceSpan | null,
   hydrateSpan: ParseSourceSpan | null,
 ): t.IdleDeferredTrigger {
-  if (parameters.length > 1) {
-    throw new Error(`"${OnTriggerType.IDLE}" trigger can only have zero or one parameters`);
+  if (parameters.length > 0) {
+    throw new Error(`"${OnTriggerType.IDLE}" trigger cannot have parameters`);
   }
 
-  let timeout: number | null = null;
-  if (parameters[0]) {
-    timeout = parseDeferredTime(parameters[0].expression);
-    if (timeout === null) {
-      throw new Error(`Could not parse time value of trigger "${OnTriggerType.IDLE}"`);
-    }
-  }
-
-  return new t.IdleDeferredTrigger(
-    nameSpan,
-    sourceSpan,
-    prefetchSpan,
-    onSourceSpan,
-    hydrateSpan,
-    timeout,
-  );
+  return new t.IdleDeferredTrigger(nameSpan, sourceSpan, prefetchSpan, onSourceSpan, hydrateSpan);
 }
 
 function createTimerTrigger(
-  parameters: ParsedParameter[],
+  parameters: string[],
   nameSpan: ParseSourceSpan,
   sourceSpan: ParseSourceSpan,
   prefetchSpan: ParseSourceSpan | null,
@@ -525,7 +477,7 @@ function createTimerTrigger(
     throw new Error(`"${OnTriggerType.TIMER}" trigger must have exactly one parameter`);
   }
 
-  const delay = parseDeferredTime(parameters[0].expression);
+  const delay = parseDeferredTime(parameters[0]);
 
   if (delay === null) {
     throw new Error(`Could not parse time value of trigger "${OnTriggerType.TIMER}"`);
@@ -542,7 +494,7 @@ function createTimerTrigger(
 }
 
 function createImmediateTrigger(
-  parameters: ParsedParameter[],
+  parameters: string[],
   nameSpan: ParseSourceSpan,
   sourceSpan: ParseSourceSpan,
   prefetchSpan: ParseSourceSpan | null,
@@ -563,17 +515,18 @@ function createImmediateTrigger(
 }
 
 function createHoverTrigger(
-  parameters: ParsedParameter[],
+  parameters: string[],
   nameSpan: ParseSourceSpan,
   sourceSpan: ParseSourceSpan,
   prefetchSpan: ParseSourceSpan | null,
   onSourceSpan: ParseSourceSpan | null,
   hydrateSpan: ParseSourceSpan | null,
+  placeholder: t.DeferredBlockPlaceholder | null,
   validator: ReferenceTriggerValidator,
 ): t.HoverDeferredTrigger {
   validator(OnTriggerType.HOVER, parameters);
   return new t.HoverDeferredTrigger(
-    parameters[0]?.expression ?? null,
+    parameters[0] ?? null,
     nameSpan,
     sourceSpan,
     prefetchSpan,
@@ -583,7 +536,7 @@ function createHoverTrigger(
 }
 
 function createInteractionTrigger(
-  parameters: ParsedParameter[],
+  parameters: string[],
   nameSpan: ParseSourceSpan,
   sourceSpan: ParseSourceSpan,
   prefetchSpan: ParseSourceSpan | null,
@@ -593,7 +546,7 @@ function createInteractionTrigger(
 ): t.InteractionDeferredTrigger {
   validator(OnTriggerType.INTERACTION, parameters);
   return new t.InteractionDeferredTrigger(
-    parameters[0]?.expression ?? null,
+    parameters[0] ?? null,
     nameSpan,
     sourceSpan,
     prefetchSpan,
@@ -603,10 +556,7 @@ function createInteractionTrigger(
 }
 
 function createViewportTrigger(
-  start: number,
-  isHydrationTrigger: boolean,
-  bindingParser: BindingParser,
-  parameters: ParsedParameter[],
+  parameters: string[],
   nameSpan: ParseSourceSpan,
   sourceSpan: ParseSourceSpan,
   prefetchSpan: ParseSourceSpan | null,
@@ -615,74 +565,8 @@ function createViewportTrigger(
   validator: ReferenceTriggerValidator,
 ): t.ViewportDeferredTrigger {
   validator(OnTriggerType.VIEWPORT, parameters);
-
-  let reference: string | null;
-  let options: LiteralMap | null;
-
-  if (parameters.length === 0) {
-    reference = options = null;
-  } else if (!parameters[0].expression.startsWith('{')) {
-    reference = parameters[0].expression;
-    options = null;
-  } else {
-    const parsed = bindingParser.parseBinding(
-      parameters[0].expression,
-      false,
-      sourceSpan,
-      sourceSpan.start.offset + start + parameters[0].start,
-    );
-
-    if (!(parsed.ast instanceof LiteralMap)) {
-      throw new Error('Options parameter of the "viewport" trigger must be an object literal');
-    } else if (parsed.ast.keys.some((key) => key.kind === 'spread')) {
-      throw new Error('Spread operator are not allowed in this context');
-    } else if (parsed.ast.keys.some((key) => key.kind === 'property' && key.key === 'root')) {
-      throw new Error(
-        'The "root" option is not supported in the options parameter of the "viewport" trigger',
-      );
-    }
-
-    const triggerIndex = parsed.ast.keys.findIndex(
-      (key) => key.kind === 'property' && key.key === 'trigger',
-    );
-
-    if (triggerIndex === -1) {
-      reference = null;
-      options = parsed.ast;
-    } else {
-      const value = parsed.ast.values[triggerIndex];
-      const triggerFilter = (_: unknown, index: number) => index !== triggerIndex;
-
-      if (!(value instanceof PropertyRead) || !(value.receiver instanceof ImplicitReceiver)) {
-        throw new Error(`"trigger" option of the "viewport" trigger must be an identifier`);
-      }
-
-      reference = (value as PropertyRead).name;
-      options = new LiteralMap(
-        parsed.ast.span,
-        parsed.ast.sourceSpan,
-        parsed.ast.keys.filter(triggerFilter),
-        parsed.ast.values.filter(triggerFilter),
-      );
-    }
-  }
-
-  if (isHydrationTrigger && reference !== null) {
-    throw new Error(`"viewport" hydration trigger cannot have a "trigger"`);
-  } else if (options) {
-    const dynamicNode = DynamicAstValidator.findDynamicNode(options);
-
-    if (dynamicNode !== null) {
-      throw new Error(
-        `Options of the "viewport" trigger must be an object ` +
-          `literal containing only literal values, but "${dynamicNode.constructor.name}" was found`,
-      );
-    }
-  }
-
   return new t.ViewportDeferredTrigger(
-    reference,
-    options,
+    parameters[0] ?? null,
     nameSpan,
     sourceSpan,
     prefetchSpan,
@@ -696,7 +580,7 @@ function createViewportTrigger(
  * @param type Type of the trigger being validated.
  * @param parameters Parameters of the trigger.
  */
-function validatePlainReferenceBasedTrigger(type: OnTriggerType, parameters: ParsedParameter[]) {
+function validatePlainReferenceBasedTrigger(type: OnTriggerType, parameters: string[]) {
   if (parameters.length > 1) {
     throw new Error(`"${type}" trigger can only have zero or one parameters`);
   }
@@ -707,14 +591,7 @@ function validatePlainReferenceBasedTrigger(type: OnTriggerType, parameters: Par
  * @param type Type of the trigger being validated.
  * @param parameters Parameters of the trigger.
  */
-function validateHydrateReferenceBasedTrigger(type: OnTriggerType, parameters: ParsedParameter[]) {
-  if (type === OnTriggerType.VIEWPORT) {
-    if (parameters.length > 1) {
-      throw new Error(`Hydration trigger "${type}" cannot have more than one parameter`);
-    }
-    return;
-  }
-
+function validateHydrateReferenceBasedTrigger(type: OnTriggerType, parameters: string[]) {
   if (parameters.length > 0) {
     throw new Error(`Hydration trigger "${type}" cannot have parameters`);
   }
@@ -748,27 +625,4 @@ export function parseDeferredTime(value: string): number | null {
 
   const [time, units] = match;
   return parseFloat(time) * (units === 's' ? 1000 : 1);
-}
-
-class DynamicAstValidator extends RecursiveAstVisitor {
-  private dynamicNode: AST | null = null;
-
-  static findDynamicNode(ast: AST): AST | null {
-    const visitor = new DynamicAstValidator();
-    visitor.visit(ast);
-    return visitor.dynamicNode;
-  }
-
-  override visit(ast: AST): void {
-    if (
-      !(ast instanceof ASTWithSource) &&
-      !(ast instanceof LiteralPrimitive) &&
-      !(ast instanceof LiteralArray) &&
-      !(ast instanceof LiteralMap)
-    ) {
-      this.dynamicNode = ast;
-    } else {
-      super.visit(ast);
-    }
-  }
 }

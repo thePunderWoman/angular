@@ -17,6 +17,7 @@ import {
 import {getLDeferBlockDetails, getTDeferBlockDetails, isDeferBlock} from '../defer/utils';
 import {isDetachedByI18n} from '../i18n/utils';
 import {ViewEncapsulation} from '../metadata';
+import {Renderer2} from '../render';
 import {assertTNode} from '../render3/assert';
 import {collectNativeNodes, collectNativeNodesInLContainer} from '../render3/collect_native_nodes';
 import {getComponentDef} from '../render3/def_getters';
@@ -34,6 +35,7 @@ import {
   CONTEXT,
   HEADER_OFFSET,
   HOST,
+  INJECTOR,
   LView,
   PARENT,
   RENDERER,
@@ -89,6 +91,7 @@ import {
   processTextNodeBeforeSerialization,
   TextNodeMarker,
 } from './utils';
+import {Injector} from '../di';
 
 /**
  * A collection that tracks all serialized views (`ngh` DOM annotations)
@@ -180,6 +183,7 @@ function calcNumRootNodesInLContainer(lContainer: LContainer): number {
 function annotateComponentLViewForHydration(
   lView: LView,
   context: HydrationContext,
+  injector: Injector,
 ): number | null {
   const hostElement = lView[HOST];
   // Root elements might also be annotated with the `ngSkipHydration` attribute,
@@ -196,11 +200,19 @@ function annotateComponentLViewForHydration(
  * This function serializes the component itself as well as all views from the view
  * container.
  */
-function annotateLContainerForHydration(lContainer: LContainer, context: HydrationContext) {
+function annotateLContainerForHydration(
+  lContainer: LContainer,
+  context: HydrationContext,
+  injector: Injector,
+) {
   const componentLView = unwrapLView(lContainer[HOST]) as LView<unknown>;
 
   // Serialize the root component itself.
-  const componentLViewNghIndex = annotateComponentLViewForHydration(componentLView, context);
+  const componentLViewNghIndex = annotateComponentLViewForHydration(
+    componentLView,
+    context,
+    injector,
+  );
 
   if (componentLViewNghIndex === null) {
     // Component was not serialized (for example, if hydration was skipped by adding
@@ -216,7 +228,7 @@ function annotateLContainerForHydration(lContainer: LContainer, context: Hydrati
   const rootLView = lContainer[PARENT];
   const rootLViewNghIndex = annotateHostElementForHydration(hostElement, rootLView, null, context);
 
-  const renderer = componentLView[RENDERER];
+  const renderer = componentLView[RENDERER] as Renderer2;
 
   // For cases when a root component also acts as an anchor node for a ViewContainerRef
   // (for example, when ViewContainerRef is injected in a root component), there is a need
@@ -272,9 +284,9 @@ export function annotateForHydration(appRef: ApplicationRef, doc: Document) {
         deferBlocks,
       };
       if (isLContainer(lNode)) {
-        annotateLContainerForHydration(lNode, context);
+        annotateLContainerForHydration(lNode, context, injector);
       } else {
-        annotateComponentLViewForHydration(lNode, context);
+        annotateComponentLViewForHydration(lNode, context, injector);
       }
       insertCorruptedTextNodeMarkers(corruptedTextNodes, doc);
     }
@@ -337,13 +349,14 @@ function serializeLContainer(
       // host element was used as a ViewContainerRef anchor (e.g. a `ViewContainerRef`
       // was injected within the component class). This case requires special handling.
       if (isLContainer(childLView)) {
-        // Calculate the number of root nodes in all attached views and add 2 to account for the
-        // component's host node and the container's anchor node. i.e. in this scenario we'll have a
-        // layout that would look like this:
+        // Calculate the number of root nodes in all views in a given container
+        // and increment by one to account for an anchor node itself, i.e. in this
+        // scenario we'll have a layout that would look like this:
         // `<app-root /><#VIEW1><#VIEW2>...<!--container-->`
-        numRootNodes = calcNumRootNodesInLContainer(childLView) + 2;
+        // The `+1` is to capture the `<app-root />` element.
+        numRootNodes = calcNumRootNodesInLContainer(childLView) + 1;
 
-        annotateLContainerForHydration(childLView, context);
+        annotateLContainerForHydration(childLView, context, lView[INJECTOR]);
 
         const componentLView = unwrapLView(childLView[HOST]) as LView<unknown>;
 
@@ -441,24 +454,10 @@ function serializeLContainer(
       }
 
       if (!isHydrateNeverBlock) {
-        // Skip serialization for component views that opted out of hydration via
-        // ngSkipHydration. This mirrors the guard in serializeLView for inline
-        // child components (see the Array.isArray branch below), but applies to
-        // components hosted inside an LContainer (e.g. created via
-        // ViewContainerRef.createComponent). Without this check, NG0503 is thrown
-        // when such a component receives projectable nodes even if ngSkipHydration
-        // is present on its host element (#67928).
-        const childHostElement = unwrapRNode(childLView[HOST]!);
-        if (
-          childLView[TVIEW].type !== TViewType.Component ||
-          childHostElement === null ||
-          !(childHostElement as HTMLElement).hasAttribute(SKIP_HYDRATION_ATTR_NAME)
-        ) {
-          Object.assign(
-            serializedView,
-            serializeLView(lContainer[i] as LView, parentDeferBlockId, context),
-          );
-        }
+        Object.assign(
+          serializedView,
+          serializeLView(lContainer[i] as LView, parentDeferBlockId, context),
+        );
       }
     }
 
@@ -493,10 +492,8 @@ function serializeHydrateTriggers(
     if (serializableDeferBlockTrigger.has(trigger)) {
       if (details === null) {
         triggers.push(trigger);
-      } else if (details.type === DeferBlockTrigger.Timer) {
-        triggers.push({trigger, delay: details.delay});
       } else {
-        triggers.push({trigger, intersectionObserverOptions: details.intersectionObserverOptions});
+        triggers.push({trigger, delay: details.delay});
       }
     }
   }
@@ -799,7 +796,7 @@ function componentUsesShadowDomEncapsulation(lView: LView): boolean {
   const def = getComponentDef(instance.constructor);
   return (
     def?.encapsulation === ViewEncapsulation.ShadowDom ||
-    def?.encapsulation === ViewEncapsulation.ExperimentalIsolatedShadowDom
+    def?.encapsulation === ViewEncapsulation.IsolatedShadowDom
   );
 }
 

@@ -9,6 +9,7 @@
 import {
   afterNextRender,
   booleanAttribute,
+  ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
   effect,
@@ -85,6 +86,7 @@ import {
 @Component({
   selector: 'as-split',
   exportAs: 'asSplit',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrls: [`./split.component.scss`],
   template: `<ng-content></ng-content>
     @for (_ of displayedAreas; track $index) {
@@ -99,9 +101,7 @@ import {
           (mouseup)="clickGutter($event, $index + 1)"
           (touchend)="clickGutter($event, $index + 1)"
         >
-          @if (showGutterIcon()) {
-            <div class="as-split-gutter-icon"></div>
-          }
+          <div class="as-split-gutter-icon"></div>
         </div>
       }
     }`,
@@ -114,30 +114,27 @@ import {
   },
 })
 export class SplitComponent implements OnDestroy {
-  readonly directionInput = input<Direction>('horizontal', {alias: 'direction'});
+  directionInput = input<Direction>('horizontal', {alias: 'direction'});
   // This allows the direction to be writable from the outside
-  readonly direction = linkedSignal(this.directionInput);
+  direction = linkedSignal(this.directionInput);
 
-  readonly unit = input<Unit>('percent');
+  unit = input<Unit>('percent');
 
-  readonly showGutterIcon = input(false, {transform: booleanAttribute});
-  readonly gutterSize = input(11, {transform: (v: unknown) => getInputPositiveNumber(v, 11)});
-  readonly gutterStep = input(1, {transform: (v: unknown) => getInputPositiveNumber(v, 1)});
-  readonly restrictMove = input(false, {transform: booleanAttribute});
-  readonly useTransition = input(false, {transform: booleanAttribute});
-  readonly disabled = input(false, {transform: booleanAttribute});
-  readonly dir = input<'ltr' | 'rtl'>('ltr');
+  gutterSize = input(11, {transform: (v: unknown) => getInputPositiveNumber(v, 11)});
+  gutterStep = input(1, {transform: (v: unknown) => getInputPositiveNumber(v, 1)});
+  restrictMove = input(false, {transform: booleanAttribute});
+  useTransition = input(false, {transform: booleanAttribute});
+  disabled = input(false, {transform: booleanAttribute});
+  dir = input<'ltr' | 'rtl'>('ltr');
 
-  readonly gutterDblClickDuration = input(0, {
-    transform: (v: unknown) => getInputPositiveNumber(v, 0),
-  });
+  gutterDblClickDuration = input(0, {transform: (v: unknown) => getInputPositiveNumber(v, 0)});
 
   ////
 
-  readonly dragStart = output<IOutputData>();
-  readonly dragEnd = output<IOutputData>();
-  readonly gutterClick = output<IOutputData>();
-  readonly gutterDblClick = output<IOutputData>();
+  dragStart = output<IOutputData>();
+  dragEnd = output<IOutputData>();
+  gutterClick = output<IOutputData>();
+  gutterDblClick = output<IOutputData>();
 
   private transitionEndSubscriber: Subscriber<IOutputAreaSizes> | null = null;
   transitionEnd = outputFromObservable<IOutputAreaSizes>(

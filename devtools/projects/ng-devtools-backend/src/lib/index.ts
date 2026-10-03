@@ -7,13 +7,9 @@
  */
 
 import {Events, MessageBus} from '../../../protocol';
-import {DevtoolsBackendConfig} from './shared/interfaces';
 
 import {subscribeToClientEvents} from './client-event-subscribers';
 
-export const initializeMessageBus = (
-  messageBus: MessageBus<Events>,
-  config?: DevtoolsBackendConfig,
-) => {
-  subscribeToClientEvents(messageBus, config);
+export const initializeMessageBus = (messageBus: MessageBus<Events>) => {
+  subscribeToClientEvents(messageBus);
 };

@@ -6,16 +6,16 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import ts from 'typescript';
 import {
-  createCompilerHost,
-  createProgram,
   CustomTransformers,
   defaultGatherDiagnostics,
   Program,
+  createCompilerHost,
+  createProgram,
 } from '../../index';
 import {DocEntry} from '../../src/ngtsc/docs';
 import * as api from '../../src/transformers/api';
+import ts from 'typescript';
 
 import {mainXi18n} from '../../src/extract_i18n';
 import {main, mainDiagnosticsForTest, readNgcCommandLineAndConfiguration} from '../../src/main';
@@ -35,21 +35,15 @@ import {TemplateTypeChecker} from '../../src/ngtsc/typecheck/api';
 import {setWrapHostForTest} from '../../src/transformers/compiler_host';
 
 type TsConfigOptionsValue =
-  string | boolean | number | null | TsConfigOptionsValue[] | {[key: string]: TsConfigOptionsValue};
-
+  | string
+  | boolean
+  | number
+  | null
+  | TsConfigOptionsValue[]
+  | {[key: string]: TsConfigOptionsValue};
 export type TsConfigOptions = {
   [key: string]: TsConfigOptionsValue;
 };
-
-type KnownKeys<T> = {
-  [K in keyof T as string extends K ? never : number extends K ? never : K]: T[K];
-};
-
-// We don't use ts.CompilerOptions directly since enum-based options
-// require additional mapping to be JSON-ified.
-type TsCompilerOptions = Partial<
-  Record<keyof KnownKeys<ts.CompilerOptions>, ts.CompilerOptionsValue>
->;
 
 /**
  * Manages a temporary testing directory structure and environment for testing ngtsc by feeding it
@@ -90,13 +84,14 @@ export class NgtscTestEnvironment {
       `{
       "compilerOptions": {
         "emitDecoratorMetadata": false,
-        "strictPropertyInitialization": false,
         "experimentalDecorators": true,
         "skipLibCheck": true,
         "noImplicitAny": true,
         "noEmitOnError": true,
+        "strictNullChecks": true,
         "outDir": "built",
         "rootDir": ".",
+        "baseUrl": ".",
         "allowJs": true,
         "declaration": true,
         "target": "es2015",
@@ -218,20 +213,18 @@ export class NgtscTestEnvironment {
     }
   }
 
-  tsconfig(
-    extraOpts: TsConfigOptions = {},
-    compilerOptions?: TsCompilerOptions,
-    files?: string[],
-  ): void {
-    let tsconfig: {[key: string]: any} = {
+  tsconfig(extraOpts: TsConfigOptions = {}, extraRootDirs?: string[], files?: string[]): void {
+    const tsconfig: {[key: string]: any} = {
       extends: './tsconfig-base.json',
       angularCompilerOptions: extraOpts,
     };
     if (files !== undefined) {
       tsconfig['files'] = files;
     }
-    if (compilerOptions !== undefined) {
-      tsconfig['compilerOptions'] = compilerOptions;
+    if (extraRootDirs !== undefined) {
+      tsconfig['compilerOptions'] = {
+        rootDirs: ['.', ...extraRootDirs],
+      };
     }
     this.write('tsconfig.json', JSON.stringify(tsconfig, null, 2));
 
@@ -262,12 +255,7 @@ export class NgtscTestEnvironment {
       reuseProgram,
       this.changedResources,
     );
-
-    if (errorSpy.calls.count() > 0) {
-      console.error('>>>', errorSpy.calls.allArgs().join('\n'));
-    }
     expect(errorSpy).not.toHaveBeenCalled();
-
     expect(exitCode).toBe(0);
     if (this.multiCompileHostExt !== null) {
       this.oldProgram = reuseProgram!.program!;

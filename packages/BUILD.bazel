@@ -31,6 +31,7 @@ ts_project(
     ),
     deps = [
         ":goog_types",
+        "//:node_modules/@types/hammerjs",
         "//:node_modules/tslib",
         "//:node_modules/zone.js",
     ],
@@ -107,7 +108,6 @@ filegroup(
         "//packages/elements:elements_docs_extraction",
         "//packages/forms:forms_docs_extraction",
         "//packages/forms/signals:forms_signals_docs_extraction",
-        "//packages/forms/signals/compat:forms_signals_compat_docs_extraction",
         "//packages/localize:localize_docs_extraction",
         "//packages/localize/src/localize:localize_init_docs_extraction",
         "//packages/platform-browser:platform-browser_docs_extraction",

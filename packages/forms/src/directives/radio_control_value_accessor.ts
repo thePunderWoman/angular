@@ -11,15 +11,14 @@ import {
   ElementRef,
   forwardRef,
   inject,
+  Injectable,
   Injector,
   Input,
   OnDestroy,
   OnInit,
   Provider,
   Renderer2,
-  SimpleChanges,
   ɵRuntimeError as RuntimeError,
-  Service,
 } from '@angular/core';
 
 import {RuntimeErrorCode} from '../errors';
@@ -52,9 +51,9 @@ function throwNameError() {
  * @description
  * Class used by Angular to track radio buttons. For internal use only.
  */
-@Service()
+@Injectable({providedIn: 'root'})
 export class RadioControlRegistry {
-  private _accessors: [NgControl, RadioControlValueAccessor][] = [];
+  private _accessors: any[] = [];
 
   /**
    * @description
@@ -122,7 +121,7 @@ export class RadioControlRegistry {
  */
 @Directive({
   selector:
-    'input[type=radio]:not([ngNoCva])[formControlName],input[type=radio]:not([ngNoCva])[formControl],input[type=radio]:not([ngNoCva])[ngModel]',
+    'input[type=radio][formControlName],input[type=radio][formControl],input[type=radio][ngModel]',
   host: {'(change)': 'onChange()', '(blur)': 'onTouched()'},
   providers: [RADIO_VALUE_ACCESSOR],
   standalone: false,
@@ -178,15 +177,6 @@ export class RadioControlValueAccessor
     private _injector: Injector,
   ) {
     super(renderer, elementRef);
-  }
-
-  /** @internal */
-  ngOnChanges(changes: SimpleChanges): void {
-    const control = this._control?.control;
-
-    if (changes['value'] && control) {
-      this.writeValue(control.value);
-    }
   }
 
   /** @docs-private */

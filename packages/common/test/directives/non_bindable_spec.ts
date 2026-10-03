@@ -7,41 +7,48 @@
  */
 
 import {Component, Directive, ElementRef} from '@angular/core';
-import {ComponentFixture, TestBed} from '@angular/core/testing';
+import {ComponentFixture, TestBed, waitForAsync} from '@angular/core/testing';
 import {hasClass} from '@angular/private/testing';
 import {expect} from '@angular/private/testing/matchers';
 
 describe('non-bindable', () => {
-  it('should not interpolate children', async () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      declarations: [TestComponent, TestDirective],
+    });
+  });
+
+  it('should not interpolate children', waitForAsync(() => {
     const template = '<div>{{text}}<span ngNonBindable>{{text}}</span></div>';
     const fixture = createTestComponent(template);
 
-    await fixture.whenStable();
+    fixture.detectChanges();
     expect(fixture.nativeElement).toHaveText('foo{{text}}');
-  });
+  }));
 
-  it('should ignore directives on child nodes', async () => {
+  it('should ignore directives on child nodes', waitForAsync(() => {
     const template = '<div ngNonBindable><span id=child test-dec>{{text}}</span></div>';
     const fixture = createTestComponent(template);
-    await fixture.whenStable();
+    fixture.detectChanges();
 
     // We must use getDOM().querySelector instead of fixture.query here
     // since the elements inside are not compiled.
     const span = fixture.nativeElement.querySelector('#child');
     expect(hasClass(span, 'compiled')).toBeFalsy();
-  });
+  }));
 
-  it('should trigger directives on the same node', async () => {
+  it('should trigger directives on the same node', waitForAsync(() => {
     const template = '<div><span id=child ngNonBindable test-dec>{{text}}</span></div>';
     const fixture = createTestComponent(template);
-    await fixture.whenStable();
+    fixture.detectChanges();
     const span = fixture.nativeElement.querySelector('#child');
     expect(hasClass(span, 'compiled')).toBeTruthy();
-  });
+  }));
 });
 
 @Directive({
   selector: '[test-dec]',
+  standalone: false,
 })
 class TestDirective {
   constructor(el: ElementRef) {
@@ -52,7 +59,7 @@ class TestDirective {
 @Component({
   selector: 'test-cmp',
   template: '',
-  imports: [TestDirective],
+  standalone: false,
 })
 class TestComponent {
   text: string;

@@ -24,10 +24,8 @@ import {RuntimeError, RuntimeErrorCode} from '../errors';
 
 import {PlatformRef} from './platform_ref';
 import {PLATFORM_DESTROY_LISTENERS} from './platform_destroy_listeners';
-import {registerAiTools} from '../debug/ai';
 
 let _platformInjector: Injector | null = null;
-let _unregisterAiTools: (() => void) | null = null;
 
 /**
  * Creates a platform.
@@ -45,9 +43,6 @@ export function createPlatform(injector: Injector): PlatformRef {
 
   publishDefaultGlobalUtils();
   publishSignalConfiguration();
-  if (typeof ngDevMode !== 'undefined' && ngDevMode) {
-    _unregisterAiTools = registerAiTools();
-  }
 
   // During SSR, using this setting and using an injector from the global can cause the
   // injector to be used for a different requjest due to concurrency.
@@ -156,11 +151,6 @@ export function getPlatform(): PlatformRef | null {
  * @publicApi
  */
 export function destroyPlatform(): void {
-  if (typeof ngDevMode !== 'undefined' && ngDevMode) {
-    _unregisterAiTools?.();
-    _unregisterAiTools = null;
-  }
-
   getPlatform()?.destroy();
 }
 
@@ -175,9 +165,6 @@ export function createOrReusePlatformInjector(providers: StaticProvider[] = []):
   if (_platformInjector) return _platformInjector;
 
   publishDefaultGlobalUtils();
-  if (typeof ngDevMode !== 'undefined' && ngDevMode) {
-    _unregisterAiTools = registerAiTools();
-  }
 
   // Otherwise, setup a new platform injector and run platform initializers.
   const injector = createPlatformInjector(providers);
@@ -200,23 +187,20 @@ export function createOrReusePlatformInjector(providers: StaticProvider[] = []):
  *
  * Note that the provided initializer is run in the injection context.
  *
- * @usageNotes
- * The platform initializer should be provided during platform creation:
+ * Previously, this was achieved using the `PLATFORM_INITIALIZER` token which is now deprecated.
  *
- * ```ts
- * const platformRef = platformBrowser([ providePlatformInitializer(() =>  ...) ]);
- *
- * bootstrapApplication(App, appConfig, { platformRef })
- * ```
+ * @see {@link PLATFORM_INITIALIZER}
  *
  * @publicApi
  */
-export function providePlatformInitializer(initializerFn: () => void): StaticProvider {
-  return {
-    provide: PLATFORM_INITIALIZER,
-    useValue: initializerFn,
-    multi: true,
-  };
+export function providePlatformInitializer(initializerFn: () => void): EnvironmentProviders {
+  return makeEnvironmentProviders([
+    {
+      provide: PLATFORM_INITIALIZER,
+      useValue: initializerFn,
+      multi: true,
+    },
+  ]);
 }
 
 function runPlatformInitializers(injector: Injector): void {

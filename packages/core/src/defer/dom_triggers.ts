@@ -31,7 +31,6 @@ import {
   TriggerType,
 } from './interfaces';
 import {getLDeferBlockDetails} from './utils';
-import {shouldTriggerDeferBlock} from './rendering';
 
 /**
  * Wrapper for onViewport trigger with angular specific Injector for resolving NgZone instance
@@ -40,18 +39,12 @@ import {shouldTriggerDeferBlock} from './rendering';
  * @param callback Callback to be invoked when the trigger comes into the viewport.
  * @param injector Injector that can be used by the trigger to resolve DI tokens.
  */
-export function onViewportWrapper(
-  trigger: Element,
-  callback: VoidFunction,
-  injector: Injector,
-  wrapperOptions?: IntersectionObserverInit,
-) {
+export function onViewportWrapper(trigger: Element, callback: VoidFunction, injector: Injector) {
   const ngZone = injector.get(NgZone);
   return onViewport(
     trigger,
     () => ngZone.run(callback),
-    (options) => ngZone.runOutsideAngular(() => createIntersectionObserver(options)),
-    wrapperOptions,
+    () => ngZone.runOutsideAngular(() => createIntersectionObserver()),
   );
 }
 
@@ -66,7 +59,7 @@ export function onViewportWrapper(
 export function getTriggerLView(
   deferredHostLView: LView,
   deferredTNode: TNode,
-  walkUpTimes: number | undefined | null,
+  walkUpTimes: number | undefined,
 ): LView | null {
   // The trigger is in the same view, we don't need to traverse.
   if (walkUpTimes == null) {
@@ -120,25 +113,15 @@ export function getTriggerElement(triggerLView: LView, triggerIndex: number): El
  *     the deferred block.
  * @param type Trigger type to distinguish between regular and prefetch triggers.
  */
-export function registerDomTrigger<O>(
+export function registerDomTrigger(
   initialLView: LView,
   tNode: TNode,
   triggerIndex: number,
-  walkUpTimes: number | undefined | null,
-  registerFn: (
-    element: Element,
-    callback: VoidFunction,
-    injector: Injector,
-    options?: O,
-  ) => VoidFunction,
+  walkUpTimes: number | undefined,
+  registerFn: (element: Element, callback: VoidFunction, injector: Injector) => VoidFunction,
   callback: VoidFunction,
   type: TriggerType,
-  options?: O,
 ) {
-  if (!shouldTriggerDeferBlock(type, initialLView)) {
-    return;
-  }
-
   const injector = initialLView[INJECTOR];
   const zone = injector.get(NgZone);
   let poll: AfterRenderRef;
@@ -190,7 +173,6 @@ export function registerDomTrigger<O>(
         });
       },
       injector,
-      options,
     );
 
     // The trigger and deferred block might be in different LViews.

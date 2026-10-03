@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "stableTypeOrdering": true,
     "module": "esnext",
     "target": "es2022",
     "moduleResolution": "node",
@@ -10,6 +9,7 @@
     "declaration": true,
     "noEmitOnError": false,
     "stripInternal": true,
+    "strict": true,
     "sourceMap": true,
     "noImplicitOverride": true,
     "lib": [
@@ -18,8 +18,7 @@
       "es2015.iterable",
       "es2015.promise",
       "es2015.symbol",
-      "es2015.symbol.wellknown",
-      "es2022.object"
-    ]
-  }
+      "es2015.symbol.wellknown"
+    ],
+  },
 }

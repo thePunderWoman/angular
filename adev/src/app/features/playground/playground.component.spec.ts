@@ -12,7 +12,6 @@ import {WINDOW} from '@angular/docs';
 import {EmbeddedTutorialManager} from '../../editor';
 import {NodeRuntimeSandbox} from '../../editor/node-runtime-sandbox.service';
 
-import {provideRouter} from '@angular/router';
 import TutorialPlayground from './playground.component';
 
 describe('TutorialPlayground', () => {
@@ -25,53 +24,35 @@ describe('TutorialPlayground', () => {
     },
   };
 
-  beforeEach(async () => {
-    class FakeEmbeddedTutorialManager {
-      fetchAndSetTutorialFiles() {}
-    }
-
-    class FakeNodeRuntimeSandbox {
-      init() {}
-      reset() {}
-    }
-
+  beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [TutorialPlayground],
       providers: [
-        provideRouter([]),
         {
           provide: WINDOW,
           useValue: fakeWindow,
         },
-        {provide: NodeRuntimeSandbox, useClass: FakeNodeRuntimeSandbox},
-        {provide: EmbeddedTutorialManager, useClass: FakeEmbeddedTutorialManager},
+        {
+          provide: EmbeddedTutorialManager,
+          useValue: {
+            fetchAndSetTutorialFiles: () => {},
+          },
+        },
+        {
+          provide: NodeRuntimeSandbox,
+          useVaue: {
+            init: () => {},
+          },
+        },
       ],
     });
 
     fixture = TestBed.createComponent(TutorialPlayground);
     component = fixture.componentInstance;
-    await fixture.whenStable();
+    fixture.detectChanges();
   });
 
   it('should create', () => {
     expect(component).toBeTruthy();
-  });
-
-  it('should not call reset on the sandbox before it is initialized', async () => {
-    const fakeSandbox = {reset: jasmine.createSpy('reset')} as any;
-    component['nodeRuntimeSandbox'] = fakeSandbox;
-    component['isSandboxReady'].set(false);
-    spyOn<any>(component, 'loadTemplate').and.resolveTo();
-    await component.changeTemplate(component.templates[1]);
-    expect(fakeSandbox.reset).not.toHaveBeenCalled();
-  });
-
-  it('should call reset on the sandbox after it is initialized', async () => {
-    const fakeSandbox = {reset: jasmine.createSpy('reset')} as any;
-    component['nodeRuntimeSandbox'] = fakeSandbox;
-    component['isSandboxReady'].set(true);
-    spyOn<any>(component, 'loadTemplate').and.resolveTo();
-    await component.changeTemplate(component.templates[1]);
-    expect(fakeSandbox.reset).toHaveBeenCalled();
   });
 });

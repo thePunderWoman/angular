@@ -7,30 +7,22 @@
  */
 
 import {
-  AbsoluteSourceSpan,
   AST,
-  BoundTarget,
   CssSelector,
   DomElementSchemaRegistry,
   ExternalExpr,
-  ForeignComponentMeta,
   LiteralPrimitive,
   ParseSourceSpan,
   PropertyRead,
-  ReferenceTarget,
   SafePropertyRead,
   TemplateEntity,
-  TmplAstBoundAttribute,
-  TmplAstBoundEvent,
   TmplAstComponent,
   TmplAstDirective,
   TmplAstElement,
   TmplAstHostElement,
   TmplAstNode,
-  TmplAstReference,
   TmplAstTemplate,
   TmplAstTextAttribute,
-  TypeCheckingConfig,
   WrappedNodeExpr,
 } from '@angular/compiler';
 
@@ -52,7 +44,7 @@ import {
   PipeMeta,
 } from '../../metadata';
 import {PerfCheckpoint, PerfEvent, PerfPhase, PerfRecorder} from '../../perf';
-import {InliningMode, ProgramDriver, UpdateMode} from '../../program_driver';
+import {ProgramDriver, UpdateMode} from '../../program_driver';
 import {
   ClassDeclaration,
   DeclarationNode,
@@ -60,12 +52,12 @@ import {
   ReflectionHost,
 } from '../../reflection';
 import {
-  ComponentScope,
   ComponentScopeKind,
   ComponentScopeReader,
-  LocalModuleScope,
   StandaloneScope,
   TypeCheckScopeRegistry,
+  LocalModuleScope,
+  ComponentScope,
 } from '../../scope';
 import {isShim} from '../../shims';
 import {
@@ -74,8 +66,6 @@ import {
   isSymbolWithValueDeclaration,
 } from '../../util/src/typescript';
 import {
-  BindingSymbol,
-  ClassSymbol,
   DirectiveModuleExportDetails,
   ElementSymbol,
   FullSourceMapping,
@@ -93,153 +83,30 @@ import {
   SelectorlessComponentSymbol,
   SelectorlessDirectiveSymbol,
   Symbol,
-  SymbolKind,
-  SymbolReference,
   TcbLocation,
   TemplateDiagnostic,
   TemplateSymbol,
   TemplateTypeChecker,
   TsCompletionEntryInfo,
   TypeCheckableDirectiveMeta,
+  TypeCheckingConfig,
 } from '../api';
 import {makeTemplateDiagnostic} from '../diagnostics';
 
-import {findAllMatchingNodes} from './comments';
 import {CompletionEngine} from './completion';
 import {
+  InliningMode,
   ShimTypeCheckingData,
-  TypeCheckContextImpl,
   TypeCheckData,
+  TypeCheckContextImpl,
   TypeCheckingHost,
 } from './context';
 import {shouldReportDiagnostic, translateDiagnostic} from './diagnostics';
 import {TypeCheckShimGenerator} from './shim';
 import {DirectiveSourceManager} from './source';
 import {findTypeCheckBlock, getSourceMapping, TypeCheckSourceResolver} from './tcb_util';
-import {SymbolBoundTarget, SymbolBuilder, SymbolDirectiveMeta} from './template_symbol_builder';
-import {TCB_FUNCTION_PREFIX} from './type_check_file';
-
-export class TypeCheckableDirectiveMetaAdapter implements SymbolDirectiveMeta {
-  constructor(
-    private meta: TypeCheckableDirectiveMeta,
-    private componentScopeReader: ComponentScopeReader,
-  ) {}
-
-  getSymbolReference(): SymbolReference {
-    return {
-      filePath: this.meta.ref.node.getSourceFile().fileName,
-      position: this.meta.ref.node.name.getStart(),
-      name: this.meta.ref.node.name.text,
-      moduleSpecifier: this.meta.ref.bestGuessOwningModule?.specifier,
-    };
-  }
-
-  getNgModule(): ClassDeclaration | null {
-    if (ts.isClassDeclaration(this.meta.ref.node)) {
-      const scope = this.componentScopeReader.getScopeForComponent(this.meta.ref.node);
-      if (scope === null || scope.kind !== ComponentScopeKind.NgModule) {
-        return null;
-      }
-      return scope.ngModule;
-    }
-    return null;
-  }
-
-  getReferenceTargetNode(): ts.ClassDeclaration | null {
-    return ts.isClassDeclaration(this.meta.ref.node) ? this.meta.ref.node : null;
-  }
-
-  get selector() {
-    return this.meta.selector;
-  }
-  get isComponent() {
-    return this.meta.isComponent;
-  }
-  get inputs() {
-    return this.meta.inputs;
-  }
-  get outputs() {
-    return this.meta.outputs;
-  }
-  get isStructural() {
-    return this.meta.isStructural;
-  }
-  get hostDirectives() {
-    return this.meta.hostDirectives;
-  }
-  get matchSource() {
-    return this.meta.matchSource;
-  }
-}
-
-export class BoundTargetAdapter implements SymbolBoundTarget {
-  constructor(
-    private delegate: BoundTarget<TypeCheckableDirectiveMeta>,
-    private componentScopeReader: ComponentScopeReader,
-  ) {}
-
-  getDirectivesOfNode(node: TmplAstNode): SymbolDirectiveMeta[] | null {
-    const dirs = this.delegate.getDirectivesOfNode(node as TmplAstElement | TmplAstTemplate);
-    return dirs
-      ? dirs.map((d) => new TypeCheckableDirectiveMetaAdapter(d, this.componentScopeReader))
-      : null;
-  }
-
-  getReferenceTarget(ref: TmplAstReference): ReferenceTarget<SymbolDirectiveMeta> | null {
-    const target = this.delegate.getReferenceTarget(ref);
-    if (target === null) return null;
-    if ('directive' in target) {
-      return {
-        directive: new TypeCheckableDirectiveMetaAdapter(
-          target.directive,
-          this.componentScopeReader,
-        ),
-        node: target.node,
-      };
-    }
-    return target;
-  }
-
-  getConsumerOfBinding(
-    binding: TmplAstBoundAttribute | TmplAstBoundEvent | TmplAstTextAttribute,
-  ): SymbolDirectiveMeta | TmplAstElement | TmplAstTemplate | null {
-    const consumer = this.delegate.getConsumerOfBinding(binding);
-    if (consumer === null) return null;
-    if (typeof consumer === 'object' && 'ref' in consumer) {
-      return new TypeCheckableDirectiveMetaAdapter(
-        consumer as TypeCheckableDirectiveMeta,
-        this.componentScopeReader,
-      );
-    }
-    return consumer;
-  }
-
-  getExpressionTarget(expr: AST) {
-    return this.delegate.getExpressionTarget(expr);
-  }
-}
-
-function getTcbLocationForSymbol(symbol: Symbol | BindingSymbol | ClassSymbol): TcbLocation | null {
-  if ('tcbLocation' in symbol && symbol.tcbLocation !== undefined) {
-    return symbol.tcbLocation as TcbLocation;
-  }
-
-  if (!('kind' in symbol)) {
-    return null;
-  }
-
-  // For symbols that don't have a direct tcbLocation, we map to the appropriate location
-  // that historically provided the ts.Symbol or ts.Type properties.
-  switch (symbol.kind) {
-    case SymbolKind.Reference:
-      return symbol.targetLocation;
-    case SymbolKind.Variable:
-    case SymbolKind.LetDeclaration:
-      return symbol.initializerLocation;
-    default:
-      return null;
-  }
-}
+import {SymbolBuilder} from './template_symbol_builder';
+import {ExpressionIdentifier, findAllMatchingNodes, hasExpressionIdentifier} from './comments';
 
 const REGISTRY = new DomElementSchemaRegistry();
 /**
@@ -285,7 +152,6 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
    * destroyed and replaced.
    */
   private elementTagCache = new Map<ts.ClassDeclaration, Map<string, PotentialDirective | null>>();
-  private generatedRangeCache = new WeakMap<ts.SourceFile, ts.TextRange[]>();
 
   private isComplete = false;
   private priorResultsAdopted = false;
@@ -297,7 +163,7 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
     private config: TypeCheckingConfig,
     private refEmitter: ReferenceEmitter,
     private reflector: ReflectionHost,
-    private compilerHost: Pick<ts.CompilerHost, 'getCanonicalFileName' | 'getSourceFile'>,
+    private compilerHost: Pick<ts.CompilerHost, 'getCanonicalFileName'>,
     private priorBuild: IncrementalBuild<unknown, FileTypeCheckingData>,
     private readonly metaReader: MetadataReader,
     private readonly localMetaReader: MetadataReaderWithIndex,
@@ -306,145 +172,6 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
     private readonly typeCheckScopeRegistry: TypeCheckScopeRegistry,
     private readonly perf: PerfRecorder,
   ) {}
-
-  getTypeOfSymbol(symbol: Symbol | BindingSymbol | ClassSymbol): ts.Type | null {
-    const location =
-      'tcbTypeLocation' in symbol && symbol.tcbTypeLocation !== undefined
-        ? (symbol.tcbTypeLocation as TcbLocation)
-        : 'kind' in symbol &&
-            (symbol.kind === SymbolKind.Variable || symbol.kind === SymbolKind.LetDeclaration)
-          ? symbol.localVarLocation
-          : getTcbLocationForSymbol(symbol);
-    if (!location) {
-      return null;
-    }
-    const sf = this.programDriver.getProgram().getSourceFile(location.tcbPath);
-    if (!sf) {
-      return null;
-    }
-    let node: ts.Node = getTokenAtPosition(sf, location.positionInFile);
-    let bestMatch = node;
-
-    if (location.endInFile !== undefined) {
-      while (node && node.getEnd() <= location.endInFile) {
-        if (node.getStart() >= location.positionInFile) {
-          bestMatch = node;
-        }
-        node = node.parent;
-      }
-    }
-    node = bestMatch;
-    return this.programDriver.getProgram().getTypeChecker().getTypeAtLocation(node);
-  }
-
-  getTsSymbolOfSymbol(symbol: Symbol | BindingSymbol | ClassSymbol): ts.Symbol | null {
-    const location = getTcbLocationForSymbol(symbol);
-    if (!location) {
-      return null;
-    }
-    const sf = this.programDriver.getProgram().getSourceFile(location.tcbPath);
-    if (!sf) {
-      return null;
-    }
-    let node: ts.Node = getTokenAtPosition(sf, location.positionInFile);
-    let bestMatch = node;
-    if (location.endInFile !== undefined) {
-      while (node && node.getEnd() <= location.endInFile) {
-        if (node.getStart() >= location.positionInFile) {
-          bestMatch = node;
-        }
-        if (node.getEnd() === location.endInFile && node.getStart() === location.positionInFile) {
-          bestMatch = node;
-          break;
-        }
-        node = node.parent;
-      }
-    }
-    node = bestMatch;
-
-    const typeChecker = this.programDriver.getProgram().getTypeChecker();
-
-    if ('kind' in symbol && symbol.kind === SymbolKind.Directive) {
-      const tsSymbol = this.getTsSymbolOfReference(symbol.ref, typeChecker);
-      if (tsSymbol) return tsSymbol;
-    }
-
-    if ('kind' in symbol && symbol.kind === SymbolKind.Reference) {
-      const tsSymbol = this.getTsSymbolOfReference(symbol.target, typeChecker);
-      if (tsSymbol) return tsSymbol;
-
-      if (ts.isCallExpression(node)) {
-        return null;
-      }
-      // For other Reference targets (like Template), we just use the default fallback below
-      // which will get the symbol of the local variable (e.g. _t4).
-    }
-
-    if ('isPipeClassSymbol' in symbol && symbol.isPipeClassSymbol) {
-      const type = typeChecker.getTypeAtLocation(node);
-      if (type && type.getSymbol()) return type.getSymbol() || null;
-    }
-
-    let tsSymbol: ts.Symbol | undefined;
-    if (ts.isPropertyAccessExpression(node)) {
-      tsSymbol = typeChecker.getSymbolAtLocation(node.name);
-    } else if (ts.isCallExpression(node)) {
-      tsSymbol = typeChecker.getSymbolAtLocation(node.expression);
-    } else if (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression)) {
-      const type = typeChecker.getTypeAtLocation(node.expression);
-      tsSymbol = typeChecker.getPropertyOfType(type, node.argumentExpression.text);
-    } else {
-      tsSymbol = typeChecker.getSymbolAtLocation(node);
-    }
-
-    if (tsSymbol !== undefined && tsSymbol.name.startsWith('_t')) {
-      // For synthetic variables like `_t1`, we do not want to return the synthetic declaration symbol itself.
-      // Instead, we fall back to its alias/type symbol.
-      let type = typeChecker.getTypeAtLocation(node);
-      tsSymbol = type.aliasSymbol ?? type.symbol;
-    }
-
-    if (tsSymbol === undefined && ts.isIdentifier(node) && node.text.startsWith('_t')) {
-      // For synthetic variables like `_t1` where getSymbolAtLocation fails, fall back to alias/type symbol.
-      let type = typeChecker.getTypeAtLocation(node);
-      tsSymbol = type.aliasSymbol ?? type.symbol;
-    }
-
-    // Fall back to the type's symbol.
-    return tsSymbol ?? typeChecker.getTypeAtLocation(node).symbol ?? null;
-  }
-
-  private getTsSymbolOfReference(
-    target: SymbolReference | TmplAstElement | TmplAstTemplate,
-    typeChecker: ts.TypeChecker,
-  ): ts.Symbol | null {
-    if (!target || !('filePath' in target)) {
-      return null;
-    }
-
-    const sf = this.programDriver.getProgram().getSourceFile(target.filePath);
-    if (!sf) {
-      return null;
-    }
-
-    const visit = (node: ts.Node): ts.ClassDeclaration | null => {
-      if (node.pos <= target.position && target.position < node.end) {
-        if (ts.isClassDeclaration(node)) {
-          return node;
-        }
-        return ts.forEachChild(node, visit) ?? null;
-      }
-      return null;
-    };
-
-    const classDecl = ts.forEachChild(sf, visit) ?? null;
-    if (!classDecl) {
-      return null;
-    }
-
-    const nameNode = classDecl.name ?? classDecl;
-    return typeChecker.getSymbolAtLocation(nameNode) ?? null;
-  }
 
   getTemplate(component: ts.ClassDeclaration, optimizeFor?: OptimizeFor): TmplAstNode[] | null {
     const {data} = this.getLatestComponentState(component, optimizeFor);
@@ -457,24 +184,6 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
   ): TmplAstHostElement | null {
     const {data} = this.getLatestComponentState(directive, optimizeFor);
     return data?.hostElement ?? null;
-  }
-
-  getDirectivesOfNode(
-    component: ts.ClassDeclaration,
-    node: TmplAstElement | TmplAstTemplate,
-  ): TypeCheckableDirectiveMeta[] | null {
-    return (
-      this.getLatestComponentState(component).data?.boundTarget.getDirectivesOfNode(node) ?? null
-    );
-  }
-
-  getForeignComponent(
-    component: ts.ClassDeclaration,
-    element: TmplAstElement,
-  ): ForeignComponentMeta | null {
-    return (
-      this.getLatestComponentState(component).data?.boundTarget.getForeignComponent(element) ?? null
-    );
   }
 
   getUsedDirectives(component: ts.ClassDeclaration): TypeCheckableDirectiveMeta[] | null {
@@ -605,51 +314,6 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
     this.ensureAllShimsForAllFiles();
   }
 
-  private getGeneratedCodeRanges(sf: ts.SourceFile): ts.TextRange[] {
-    if (this.generatedRangeCache.has(sf)) {
-      return this.generatedRangeCache.get(sf)!;
-    }
-
-    const ranges: ts.TextRange[] = [];
-    const visit = (node: ts.Node) => {
-      if (ts.isInterfaceDeclaration(node)) {
-        return;
-      }
-      if (ts.isFunctionDeclaration(node)) {
-        if (node.name !== undefined) {
-          const name = node.name.text;
-          if (name.startsWith(TCB_FUNCTION_PREFIX)) {
-            ranges.push({pos: node.getStart(), end: node.getEnd()});
-            // TCBs never contain other TCBs or generated utilities, so we can skip traversing inside them.
-            return;
-          }
-        }
-      }
-      ts.forEachChild(node, visit);
-    };
-
-    // We do a full AST traversal because TCBs can be generated inside closures (e.g. `it` blocks in tests)
-    // so a shallow scan of top-level statements is insufficient.
-    ts.forEachChild(sf, visit);
-
-    this.generatedRangeCache.set(sf, ranges);
-    return ranges;
-  }
-
-  private filterShimDiagnostics(
-    shimSf: ts.SourceFile,
-    semanticDiagnostics: readonly ts.Diagnostic[],
-  ): readonly ts.Diagnostic[] {
-    if (this.programDriver.inliningMode !== InliningMode.CopySourceToTcb) {
-      return semanticDiagnostics;
-    }
-    const ranges = this.getGeneratedCodeRanges(shimSf);
-    return semanticDiagnostics.filter((diag) => {
-      if (diag.start === undefined) return true;
-      return ranges.some((range) => diag.start! >= range.pos && diag.start! < range.end);
-    });
-  }
-
   /**
    * Retrieve type-checking and template parse diagnostics from the given `ts.SourceFile` using the
    * most recent type-checking program.
@@ -682,12 +346,10 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
 
       for (const [shimPath, shimRecord] of fileRecord.shimData) {
         const shimSf = getSourceFileOrError(typeCheckProgram, shimPath);
-        const semanticDiagnostics = typeCheckProgram.getSemanticDiagnostics(shimSf);
-
-        const filteredDiagnostics = this.filterShimDiagnostics(shimSf, semanticDiagnostics);
-
         diagnostics.push(
-          ...filteredDiagnostics.map((diag) => convertDiagnostic(diag, fileRecord.sourceManager)),
+          ...typeCheckProgram
+            .getSemanticDiagnostics(shimSf)
+            .map((diag) => convertDiagnostic(diag, fileRecord.sourceManager)),
         );
         diagnostics.push(...shimRecord.genesisDiagnostics);
 
@@ -769,11 +431,10 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
       }
 
       const shimSf = getSourceFileOrError(typeCheckProgram, shimPath);
-      const semanticDiagnostics = typeCheckProgram.getSemanticDiagnostics(shimSf);
-      const filteredDiagnostics = this.filterShimDiagnostics(shimSf, semanticDiagnostics);
-
       diagnostics.push(
-        ...filteredDiagnostics.map((diag) => convertDiagnostic(diag, fileRecord.sourceManager)),
+        ...typeCheckProgram
+          .getSemanticDiagnostics(shimSf)
+          .map((diag) => convertDiagnostic(diag, fileRecord.sourceManager)),
       );
       diagnostics.push(...shimRecord.genesisDiagnostics);
 
@@ -898,7 +559,7 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
 
   makeTemplateDiagnostic<T extends ErrorCode>(
     clazz: ts.ClassDeclaration,
-    sourceSpan: ParseSourceSpan | AbsoluteSourceSpan,
+    sourceSpan: ParseSourceSpan,
     category: ts.DiagnosticCategory,
     errorCode: T,
     message: string,
@@ -906,23 +567,19 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
       text: string;
       start: number;
       end: number;
-      sourceFile?: ts.SourceFile;
+      sourceFile: ts.SourceFile;
     }[],
   ): NgTemplateDiagnostic<T> {
     const sfPath = absoluteFromSourceFile(clazz.getSourceFile());
     const fileRecord = this.state.get(sfPath)!;
     const id = fileRecord.sourceManager.getTypeCheckId(clazz);
     const mapping = fileRecord.sourceManager.getTemplateSourceMapping(id);
-    const span =
-      sourceSpan instanceof ParseSourceSpan
-        ? sourceSpan
-        : fileRecord.sourceManager.toTemplateParseSourceSpan(id, sourceSpan)!;
 
     return {
       ...makeTemplateDiagnostic(
         id,
         mapping,
-        span,
+        sourceSpan,
         category,
         ngErrorCode(errorCode),
         message,
@@ -1054,13 +711,16 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
   }
 
   private newContext(host: TypeCheckingHost): TypeCheckContextImpl {
+    const inlining = this.programDriver.supportsInlineOperations
+      ? InliningMode.InlineOps
+      : InliningMode.Error;
     return new TypeCheckContextImpl(
       this.config,
       this.compilerHost,
       this.refEmitter,
       this.reflector,
       host,
-      this.programDriver.inliningMode,
+      inlining,
       this.perf,
     );
   }
@@ -1144,8 +804,9 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
       tcbPath,
       tcbIsShim,
       tcb,
-      new BoundTargetAdapter(data.boundTarget, this.componentScopeReader),
-      this.config,
+      data,
+      this.componentScopeReader,
+      () => this.programDriver.getProgram().getTypeChecker(),
     );
     this.symbolBuilderCache.set(component, builder);
     return builder;
@@ -1157,14 +818,6 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
       return null;
     }
     return engine.getGlobalTsContext();
-  }
-
-  private getRefKey(ref: Reference<ClassDeclaration> | SymbolReference): string {
-    if ('filePath' in ref) {
-      return `${ref.filePath}#${ref.position}`;
-    } else {
-      return `${ref.node.getSourceFile().fileName}#${ref.node.name!.getStart()}`;
-    }
   }
 
   getPotentialTemplateDirectives(
@@ -1179,15 +832,14 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
       return [];
     }
 
-    const resultingDirectives = new Map<string, PotentialDirective>();
+    const resultingDirectives = new Map<ClassDeclaration<DeclarationNode>, PotentialDirective>();
     const directivesInScope = this.getTemplateDirectiveInScope(component);
     const directiveInGlobal = this.getElementsInGlobal(component, tsLs, options);
     for (const directive of [...directivesInScope, ...directiveInGlobal]) {
-      const key = this.getRefKey(directive.ref);
-      if (resultingDirectives.has(key)) {
+      if (resultingDirectives.has(directive.ref.node)) {
         continue;
       }
-      resultingDirectives.set(key, directive);
+      resultingDirectives.set(directive.ref.node, directive);
     }
     return Array.from(resultingDirectives.values());
   }
@@ -1202,20 +854,20 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
 
     // Very similar to the above `getPotentialTemplateDirectives`, but on pipes.
     const typeChecker = this.programDriver.getProgram().getTypeChecker();
-    const resultingPipes = new Map<string, PotentialPipe>();
+    const resultingPipes = new Map<ClassDeclaration<DeclarationNode>, PotentialPipe>();
     if (scope !== null) {
       const inScopePipes = this.getScopeData(component, scope)?.pipes ?? [];
       for (const p of inScopePipes) {
-        resultingPipes.set(this.getRefKey(p.ref), p);
+        resultingPipes.set(p.ref.node, p);
       }
     }
     for (const pipeClass of this.localMetaReader.getKnown(MetaKind.Pipe)) {
       const pipeMeta = this.metaReader.getPipeMetadata(new Reference(pipeClass));
       if (pipeMeta === null) continue;
-      if (resultingPipes.has(this.getRefKey(new Reference(pipeClass)))) continue;
+      if (resultingPipes.has(pipeClass)) continue;
       const withScope = this.scopeDataOfPipeMeta(typeChecker, pipeMeta);
       if (withScope === null) continue;
-      resultingPipes.set(this.getRefKey(withScope.ref), {...withScope, isInScope: false});
+      resultingPipes.set(pipeClass, {...withScope, isInScope: false});
     }
     return Array.from(resultingPipes.values());
   }
@@ -1242,7 +894,7 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
   }
 
   getTemplateDirectiveInScope(component: ts.ClassDeclaration): PotentialDirective[] {
-    const resultingDirectives = new Map<string, PotentialDirective>();
+    const resultingDirectives = new Map<ClassDeclaration<DeclarationNode>, PotentialDirective>();
 
     const scope = this.getComponentScope(component);
 
@@ -1255,7 +907,7 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
       const inScopeDirectives = this.getScopeData(component, scope)?.directives ?? [];
       // First, all in scope directives can be used.
       for (const d of inScopeDirectives) {
-        resultingDirectives.set(this.getRefKey(d.ref), d);
+        resultingDirectives.set(d.ref.node, d);
       }
     }
 
@@ -1270,14 +922,12 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
       if (directiveClass.getSourceFile().fileName !== currentComponentFileName) {
         continue;
       }
-      const ref = new Reference(directiveClass);
-      const directiveMeta = this.metaReader.getDirectiveMetadata(ref);
+      const directiveMeta = this.metaReader.getDirectiveMetadata(new Reference(directiveClass));
       if (directiveMeta === null) continue;
-      const key = this.getRefKey(ref);
-      if (resultingDirectives.has(key)) continue;
+      if (resultingDirectives.has(directiveClass)) continue;
       const withScope = this.scopeDataOfDirectiveMeta(typeChecker, directiveMeta);
       if (withScope === null) continue;
-      resultingDirectives.set(key, {...withScope, isInScope: false});
+      resultingDirectives.set(directiveClass, {...withScope, isInScope: false});
     }
 
     return Array.from(resultingDirectives.values());
@@ -1747,15 +1397,11 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
     }
 
     return {
-      ref: {
-        filePath: dep.ref.node.getSourceFile().fileName,
-        position: dep.ref.node.name!.getStart(),
-        name: dep.ref.node.name!.text,
-        moduleSpecifier: dep.ref.bestGuessOwningModule?.specifier,
-      },
+      ref: dep.ref,
       isComponent: dep.isComponent,
       isStructural: dep.isStructural,
       selector: dep.selector,
+      tsSymbol,
       ngModule,
       tsCompletionEntryInfos: null,
     };
@@ -1765,17 +1411,14 @@ export class TemplateTypeCheckerImpl implements TemplateTypeChecker {
     typeChecker: ts.TypeChecker,
     dep: PipeMeta,
   ): Omit<PotentialPipe, 'isInScope'> | null {
-    if (!dep.ref.node.name) {
+    const tsSymbol = typeChecker.getSymbolAtLocation(dep.ref.node.name);
+    if (tsSymbol === undefined) {
       return null;
     }
     return {
-      ref: {
-        filePath: dep.ref.node.getSourceFile().fileName,
-        position: dep.ref.node.name!.getStart(),
-        name: dep.ref.node.name!.text,
-        moduleSpecifier: dep.ref.bestGuessOwningModule?.specifier,
-      },
+      ref: dep.ref,
       name: dep.name,
+      tsSymbol,
       tsCompletionEntryInfos: null,
     };
   }

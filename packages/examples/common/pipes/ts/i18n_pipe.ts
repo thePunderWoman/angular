@@ -7,13 +7,12 @@
  */
 
 import {Component} from '@angular/core';
-import {I18nPluralPipe, I18nSelectPipe} from '@angular/common';
 
 // #docregion I18nPluralPipeComponent
 @Component({
   selector: 'i18n-plural-pipe',
-  imports: [I18nPluralPipe],
   template: `<div>{{ messages.length | i18nPlural: messageMapping }}</div>`,
+  standalone: false,
 })
 export class I18nPluralPipeComponent {
   messages: any[] = ['Message 1'];
@@ -28,8 +27,8 @@ export class I18nPluralPipeComponent {
 // #docregion I18nSelectPipeComponent
 @Component({
   selector: 'i18n-select-pipe',
-  imports: [I18nSelectPipe],
   template: `<div>{{ gender | i18nSelect: inviteMap }}</div>`,
+  standalone: false,
 })
 export class I18nSelectPipeComponent {
   gender: string = 'male';

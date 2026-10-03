@@ -11,8 +11,8 @@ import {
   Directive,
   NgModule,
   Pipe,
-  ɵReflectionCapabilities as ReflectionCapabilities,
   Type,
+  ɵReflectionCapabilities as ReflectionCapabilities,
 } from '../../src/core';
 
 import {MetadataOverride} from './metadata_override';
@@ -26,8 +26,6 @@ const reflection = new ReflectionCapabilities();
 export interface Resolver<T> {
   addOverride(type: Type<any>, override: MetadataOverride<T>): void;
   setOverrides(overrides: Array<[Type<any>, MetadataOverride<T>]>): void;
-  getOverrides(type: Type<any>): MetadataOverride<T>[] | null;
-  hasOverrides(type: Type<any>): boolean;
   resolve(type: Type<any>): T | null;
 }
 
@@ -54,13 +52,6 @@ abstract class OverrideResolver<T> implements Resolver<T> {
     });
   }
 
-  getOverrides(type: Type<any>): MetadataOverride<T>[] | null {
-    return this.overrides.get(type) || null;
-  }
-
-  hasOverrides(type: Type<any>): boolean {
-    return this.overrides.has(type);
-  }
   getAnnotation(type: Type<any>): T | null {
     const annotations = reflection.annotations(type);
     // Try to find the nearest known Type annotation and make sure that this annotation is an

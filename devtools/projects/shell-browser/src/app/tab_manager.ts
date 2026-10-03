@@ -38,16 +38,13 @@ export class TabManager {
 
   static initialize(tabs: Tabs, runtime: typeof chrome.runtime = chrome.runtime): TabManager {
     const manager = new TabManager(tabs, runtime);
-    manager.initialize(runtime);
+    manager.initialize();
     return manager;
   }
 
-  private initialize(runtime: typeof chrome.runtime): void {
+  private initialize(): void {
     this.runtime.onConnect.addListener((port) => {
-      // Verify that the connection is actually from the extension's DevTools page
-      const isFromExtension = port.sender?.url?.startsWith(runtime.getURL(''));
-
-      if (isNumeric(port.name) && isFromExtension) {
+      if (isNumeric(port.name)) {
         this.registerDevToolsForTab(port);
         return;
       }
@@ -85,7 +82,6 @@ export class TabManager {
       tab.devtools = null;
 
       for (const connection of Object.values(tab.contentScripts)) {
-        connection.port?.postMessage({topic: 'devtoolsShutdown'});
         connection.enabled = false;
       }
     });

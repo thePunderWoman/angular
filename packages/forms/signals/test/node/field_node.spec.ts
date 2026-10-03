@@ -6,36 +6,23 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {Component, computed, effect, Injector, signal, WritableSignal} from '@angular/core';
+import {computed, Injector, signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {FieldNode} from '../../src/field/node';
 import {
   apply,
   applyEach,
-  debounce,
+  customError,
   disabled,
-  EmailValidationError,
+  FieldPath,
   form,
-  FormField,
   hidden,
-  MaxDateValidationError,
-  MaxLengthValidationError,
-  MaxValidationError,
-  MinDateValidationError,
-  MinLengthValidationError,
-  MinValidationError,
-  NativeInputParseError,
-  PatternValidationError,
   readonly,
   required,
+  REQUIRED,
   requiredError,
-  RequiredValidationError,
   Schema,
   schema,
   SchemaOrSchemaFn,
-  SchemaPath,
-  SchemaPathTree,
-  StandardSchemaValidationError,
   validate,
   validateTree,
   ValidationError,
@@ -68,7 +55,7 @@ describe('FieldNode', () => {
       expect(f.a).toBe(child);
     });
 
-    it('should get the same instance when asking for a child multiple times (after update)', () => {
+    it('should get the same instance when asking for a child multiple times', () => {
       const value = signal<{a: number; b?: number}>({a: 1, b: 2});
       const f = form(value, {injector: TestBed.inject(Injector)});
       const child = f.a;
@@ -90,60 +77,6 @@ describe('FieldNode', () => {
     expect(f.c).toBeUndefined();
   });
 
-  it('infers built-in error types from getError', () => {
-    const f = form(signal({a: 1}), {injector: TestBed.inject(Injector)});
-    const field = f.a();
-
-    {
-      const error = field.getError('required');
-      let t: (RequiredValidationError & ValidationError.WithFieldTree) | undefined = error;
-    }
-    {
-      const error = field.getError('min');
-      let t: (MinValidationError & ValidationError.WithFieldTree) | undefined = error;
-    }
-    {
-      const error = field.getError('minDate');
-      let t: (MinDateValidationError & ValidationError.WithFieldTree) | undefined = error;
-    }
-    {
-      const error = field.getError('max');
-      let t: (MaxValidationError & ValidationError.WithFieldTree) | undefined = error;
-    }
-    {
-      const error = field.getError('maxDate');
-      let t: (MaxDateValidationError & ValidationError.WithFieldTree) | undefined = error;
-    }
-    {
-      const error = field.getError('minLength');
-      let t: (MinLengthValidationError & ValidationError.WithFieldTree) | undefined = error;
-    }
-    {
-      const error = field.getError('maxLength');
-      let t: (MaxLengthValidationError & ValidationError.WithFieldTree) | undefined = error;
-    }
-    {
-      const error = field.getError('pattern');
-      let t: (PatternValidationError & ValidationError.WithFieldTree) | undefined = error;
-    }
-    {
-      const error = field.getError('email');
-      let t: (EmailValidationError & ValidationError.WithFieldTree) | undefined = error;
-    }
-    {
-      const error = field.getError('standardSchema');
-      let t: (StandardSchemaValidationError & ValidationError.WithFieldTree) | undefined = error;
-    }
-    {
-      const error = field.getError('parse');
-      let t: (NativeInputParseError & ValidationError.WithFieldTree) | undefined = error;
-    }
-    {
-      const error = field.getError('custom');
-      let t: ValidationError.WithFieldTree | undefined = error;
-    }
-  });
-
   it('can get a child inside of a computed', () => {
     const f = form(
       signal({
@@ -156,81 +89,16 @@ describe('FieldNode', () => {
     expect(childA()).toBeDefined();
   });
 
-  describe('resetting', () => {
-    it('can be reset with a value', () => {
-      const model = signal({a: 1, b: 2});
-      const f = form(model, {injector: TestBed.inject(Injector)});
-      f.a().markAsDirty();
-      f.a().markAsTouched();
-
-      f().reset({a: 5, b: 8});
-      expect(f.a().value()).toBe(5);
-      expect(f.a().dirty()).toBe(false);
-      expect(f.a().touched()).toBe(false);
-    });
-
-    it('can be reset without a value', () => {
-      const model = signal({a: 1, b: 2});
-      const f = form(model, {injector: TestBed.inject(Injector)});
-
-      f().reset();
-      expect(f.a().value()).toBe(1);
-    });
-
-    it('can reset with empty string', () => {
-      const model = signal('hello');
-      const f = form(model, {injector: TestBed.inject(Injector)});
-      f().reset('');
-      expect(f().value()).toBe('');
-    });
-
-    it('can reset with false', () => {
-      const model = signal(true);
-      const f = form(model, {injector: TestBed.inject(Injector)});
-      f().reset(false);
-      expect(f().value()).toBe(false);
-    });
-
-    it('can reset with null', () => {
-      const model: WritableSignal<string | null> = signal('hello');
-      const f = form(model, {injector: TestBed.inject(Injector)});
-      f().reset(null);
-      expect(f().value()).toBeNull();
-    });
-
-    it('can reset with 0', () => {
-      const model = signal(5);
-      const f = form(model, {injector: TestBed.inject(Injector)});
-      f().reset(0);
-      expect(f().value()).toBe(0);
-    });
-
-    it('can reset with NaN', () => {
-      const model = signal(5);
-      const f = form(model, {injector: TestBed.inject(Injector)});
-      f().reset(NaN);
-      expect(f().value()).toBeNaN();
-    });
-  });
-
-  describe('fieldTree', () => {
-    it('should return the associated field tree from state produced by the root field tree', () => {
-      const f = form(signal(''), {injector: TestBed.inject(Injector)});
-
-      expect(f().fieldTree).toBe(f);
-    });
-
-    it('should return the associated field tree from state produced by a child field tree', () => {
-      const f = form(signal({a: 1, b: 2}), {injector: TestBed.inject(Injector)});
-
-      expect(f.a().fieldTree).toBe(f.a);
-    });
-
-    it('should return the associated field tree from state produced by an array item field tree', () => {
-      const f = form(signal([1, 2, 3]), {injector: TestBed.inject(Injector)});
-
-      expect(f[0]().fieldTree).toBe(f[0]);
-    });
+  it('can get a child inside of a computed', () => {
+    const f = form(
+      signal({
+        a: 1,
+        b: 2,
+      }),
+      {injector: TestBed.inject(Injector)},
+    );
+    const childA = computed(() => f.a);
+    expect(childA()).toBeDefined();
   });
 
   describe('dirty', () => {
@@ -353,7 +221,7 @@ describe('FieldNode', () => {
           b: 2,
         }),
         (p) => {
-          hidden(p, {when: () => true});
+          hidden(p, () => true);
         },
         {injector: TestBed.inject(Injector)},
       );
@@ -418,7 +286,7 @@ describe('FieldNode', () => {
           b: 2,
         }),
         (p) => {
-          readonly(p, {when: isReadonly});
+          readonly(p, isReadonly);
         },
         {injector: TestBed.inject(Injector)},
       );
@@ -483,7 +351,7 @@ describe('FieldNode', () => {
       expect(f().touched()).toBe(true);
     });
 
-    it('propagates down by default', () => {
+    it('does not propagate down', () => {
       const f = form(
         signal({
           a: 1,
@@ -492,28 +360,8 @@ describe('FieldNode', () => {
         {injector: TestBed.inject(Injector)},
       );
 
-      expect(f().touched()).toBe(false);
       expect(f.a().touched()).toBe(false);
-      expect(f.b().touched()).toBe(false);
       f().markAsTouched();
-      expect(f().touched()).toBe(true);
-      expect(f.a().touched()).toBe(true);
-      expect(f.b().touched()).toBe(true);
-    });
-
-    it('does not propagate down when skipDescendants is true', () => {
-      const f = form(
-        signal({
-          a: 1,
-          b: 2,
-        }),
-        {injector: TestBed.inject(Injector)},
-      );
-
-      expect(f().touched()).toBe(false);
-      expect(f.a().touched()).toBe(false);
-      f().markAsTouched({skipDescendants: true});
-      expect(f().touched()).toBe(true);
       expect(f.a().touched()).toBe(false);
     });
 
@@ -538,26 +386,6 @@ describe('FieldNode', () => {
 
       f().reset();
       expect(f().touched()).toBe(false);
-    });
-
-    it('reset should not track model changes', () => {
-      const f = form(signal(''), {injector: TestBed.inject(Injector)});
-      const spy = jasmine.createSpy();
-      effect(
-        () => {
-          spy();
-          f().reset();
-        },
-        {injector: TestBed.inject(Injector)},
-      );
-
-      TestBed.tick();
-      expect(spy).toHaveBeenCalledTimes(1);
-
-      f().value.set('hi');
-
-      TestBed.tick();
-      expect(spy).toHaveBeenCalledTimes(1);
     });
 
     it('should not be marked as touched when is readonly', () => {
@@ -602,7 +430,7 @@ describe('FieldNode', () => {
           b: 2,
         }),
         (p) => {
-          hidden(p, {when: () => true});
+          hidden(p, () => true);
         },
         {injector: TestBed.inject(Injector)},
       );
@@ -667,7 +495,7 @@ describe('FieldNode', () => {
           b: 2,
         }),
         (p) => {
-          hidden(p, {when: isHidden});
+          hidden(p, isHidden);
         },
         {injector: TestBed.inject(Injector)},
       );
@@ -690,34 +518,6 @@ describe('FieldNode', () => {
       expect(f().hidden()).toBe(false);
       expect(f().touched()).toBe(true);
     });
-
-    it('should flush pending control value sync on touch', () => {
-      const product = {
-        id: 'a',
-        name: 'a',
-        displayName: 'A',
-        imgUrl: 'https://a.png',
-      };
-      const myForm = form(
-        signal(product),
-        (p) => {
-          debounce(p.name, () => new Promise(() => {}));
-        },
-        {injector: TestBed.inject(Injector)},
-      );
-
-      myForm.name().markAsTouched();
-      // Same object identity because there was no change to flush to the name.
-      expect(myForm().value()).toBe(product);
-
-      myForm.name().controlValue.set('b');
-      // Same object identity because the name change is still pending.
-      expect(myForm().value()).toBe(product);
-
-      myForm.name().markAsTouched();
-      // Different object identity because the name change was flushed.
-      expect(myForm().value()).not.toBe(product);
-    });
   });
 
   describe('arrays', () => {
@@ -734,13 +534,11 @@ describe('FieldNode', () => {
         signal({names: [{name: 'Alex'}, {name: 'Miles'}]}),
         (p) => {
           applyEach(p.names, (a) => {
-            disabled(a.name, {
-              when: ({value, fieldTreeOf}) => {
-                const el = fieldTreeOf(a);
-                expect(el().value().name).toBe(value());
-                expect([...fieldTreeOf(p).names].findIndex((e: any) => e === el)).not.toBe(-1);
-                return true;
-              },
+            disabled(a.name, ({value, fieldOf}) => {
+              const el = fieldOf(a);
+              expect(el().value().name).toBe(value());
+              expect([...fieldOf(p).names].findIndex((e: any) => e === el)).not.toBe(-1);
+              return true;
             });
           });
         },
@@ -756,7 +554,7 @@ describe('FieldNode', () => {
         (p) => {
           applyEach(p, (a) => {
             a;
-            disabled(a, {when: ({value}) => value() % 2 === 0});
+            disabled(a, ({value}) => value() % 2 === 0);
           });
         },
         {injector: TestBed.inject(Injector)},
@@ -773,7 +571,7 @@ describe('FieldNode', () => {
         (p) => {
           applyEach(p, (el) => {
             // Disabled if even.
-            disabled(el, {when: ({value}) => value() % 2 === 0});
+            disabled(el, ({value}) => value() % 2 === 0);
           });
         },
         {injector: TestBed.inject(Injector)},
@@ -816,30 +614,6 @@ describe('FieldNode', () => {
         expect(f[0] === kirill).toBeTrue();
         expect(f[1] === alex).toBeTrue();
       });
-
-      it('uses index as identity for primitive values', () => {
-        const value = signal([1, 'two']);
-        const f = form(value, {injector: TestBed.inject(Injector)});
-        const first = f[0];
-        const second = f[1];
-
-        value.update((old) => [old[1], old[0]]);
-
-        expect(f[0] === first).toBeTrue();
-        expect(f[1] === second).toBeTrue();
-      });
-
-      it('uses index as identity for array values', () => {
-        const value = signal([[1], ['two']]);
-        const f = form(value, {injector: TestBed.inject(Injector)});
-        const first = f[0];
-        const second = f[1];
-
-        value.update((old) => [old[1], old[0]]);
-
-        expect(f[0] === first).toBeTrue();
-        expect(f[1] === second).toBeTrue();
-      });
     });
   });
 
@@ -869,14 +643,14 @@ describe('FieldNode', () => {
       const f = form(
         signal({a: 1, b: 2}),
         (p) => {
-          disabled(p.a, {when: ({value}) => value() !== 2});
+          disabled(p.a, ({value}) => value() !== 2);
         },
         {injector: TestBed.inject(Injector)},
       );
       const a = f.a;
       expect(f().disabled()).toBe(false);
       expect(a().disabled()).toBe(true);
-      expect(a().disabledReasons()).toEqual([{fieldTree: f.a}]);
+      expect(a().disabledReasons()).toEqual([{field: f.a}]);
 
       a().value.set(2);
       expect(f().disabled()).toBe(false);
@@ -887,7 +661,7 @@ describe('FieldNode', () => {
       const f = form(
         signal({a: 1, b: 2}),
         (p) => {
-          disabled(p.a, {when: () => 'a cannot be changed'});
+          disabled(p.a, () => 'a cannot be changed');
         },
         {injector: TestBed.inject(Injector)},
       );
@@ -895,7 +669,7 @@ describe('FieldNode', () => {
       expect(f.a().disabled()).toBe(true);
       expect(f.a().disabledReasons()).toEqual([
         {
-          fieldTree: f.a,
+          field: f.a,
           message: 'a cannot be changed',
         },
       ]);
@@ -905,7 +679,7 @@ describe('FieldNode', () => {
       const f = form(
         signal({a: 1, b: 2}),
         (p) => {
-          disabled(p.a, {when: ({value}) => (value() > 5 ? 'a cannot be changed' : false)});
+          disabled(p.a, ({value}) => (value() > 5 ? 'a cannot be changed' : false));
         },
         {injector: TestBed.inject(Injector)},
       );
@@ -918,7 +692,7 @@ describe('FieldNode', () => {
       expect(f.a().disabled()).toBe(true);
       expect(f.a().disabledReasons()).toEqual([
         {
-          fieldTree: f.a,
+          field: f.a,
           message: 'a cannot be changed',
         },
       ]);
@@ -928,7 +702,7 @@ describe('FieldNode', () => {
       const f = form(
         signal({a: 1, b: 2}),
         (p) => {
-          disabled(p, {when: () => 'form unavailable'});
+          disabled(p, () => 'form unavailable');
         },
         {injector: TestBed.inject(Injector)},
       );
@@ -936,14 +710,14 @@ describe('FieldNode', () => {
       expect(f().disabled()).toBe(true);
       expect(f().disabledReasons()).toEqual([
         {
-          fieldTree: f,
+          field: f,
           message: 'form unavailable',
         },
       ]);
       expect(f.a().disabled()).toBe(true);
       expect(f.a().disabledReasons()).toEqual([
         {
-          fieldTree: f,
+          field: f,
           message: 'form unavailable',
         },
       ]);
@@ -954,19 +728,19 @@ describe('FieldNode', () => {
         signal({a: '', b: ''}),
         (p) => {
           disabled(p.a);
-          disabled(p.b, {when: 'disabled!'});
+          disabled(p.b, 'disabled!');
         },
         {injector: TestBed.inject(Injector)},
       );
 
       expect(f.a().disabledReasons()).toEqual([
         {
-          fieldTree: f.a,
+          field: f.a,
         },
       ]);
       expect(f.b().disabledReasons()).toEqual([
         {
-          fieldTree: f.b,
+          field: f.b,
           message: 'disabled!',
         },
       ]);
@@ -992,7 +766,7 @@ describe('FieldNode', () => {
       const f = form(
         signal({a: 1, b: 2}),
         (p) => {
-          readonly(p.a, {when: ({value}) => value() > 10});
+          readonly(p.a, ({value}) => value() > 10);
         },
         {injector: TestBed.inject(Injector)},
       );
@@ -1022,18 +796,18 @@ describe('FieldNode', () => {
       const f = form(
         signal(''),
         (p) => {
-          readonly(p, {when: isReadonly});
+          readonly(p, isReadonly);
           required(p);
         },
         {injector: TestBed.inject(Injector)},
       );
 
-      expect(f().required()).toBe(true);
+      expect(f().property(REQUIRED)()).toBe(true);
       expect(f().valid()).toBe(false);
       expect(f().readonly()).toBe(false);
 
       isReadonly.set(true);
-      expect(f().required()).toBe(true);
+      expect(f().property(REQUIRED)()).toBe(true);
       expect(f().valid()).toBe(true);
       expect(f().readonly()).toBe(true);
     });
@@ -1046,7 +820,7 @@ describe('FieldNode', () => {
         (p) => {
           validate(p.a, ({value}) => {
             if (value() > 10) {
-              return {kind: 'too-damn-high'};
+              return customError({kind: 'too-damn-high'});
             }
             return undefined;
           });
@@ -1060,7 +834,7 @@ describe('FieldNode', () => {
       expect(f().valid()).toBe(true);
 
       f.a().value.set(11);
-      expect(f.a().errors()).toEqual([{kind: 'too-damn-high', fieldTree: f.a}]);
+      expect(f.a().errors()).toEqual([customError({kind: 'too-damn-high', field: f.a})]);
       expect(f.a().valid()).toBe(false);
       expect(f().errors()).toEqual([]);
       expect(f().valid()).toBe(false);
@@ -1072,7 +846,7 @@ describe('FieldNode', () => {
         (p) => {
           validate(p.a, ({value}) => {
             if (value() > 10) {
-              return [{kind: 'too-damn-high'}, {kind: 'bad'}];
+              return [customError({kind: 'too-damn-high'}), customError({kind: 'bad'})];
             }
             return undefined;
           });
@@ -1085,41 +859,10 @@ describe('FieldNode', () => {
 
       f.a().value.set(11);
       expect(f.a().errors()).toEqual([
-        {kind: 'too-damn-high', fieldTree: f.a},
-        {kind: 'bad', fieldTree: f.a},
+        customError({kind: 'too-damn-high', field: f.a}),
+        customError({kind: 'bad', field: f.a}),
       ]);
       expect(f.a().valid()).toBe(false);
-    });
-
-    it('should get error by kind', () => {
-      const f = form(
-        signal({a: 1}),
-        (p) => {
-          validate(p.a, ({value}) => {
-            if (value() > 10) {
-              return [{kind: 'too-damn-high'}, {kind: 'bad'}];
-            }
-            return undefined;
-          });
-        },
-        {injector: TestBed.inject(Injector)},
-      );
-
-      expect(f.a().getError('too-damn-high')).toBeUndefined();
-      expect(f.a().getError('bad')).toBeUndefined();
-
-      f.a().value.set(11);
-      const errorHigh = f.a().getError('too-damn-high');
-      expect(errorHigh).toBeDefined();
-      expect(errorHigh?.kind).toBe('too-damn-high');
-      expect(errorHigh?.fieldTree).toBe(f.a);
-
-      const errorBad = f.a().getError('bad');
-      expect(errorBad).toBeDefined();
-      expect(errorBad?.kind).toBe('bad');
-      expect(errorBad?.fieldTree).toBe(f.a);
-
-      expect(f.a().getError('non-existent')).toBeUndefined();
     });
 
     it('should validate required field', () => {
@@ -1132,15 +875,15 @@ describe('FieldNode', () => {
         {injector: TestBed.inject(Injector)},
       );
 
-      expect(f.first().errors()).toEqual([requiredError({fieldTree: f.first})]);
+      expect(f.first().errors()).toEqual([requiredError({field: f.first})]);
       expect(f.first().valid()).toBe(false);
-      expect(f.first().required()).toBe(true);
+      expect(f.first().property(REQUIRED)()).toBe(true);
 
       f.first().value.set('Bob');
 
       expect(f.first().errors()).toEqual([]);
       expect(f.first().valid()).toBe(true);
-      expect(f.first().required()).toBe(true);
+      expect(f.first().property(REQUIRED)()).toBe(true);
     });
 
     it('should validate conditionally required field', () => {
@@ -1156,19 +899,19 @@ describe('FieldNode', () => {
 
       expect(f.first().errors()).toEqual([]);
       expect(f.first().valid()).toBe(true);
-      expect(f.first().required()).toBe(false);
+      expect(f.first().property(REQUIRED)()).toBe(false);
 
       f.last().value.set('Loblaw');
 
-      expect(f.first().errors()).toEqual([requiredError({fieldTree: f.first})]);
+      expect(f.first().errors()).toEqual([requiredError({field: f.first})]);
       expect(f.first().valid()).toBe(false);
-      expect(f.first().required()).toBe(true);
+      expect(f.first().property(REQUIRED)()).toBe(true);
 
       f.first().value.set('Bob');
 
       expect(f.first().errors()).toEqual([]);
       expect(f.first().valid()).toBe(true);
-      expect(f.first().required()).toBe(true);
+      expect(f.first().property(REQUIRED)()).toBe(true);
     });
 
     it('should link required error messages to their predicate', () => {
@@ -1196,7 +939,7 @@ describe('FieldNode', () => {
       expect(f.name().errors()).toEqual([
         requiredError({
           message: 'Name is required in your country',
-          fieldTree: f.name,
+          field: f.name,
         }),
       ]);
 
@@ -1204,11 +947,11 @@ describe('FieldNode', () => {
       expect(f.name().errors()).toEqual([
         requiredError({
           message: 'Name is required in your country',
-          fieldTree: f.name,
+          field: f.name,
         }),
         requiredError({
           message: 'Name is required for large transactions',
-          fieldTree: f.name,
+          field: f.name,
         }),
       ]);
 
@@ -1216,7 +959,7 @@ describe('FieldNode', () => {
       expect(f.name().errors()).toEqual([
         requiredError({
           message: 'Name is required for large transactions',
-          fieldTree: f.name,
+          field: f.name,
         }),
       ]);
 
@@ -1228,7 +971,7 @@ describe('FieldNode', () => {
       const f = form(
         signal({a: 1, b: 2}),
         (p) => {
-          validate(p.a, ({value}) => (value() > 1 ? {kind: 'error'} : null));
+          validate(p.a, ({value}) => (value() > 1 ? customError() : null));
         },
         {injector: TestBed.inject(Injector)},
       );
@@ -1237,7 +980,7 @@ describe('FieldNode', () => {
       expect(f.a().valid()).toBe(true);
 
       f.a().value.set(2);
-      expect(f.a().errors()).toEqual([{kind: 'error', fieldTree: f.a}]);
+      expect(f.a().errors()).toEqual([customError({field: f.a})]);
       expect(f.a().valid()).toBe(false);
     });
 
@@ -1247,13 +990,13 @@ describe('FieldNode', () => {
         const f = form(
           cat,
           (p) => {
-            validateTree(p, ({value, fieldTreeOf}) => {
-              const errors: ValidationError.WithOptionalFieldTree[] = [];
+            validateTree(p, ({value, fieldOf}) => {
+              const errors: ValidationError[] = [];
               if (value().name.length > 8) {
-                errors.push({kind: 'long_name', fieldTree: fieldTreeOf(p.name)});
+                errors.push(customError({kind: 'long_name', field: fieldOf(p.name)}));
               }
               if (value().age < 0) {
-                errors.push({kind: 'temporal_anomaly', fieldTree: fieldTreeOf(p.age)});
+                errors.push(customError({kind: 'temporal_anomaly', field: fieldOf(p.age)}));
               }
               return errors;
             });
@@ -1267,10 +1010,10 @@ describe('FieldNode', () => {
         f.age().value.set(-10);
 
         expect(f.name().errors()).toEqual([]);
-        expect(f.age().errors()).toEqual([{kind: 'temporal_anomaly', fieldTree: f.age}]);
+        expect(f.age().errors()).toEqual([customError({kind: 'temporal_anomaly', field: f.age})]);
 
         cat.set({name: 'Fluffy McFluffington', age: 10});
-        expect(f.name().errors()).toEqual([{kind: 'long_name', fieldTree: f.name}]);
+        expect(f.name().errors()).toEqual([customError({kind: 'long_name', field: f.name})]);
         expect(f.age().errors()).toEqual([]);
       });
 
@@ -1279,13 +1022,13 @@ describe('FieldNode', () => {
         const f = form(
           cat,
           (p) => {
-            validateTree(p, ({value, fieldTreeOf}) => {
-              const errors: ValidationError.WithOptionalFieldTree[] = [];
+            validateTree(p, ({value, fieldOf}) => {
+              const errors: ValidationError[] = [];
               if (value().name.length > 8) {
-                errors.push({kind: 'long_name', fieldTree: fieldTreeOf(p.name)});
+                errors.push(customError({kind: 'long_name', field: fieldOf(p.name)}));
               }
               if (value().age < 0) {
-                errors.push({kind: 'temporal_anomaly', fieldTree: fieldTreeOf(p.age)});
+                errors.push(customError({kind: 'temporal_anomaly', field: fieldOf(p.age)}));
               }
               return errors;
             });
@@ -1299,10 +1042,10 @@ describe('FieldNode', () => {
         f.age().value.set(-10);
 
         expect(f.name().errors()).toEqual([]);
-        expect(f.age().errors()).toEqual([{kind: 'temporal_anomaly', fieldTree: f.age}]);
+        expect(f.age().errors()).toEqual([customError({kind: 'temporal_anomaly', field: f.age})]);
 
         cat.set({name: 'Fluffy McFluffington', age: 10});
-        expect(f.name().errors()).toEqual([{kind: 'long_name', fieldTree: f.name}]);
+        expect(f.name().errors()).toEqual([customError({kind: 'long_name', field: f.name})]);
         expect(f.age().errors()).toEqual([]);
       });
     });
@@ -1326,7 +1069,7 @@ describe('FieldNode', () => {
         {injector: TestBed.inject(Injector)},
       );
 
-      expect(f().errorSummary()).toEqual([requiredError({fieldTree: f})]);
+      expect(f().errorSummary()).toEqual([requiredError({field: f})]);
     });
 
     it('should contain errors from child fields', () => {
@@ -1341,8 +1084,8 @@ describe('FieldNode', () => {
       );
 
       expect(f().errorSummary()).toEqual([
-        requiredError({fieldTree: f.first}),
-        requiredError({fieldTree: f.last}),
+        requiredError({field: f.first}),
+        requiredError({field: f.last}),
       ]);
     });
 
@@ -1355,96 +1098,24 @@ describe('FieldNode', () => {
       const f = form(
         data,
         (p) => {
-          validate(p, () => ({kind: 'root'}));
-          validate(p.child, () => ({kind: 'child'}));
-          validate(p.child.child, () => ({kind: 'grandchild'}));
+          validate(p, () => customError({kind: 'root'}));
+          validate(p.child, () => customError({kind: 'child'}));
+          validate(p.child.child, () => customError({kind: 'grandchild'}));
         },
         {injector: TestBed.inject(Injector)},
       );
 
       expect(f.child.child().errorSummary()).toEqual([
-        {kind: 'grandchild', fieldTree: f.child.child},
+        customError({kind: 'grandchild', field: f.child.child}),
       ]);
       expect(f.child().errorSummary()).toEqual([
-        {kind: 'child', fieldTree: f.child},
-        {kind: 'grandchild', fieldTree: f.child.child},
+        customError({kind: 'child', field: f.child}),
+        customError({kind: 'grandchild', field: f.child.child}),
       ]);
       expect(f().errorSummary()).toEqual([
-        {kind: 'root', fieldTree: f},
-        {kind: 'child', fieldTree: f.child},
-        {kind: 'grandchild', fieldTree: f.child.child},
-      ]);
-    });
-
-    it('should sort errors by DOM position', async () => {
-      @Component({
-        template: `
-          <input [formField]="f.b" />
-          <input [formField]="f.a" />
-        `,
-        imports: [FormField],
-      })
-      class TestCmp {
-        f = form(signal({a: '', b: ''}), (p) => {
-          validate(p.a, () => ({kind: 'error-a'}));
-          validate(p.b, () => ({kind: 'error-b'}));
-        });
-      }
-
-      const fixture = TestBed.createComponent(TestCmp);
-      const cmp = fixture.componentInstance;
-      await fixture.whenStable();
-
-      expect(cmp.f().errorSummary()).toEqual([
-        jasmine.objectContaining({kind: 'error-b'}),
-        jasmine.objectContaining({kind: 'error-a'}),
-      ]);
-    });
-
-    it('should sort bound errors before unbound errors', async () => {
-      @Component({
-        template: ` <input [formField]="f.a" /> `,
-        imports: [FormField],
-      })
-      class TestCmp {
-        f = form(signal({a: '', b: ''}), (p) => {
-          validate(p.a, () => ({kind: 'error-a'}));
-          validate(p.b, () => ({kind: 'error-b'}));
-        });
-      }
-
-      const fixture = TestBed.createComponent(TestCmp);
-      const cmp = fixture.componentInstance;
-      await fixture.whenStable();
-
-      expect(cmp.f().errorSummary()).toEqual([
-        jasmine.objectContaining({kind: 'error-a'}),
-        jasmine.objectContaining({kind: 'error-b'}),
-      ]);
-    });
-
-    it('should sort errors from nested fields by DOM position', async () => {
-      @Component({
-        template: `
-          <input [formField]="f.group.child" />
-          <input [formField]="f.other" />
-        `,
-        imports: [FormField],
-      })
-      class TestCmp {
-        f = form(signal({group: {child: ''}, other: ''}), (p) => {
-          validate(p.group.child, () => ({kind: 'child'}));
-          validate(p.other, () => ({kind: 'other'}));
-        });
-      }
-
-      const fixture = TestBed.createComponent(TestCmp);
-      const cmp = fixture.componentInstance;
-      await fixture.whenStable();
-
-      expect(cmp.f().errorSummary()).toEqual([
-        jasmine.objectContaining({kind: 'child'}),
-        jasmine.objectContaining({kind: 'other'}),
+        customError({kind: 'root', field: f}),
+        customError({kind: 'child', field: f.child}),
+        customError({kind: 'grandchild', field: f.child.child}),
       ]);
     });
   });
@@ -1457,7 +1128,7 @@ describe('FieldNode', () => {
       }
 
       const addressSchema: SchemaOrSchemaFn<Address> = (p) => {
-        disabled(p.street, {when: () => true});
+        disabled(p.street, () => true);
       };
 
       const data = signal<{name: string; address: Address}>({
@@ -1482,7 +1153,7 @@ describe('FieldNode', () => {
       const opts = {injector: TestBed.inject(Injector)};
       const subFn = jasmine.createSpy('schemaFn');
       const sub: Schema<string> = schema(subFn);
-      const s = schema((p: SchemaPathTree<{a: string; b: string}>) => {
+      const s = schema((p: FieldPath<{a: string; b: string}>) => {
         apply(p.a, sub);
         apply(p.b, sub);
       });
@@ -1497,7 +1168,7 @@ describe('FieldNode', () => {
 
     it('should resolve predefined schema paths within the local context', () => {
       const s = schema<{a: string; b: string}>((p) => {
-        disabled(p.b, {when: ({valueOf}) => valueOf(p.a) === 'disable-b'});
+        disabled(p.b, ({valueOf}) => valueOf(p.a) === 'disable-b');
       });
 
       const f = form(
@@ -1515,7 +1186,7 @@ describe('FieldNode', () => {
 
     it('should resolve predefined schema paths deeply nested within the schema', () => {
       const s = schema<{a: string; b: string}>((p) => {
-        disabled(p.b, {when: ({valueOf}) => valueOf(p.a) === 'disable-b'});
+        disabled(p.b, ({valueOf}) => valueOf(p.a) === 'disable-b');
       });
 
       const f = form(
@@ -1532,24 +1203,22 @@ describe('FieldNode', () => {
     });
 
     it('should error on resolving predefined schema path that is not part of the form', () => {
-      let otherP: SchemaPath<string>;
+      let otherP: FieldPath<any>;
       const s = schema<string>((p) => (otherP = p));
       SchemaImpl.rootCompile(s);
 
       const f = form(
         signal(''),
         (p) => {
-          disabled(p, {
-            when: ({fieldTreeOf}) => {
-              fieldTreeOf(otherP);
-              return true;
-            },
+          disabled(p, ({fieldOf}) => {
+            fieldOf(otherP);
+            return true;
           });
         },
         {injector: TestBed.inject(Injector)},
       );
 
-      expect(() => f().disabled()).toThrowError(/Path is not part of this field tree\./);
+      expect(() => f().disabled()).toThrowError('Path is not part of this field tree.');
     });
   });
 
@@ -1567,140 +1236,6 @@ describe('FieldNode', () => {
       expect(f().dirty()).toBe(false);
       expect(f.a().dirty()).toBe(false);
       expect(f.a.b().dirty()).toBe(false);
-    });
-
-    it('should immediately update value on reset even if a debounce is pending', async () => {
-      const {promise: debouncePromise, resolve: resolveDebounce} = Promise.withResolvers<void>();
-
-      const model = signal('initial');
-      const f = form(
-        model,
-        (p) => {
-          debounce(p, () => debouncePromise);
-        },
-        {injector: TestBed.inject(Injector)},
-      );
-
-      // 1. Simulate user input
-      f().controlValue.set('user input');
-
-      // Value should still be 'initial' because of debounce
-      expect(f().value()).toBe('initial');
-
-      // 2. Call reset with a new value
-      f().reset('reset value');
-
-      // Value should be 'reset value' immediately
-      expect(f().value()).toBe('reset value');
-      expect(f().controlValue()).toBe('reset value');
-
-      // 3. Resolve the debounce
-      resolveDebounce();
-      await Promise.resolve(); // Wait for promise microtasks
-
-      // Value should STILL be 'reset value', not 'user input'
-      expect(f().value()).toBe('reset value');
-    });
-
-    it('should immediately update value on reset when "blur" debounce is pending (Escape key scenario)', () => {
-      const model = signal('initial');
-      const f = form(
-        model,
-        (p) => {
-          debounce(p, 'blur');
-        },
-        {injector: TestBed.inject(Injector)},
-      );
-
-      // Simulate typing: controlValue is updated, but model value is not (pending blur)
-      f().controlValue.set('user input');
-      expect(f().value()).toBe('initial');
-      expect(f().controlValue()).toBe('user input');
-
-      // Simulate Escape key: call reset
-      f().reset('initial');
-
-      // Value should be reset immediately and controlValue should match
-      expect(f().value()).toBe('initial');
-      expect(f().controlValue()).toBe('initial');
-
-      // Simulate blur later
-      f().markAsTouched();
-
-      // Value should still be 'initial'
-      expect(f().value()).toBe('initial');
-    });
-
-    it('should abort pending debounce on reset without value and not trigger further sync', async () => {
-      const {promise: debouncePromise, resolve: resolveDebounce} = Promise.withResolvers<void>();
-
-      const model = signal('initial');
-      const f = form(
-        model,
-        (p) => {
-          debounce(p, () => debouncePromise);
-        },
-        {injector: TestBed.inject(Injector)},
-      );
-
-      // 1. Simulate user input to trigger a pending debounce
-      f().controlValue.set('user input');
-      expect(f().value()).toBe('initial');
-
-      // Spy on value.set
-      spyOn(f().value, 'set').and.callThrough();
-
-      // 2. Call reset without value
-      f().reset();
-
-      // value and controlValue should immediately be 'initial'
-      expect(f().value()).toBe('initial');
-      expect(f().controlValue()).toBe('initial');
-
-      // 3. Resolve the debounce
-      resolveDebounce();
-      await Promise.resolve(); // Wait for promise microtasks
-
-      // value.set should NEVER have been called during or after reset
-      expect(f().value.set).not.toHaveBeenCalled();
-      expect(f().value()).toBe('initial');
-    });
-
-    it('should abort pending debounce on reset with new value and only call value.set once immediately', async () => {
-      const {promise: debouncePromise, resolve: resolveDebounce} = Promise.withResolvers<void>();
-
-      const model = signal('initial');
-      const f = form(
-        model,
-        (p) => {
-          debounce(p, () => debouncePromise);
-        },
-        {injector: TestBed.inject(Injector)},
-      );
-
-      // 1. Simulate user input to trigger a pending debounce
-      f().controlValue.set('user input');
-      expect(f().value()).toBe('initial');
-
-      // Spy on value.set
-      spyOn(f().value, 'set').and.callThrough();
-
-      // 2. Call reset with a new value
-      f().reset('reset value');
-
-      // value should immediately be 'reset value'
-      expect(f().value()).toBe('reset value');
-      expect(f().controlValue()).toBe('reset value');
-      expect(f().value.set).toHaveBeenCalledTimes(1);
-      expect(f().value.set).toHaveBeenCalledWith('reset value');
-
-      // 3. Resolve the debounce
-      resolveDebounce();
-      await Promise.resolve(); // Wait for promise microtasks
-
-      // value.set should STILL have only been called once (the immediate one)
-      expect(f().value.set).toHaveBeenCalledTimes(1);
-      expect(f().value()).toBe('reset value');
     });
   });
 });

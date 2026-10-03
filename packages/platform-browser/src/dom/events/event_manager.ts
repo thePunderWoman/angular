@@ -17,19 +17,13 @@ import {
 
 import {RuntimeErrorCode} from '../../errors';
 
-import type {EventManagerPlugin} from './event_manager_plugin';
-
-import {DomEventsPlugin} from './dom_events';
-
 /**
  * The injection token for plugins of the `EventManager` service.
- *
- * @see [Extend event handling](guide/templates/event-listeners#extend-event-handling)
  *
  * @publicApi
  */
 export const EVENT_MANAGER_PLUGINS = new InjectionToken<EventManagerPlugin[]>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'EventManagerPlugins' : '',
+  typeof ngDevMode !== undefined && ngDevMode ? 'EventManagerPlugins' : '',
 );
 
 /**
@@ -53,15 +47,7 @@ export class EventManager {
     plugins.forEach((plugin) => {
       plugin.manager = this;
     });
-
-    const otherPlugins = plugins.filter((p) => !(p instanceof DomEventsPlugin));
-    this._plugins = otherPlugins.slice().reverse();
-
-    // DomEventsPlugin.supports() always returns true, it should always be the last plugin.
-    const domEventPlugin = plugins.find((p) => p instanceof DomEventsPlugin);
-    if (domEventPlugin) {
-      this._plugins.push(domEventPlugin);
-    }
+    this._plugins = plugins.slice().reverse();
   }
 
   /**
@@ -111,4 +97,35 @@ export class EventManager {
     this._eventNameToPlugin.set(eventName, plugin);
     return plugin;
   }
+}
+
+/**
+ * The plugin definition for the `EventManager` class
+ *
+ * It can be used as a base class to create custom manager plugins, i.e. you can create your own
+ * class that extends the `EventManagerPlugin` one.
+ *
+ * @publicApi
+ */
+export abstract class EventManagerPlugin {
+  // TODO: remove (has some usage in G3)
+  constructor(private _doc: any) {}
+
+  // Using non-null assertion because it's set by EventManager's constructor
+  manager!: EventManager;
+
+  /**
+   * Should return `true` for every event name that should be supported by this plugin
+   */
+  abstract supports(eventName: string): boolean;
+
+  /**
+   * Implement the behaviour for the supported events
+   */
+  abstract addEventListener(
+    element: HTMLElement,
+    eventName: string,
+    handler: Function,
+    options?: ListenerOptions,
+  ): Function;
 }

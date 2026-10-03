@@ -23,7 +23,10 @@ describe('utils', () => {
       let clearTimeoutSpy: jasmine.Spy;
 
       beforeEach(() => {
-        setTimeoutSpy = spyOn<Window, 'setTimeout'>(window, 'setTimeout').and.returnValue(42);
+        // TODO: @JiaLiPassion, need to wait @types/jasmine to fix the wrong return
+        // type infer issue.
+        // https://github.com/DefinitelyTyped/DefinitelyTyped/issues/43486
+        setTimeoutSpy = spyOn(window, 'setTimeout').and.returnValue(42 as any);
         clearTimeoutSpy = spyOn(window, 'clearTimeout');
       });
 

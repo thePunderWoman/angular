@@ -20,6 +20,9 @@
  * @publicApi
  */
 export enum ViewEncapsulation {
+  // TODO: consider making `ViewEncapsulation` a `const enum` instead. See
+  // https://github.com/angular/angular/issues/44119 for additional information.
+
   /**
    * Emulates a native Shadow DOM encapsulation behavior by adding a specific attribute to the
    * component's host element and applying the same attribute to all the CSS selectors provided
@@ -48,8 +51,6 @@ export enum ViewEncapsulation {
    * Similar to `ShadowDom`, but prevents any external styles from leaking into the
    * component's ShadowRoot. This is useful when you want to ensure that the component's
    * styles are completely isolated from the rest of the application, including global styles.
-   *
-   * @experimental 21.0
    */
-  ExperimentalIsolatedShadowDom = 4,
+  IsolatedShadowDom = 4,
 }

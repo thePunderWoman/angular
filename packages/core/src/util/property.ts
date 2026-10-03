@@ -29,7 +29,7 @@ export function getClosureSafeProperty<T>(objWithPropertyToExtract: T): string {
  */
 export function fillProperties(target: Record<string, unknown>, source: Record<string, unknown>) {
   for (const key in source) {
-    if (Object.hasOwn(source, key) && !Object.hasOwn(target, key)) {
+    if (source.hasOwnProperty(key) && !target.hasOwnProperty(key)) {
       target[key] = source[key];
     }
   }

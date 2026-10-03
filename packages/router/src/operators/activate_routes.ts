@@ -6,13 +6,35 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
+import {MonoTypeOperatorFunction} from 'rxjs';
+import {map} from 'rxjs/operators';
+
 import {ActivationEnd, ChildActivationEnd, Event} from '../events';
+import type {NavigationTransition} from '../navigation_transition';
 import type {DetachedRouteHandleInternal, RouteReuseStrategy} from '../route_reuse_strategy';
 import type {ChildrenOutletContexts} from '../router_outlet_context';
 import {ActivatedRoute, advanceActivatedRoute, RouterState} from '../router_state';
 import {nodeChildrenAsMap, TreeNode} from '../utils/tree';
 
 let warnedAboutUnsupportedInputBinding = false;
+
+export const activateRoutes = (
+  rootContexts: ChildrenOutletContexts,
+  routeReuseStrategy: RouteReuseStrategy,
+  forwardEvent: (evt: Event) => void,
+  inputBindingEnabled: boolean,
+): MonoTypeOperatorFunction<NavigationTransition> =>
+  map((t) => {
+    new ActivateRoutes(
+      routeReuseStrategy,
+      t.targetRouterState!,
+      t.currentRouterState,
+      forwardEvent,
+      inputBindingEnabled,
+    ).activate(rootContexts);
+    return t;
+  });
+
 export class ActivateRoutes {
   constructor(
     private routeReuseStrategy: RouteReuseStrategy,
@@ -107,11 +129,7 @@ export class ActivateRoutes {
 
     if (context && context.outlet) {
       const componentRef = context.outlet.detach();
-      // Reset child contexts so subsequent activations in this outlet do not mutate the detached
-      // tree (see #57285). The detached outlets are still alive, so `onOutletDeactivated()` (which
-      // the destruction path uses to prune) is intentionally not called here.
-      const contexts = context.children.contexts;
-      context.resetChildren();
+      const contexts = context.children.onOutletDeactivated();
       this.routeReuseStrategy.store(route.value.snapshot, {componentRef, route, contexts});
     }
   }
@@ -143,12 +161,6 @@ export class ActivateRoutes {
       context.attachRef = null;
       context.route = null;
     }
-    // Destroy `_localInjector` here when the route is
-    // unmounted by the Router. This method (`deactivateRouteAndOutlet`) is
-    // skipped when a route is being detached for `RouteReuseStrategy`, preserving
-    // its injector. Those preserved injectors are eventually managed and destroyed
-    // manually via `destroyDetachedRouteHandle()` or if the route is deactivated later rather than detached.
-    route.value._localInjector?.destroy();
   }
 
   private activateChildRoutes(

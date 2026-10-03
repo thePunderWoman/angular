@@ -7,20 +7,14 @@
  */
 
 import {CommonModule} from '@angular/common';
-import {By} from '@angular/platform-browser';
-import {BehaviorSubject} from 'rxjs';
 import {
   assertInInjectionContext,
   Attribute,
-  ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
   ComponentRef,
   createEnvironmentInjector,
-  ɵcreateInjector as createInjector,
   createNgModule,
-  ɵDEFAULT_LOCALE_ID as DEFAULT_LOCALE_ID,
-  DestroyRef,
   Directive,
   ElementRef,
   ENVIRONMENT_INITIALIZER,
@@ -41,7 +35,6 @@ import {
   INJECTOR,
   Injector,
   Input,
-  ɵInternalEnvironmentProviders as InternalEnvironmentProviders,
   LOCALE_ID,
   makeEnvironmentProviders,
   ModuleWithProviders,
@@ -53,7 +46,6 @@ import {
   Pipe,
   PipeTransform,
   Provider,
-  provideZoneChangeDetection,
   runInInjectionContext,
   Self,
   SkipSelf,
@@ -63,12 +55,18 @@ import {
   ViewContainerRef,
   ViewEncapsulation,
   ViewRef,
+  ɵcreateInjector as createInjector,
+  ɵDEFAULT_LOCALE_ID as DEFAULT_LOCALE_ID,
   ɵINJECTOR_SCOPE,
+  ɵInternalEnvironmentProviders as InternalEnvironmentProviders,
+  DestroyRef,
+  provideZoneChangeDetection,
 } from '../../src/core';
-import {ERROR_DETAILS_PAGE_BASE_URL} from '../../src/error_details_base_url';
 import {RuntimeError, RuntimeErrorCode} from '../../src/errors';
 import {ViewRef as ViewRefInternal} from '../../src/render3/view_ref';
 import {TestBed} from '../../testing';
+import {By} from '@angular/platform-browser';
+import {BehaviorSubject} from 'rxjs';
 
 const getProvidersByToken = (
   providers: Provider[],
@@ -287,7 +285,6 @@ describe('importProvidersFrom', () => {
         // `any[]` option.
         providers: [[importProvidersFrom(Module)]],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
@@ -315,8 +312,6 @@ describe('importProvidersFrom', () => {
     @Component({
       template: '',
       imports: [ModuleA],
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class StandaloneCmp {}
 
@@ -387,6 +382,7 @@ describe('EnvironmentProviders', () => {
   });
 
   it('should be accepted by createEnvironmentInjector', () => {
+    TestBed.configureTestingModule({});
     const inj = createEnvironmentInjector(
       [environmentProviders],
       TestBed.inject(EnvironmentInjector),
@@ -396,6 +392,7 @@ describe('EnvironmentProviders', () => {
 
   it('should be accepted as additional input to makeEnvironmentProviders', () => {
     const wrappedProviders = makeEnvironmentProviders([environmentProviders]);
+    TestBed.configureTestingModule({});
 
     const inj = createEnvironmentInjector([wrappedProviders], TestBed.inject(EnvironmentInjector));
     expect(inj.get(TOKEN)).toEqual('token!');
@@ -416,8 +413,6 @@ describe('EnvironmentProviders', () => {
     @Component({
       providers: [environmentProviders as any],
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class TestCmp {
       readonly token = inject(TOKEN);
@@ -446,7 +441,6 @@ describe('di', () => {
       @Component({
         template: '<div dir #dir="dir">{{ dir.value }}</div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {}
       TestBed.configureTestingModule({declarations: [MyDirective, MyComp]});
@@ -525,12 +519,11 @@ describe('di', () => {
 
       @Component({
         template: `
-          <div dirA>
-            <span dirB dirC #dir="dirC">{{ dir.value }}</span>
-          </div>
-        `,
+        <div dirA>
+          <span dirB dirC #dir="dirC">{{ dir.value }}</span>
+        </div>
+      `,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {}
 
@@ -558,7 +551,6 @@ describe('di', () => {
       @Component({
         template: '<div dirA dirB></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {}
 
@@ -588,7 +580,6 @@ describe('di', () => {
       @Component({
         template: '<div dirB></div><div dirA></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {}
 
@@ -607,7 +598,6 @@ describe('di', () => {
         selector: 'my-comp',
         template: '',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         constructor(dirB: DirectiveB) {
@@ -618,7 +608,6 @@ describe('di', () => {
       @Component({
         template: '<my-comp dirB></my-comp>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyApp {}
 
@@ -643,7 +632,6 @@ describe('di', () => {
       @Component({
         template: '<div dirA dirB *ngFor="let i of array"></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         array = [1, 2, 3];
@@ -701,7 +689,6 @@ describe('di', () => {
       @Component({
         template: '<div dirA dirB dirC></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {}
 
@@ -753,7 +740,6 @@ describe('di', () => {
         selector: 'my-comp',
         template: '',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         constructor(dirD: DirectiveD) {
@@ -764,7 +750,6 @@ describe('di', () => {
       @Component({
         template: '<my-comp dirA dirB dirC dirD></my-comp>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyApp {}
 
@@ -787,7 +772,6 @@ describe('di', () => {
       @Component({
         template: '<div dirA dirB dirC></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyApp {
         value = 'App';
@@ -840,14 +824,12 @@ describe('di', () => {
         selector: 'my-comp',
         template: '<div dirA dirB></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {}
 
       @Component({
         template: '<my-comp dirB></my-comp>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyApp {}
 
@@ -879,7 +861,6 @@ describe('di', () => {
         selector: 'my-comp',
         template: '<div dirA #dir="dirA">{{ dir.dirB.value }}</div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {}
 
@@ -887,8 +868,6 @@ describe('di', () => {
         @Component({
           template: '<my-comp dirB></my-comp>',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyApp {}
 
@@ -908,8 +887,6 @@ describe('di', () => {
             </div>
           </div>`,
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyApp {
           showing = false;
@@ -935,8 +912,6 @@ describe('di', () => {
             </ng-container>
           </div>`,
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyApp {
           skipContent = false;
@@ -968,18 +943,16 @@ describe('di', () => {
 
         @Component({
           template: `<div dirB value="declaration">
-              <ng-template #foo>
-                <div dirA #dir="dirA">{{ dir.dirB.value }}</div>
-              </ng-template>
-            </div>
+           <ng-template #foo>
+               <div dirA #dir="dirA">{{ dir.dirB.value }}</div>
+           </ng-template>
+         </div>
 
-            <div dirB value="insertion">
-              <div structuralDir [tmp]="foo"></div>
-              <!-- insertion point -->
-            </div>`,
+         <div dirB value="insertion">
+           <div structuralDir [tmp]="foo"></div>
+           <!-- insertion point -->
+         </div>`,
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyComp {
           @ViewChild(StructuralDirective) structuralDir!: StructuralDirective;
@@ -1004,8 +977,6 @@ describe('di', () => {
             <my-comp dirB></my-comp>
           </div>`,
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyApp {}
 
@@ -1031,8 +1002,6 @@ describe('di', () => {
             <p dirA #dir="dirA">{{ dir.dirB.value }}</p>
           </div>`,
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyApp {
           @ViewChild(HostBindingDirective) hostBindingDir!: HostBindingDirective;
@@ -1073,8 +1042,6 @@ describe('di', () => {
           selector: 'child',
           template: '',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Child {
           constructor(
@@ -1086,21 +1053,18 @@ describe('di', () => {
           selector: 'projector',
           template: '<ng-content></ng-content>',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Projector {}
 
         @Component({
-          template: ` <projector>
+          template: `
+          <projector>
             <div dirA>
               <ng-container #childOrigin></ng-container>
               <ng-container #childOriginWithDirB dirB></ng-container>
             </div>
           </projector>`,
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyApp {
           @ViewChild('childOrigin', {read: ViewContainerRef, static: true})
@@ -1158,7 +1122,6 @@ describe('di', () => {
       @Component({
         template: '<div dirA></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {}
 
@@ -1188,7 +1151,6 @@ describe('di', () => {
       @Component({
         template: '<div dirA></div><div dirB></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {}
 
@@ -1231,7 +1193,6 @@ describe('di', () => {
           {provide: TestB, useFactory: createTestB},
         ],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         constructor(public readonly testB: TestB) {}
@@ -1244,7 +1205,7 @@ describe('di', () => {
       expect(cmp.componentInstance.testB.a.injector).toBe('standalone');
     });
 
-    it('should not have access to the directive injector in a standalone injector from within a directive-level provider factory when using Optional', () => {
+    it('should not have access to the directive injector in a standalone injector from within a directive-level provider factory', () => {
       class TestA {
         constructor(public injector: string) {}
       }
@@ -1271,7 +1232,6 @@ describe('di', () => {
           {provide: TestB, useFactory: createTestB},
         ],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         constructor(public readonly testB: TestB) {}
@@ -1299,7 +1259,6 @@ describe('di', () => {
       @Component({
         template: '<div dirA></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {}
 
@@ -1307,7 +1266,7 @@ describe('di', () => {
       expect(() => TestBed.createComponent(MyComp)).toThrowError(
         'NG0200: Circular dependency detected for `DirectiveA`. ' +
           'Path: DirectiveA -> DirectiveA. ' +
-          `Find more at ${ERROR_DETAILS_PAGE_BASE_URL}/NG0200`,
+          'Find more at https://angular.dev/errors/NG0200',
       );
     });
 
@@ -1333,8 +1292,6 @@ describe('di', () => {
           @Component({
             template: '<div dirA></div>',
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyComp {
             @ViewChild(DirectiveA) dirA!: DirectiveA;
@@ -1360,8 +1317,6 @@ describe('di', () => {
           @Component({
             template: '<div dirC></div>',
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyComp {
             @ViewChild(DirectiveC) dirC!: DirectiveC;
@@ -1387,8 +1342,6 @@ describe('di', () => {
           @Component({
             template: '<div dirB></div><div dirC></div>',
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyComp {
             @ViewChild(DirectiveC) dirC!: DirectiveC;
@@ -1408,8 +1361,6 @@ describe('di', () => {
           @Component({
             template: '',
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyComp {
             value: string | undefined;
@@ -1438,8 +1389,6 @@ describe('di', () => {
         @Component({
           template: '<div dirB><div dirA></div></div>',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyComp {}
         TestBed.configureTestingModule({declarations: [DirectiveA, DirectiveB, MyComp]});
@@ -1461,8 +1410,6 @@ describe('di', () => {
                 },
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ParentComponent {}
 
@@ -1476,8 +1423,6 @@ describe('di', () => {
                 },
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ChildComponent {
               constructor(
@@ -1512,8 +1457,6 @@ describe('di', () => {
                 },
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComponent {
               constructor(@SkipSelf() public injector: Injector) {
@@ -1559,8 +1502,6 @@ describe('di', () => {
                 },
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComponent {
               constructor(@Host() @SkipSelf() public injector: Injector) {
@@ -1603,8 +1544,6 @@ describe('di', () => {
                 },
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ParentComponent {}
 
@@ -1618,8 +1557,6 @@ describe('di', () => {
                 },
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ChildComponent {
               constructor(@Host() @SkipSelf() public injector: Injector) {}
@@ -1646,8 +1583,6 @@ describe('di', () => {
                 },
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ParentComponent {}
 
@@ -1661,8 +1596,6 @@ describe('di', () => {
                 },
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ChildComponent {
               constructor(@Host() @SkipSelf() @Optional() public injector: Injector) {}
@@ -1689,8 +1622,6 @@ describe('di', () => {
             @Component({
               template: '<div>component</div>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComponent {
               constructor(@SkipSelf() public el: ElementRef) {
@@ -1730,8 +1661,6 @@ describe('di', () => {
               selector: 'child',
               template: '...',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComponent {
               constructor(@SkipSelf() public el: ElementRef) {
@@ -1742,8 +1671,6 @@ describe('di', () => {
             @Component({
               template: '<child></child>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ParentComponent {
               constructor(public el: ElementRef) {
@@ -1788,8 +1715,6 @@ describe('di', () => {
             @Component({
               template: '<div parent>parent <span child>child</span></div>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComp {}
 
@@ -1812,8 +1737,6 @@ describe('di', () => {
               selector: 'child',
               template: '...',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ChildComponent {
               constructor(@SkipSelf() public elementRef: ElementRef) {
@@ -1824,8 +1747,6 @@ describe('di', () => {
               selector: 'root',
               template: '<div><child *ngIf="true"></child></div>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ParentComponent {}
 
@@ -1846,8 +1767,6 @@ describe('di', () => {
               selector: 'child',
               template: '...',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ChildComponent {
               constructor(@SkipSelf() public elementRef: ElementRef) {
@@ -1858,8 +1777,6 @@ describe('di', () => {
               selector: 'root',
               template: '<div><ng-template [ngIf]="true"><child></child></ng-template></div>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ParentComponent {}
 
@@ -1880,8 +1797,6 @@ describe('di', () => {
               selector: 'child',
               template: '...',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ChildComponent {
               constructor(@SkipSelf() public ref: ViewContainerRef) {
@@ -1893,8 +1808,6 @@ describe('di', () => {
               selector: 'root',
               template: '<div><child *ngIf="true"></child></div>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ParentComponent {}
 
@@ -1915,8 +1828,6 @@ describe('di', () => {
               selector: 'child',
               template: '...',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ChildComponent {
               constructor(@SkipSelf() public changeDetectorRef: ChangeDetectorRef) {
@@ -1928,8 +1839,6 @@ describe('di', () => {
               selector: 'root',
               template: '<child *ngIf="true"></child>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ParentComponent {}
 
@@ -1958,8 +1867,6 @@ describe('di', () => {
                 },
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ParentComponent {
               constructor(public injector: Injector) {
@@ -1977,8 +1884,6 @@ describe('di', () => {
                 },
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ChildComponent {
               constructor(@SkipSelf() public injector: Injector) {
@@ -2010,8 +1915,6 @@ describe('di', () => {
                 },
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ParentComponent {
               constructor(public injector: Injector) {
@@ -2029,8 +1932,6 @@ describe('di', () => {
                 },
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ChildComponent {
               constructor(@SkipSelf() public injector: Injector) {
@@ -2069,8 +1970,6 @@ describe('di', () => {
               selector: '[child]',
               template: '<ng-template dir></ng-template>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ChildComp {
               constructor(public templateRef: TemplateRef<any>) {}
@@ -2081,8 +1980,6 @@ describe('di', () => {
               selector: 'root',
               template: '<div child></div>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComp {
               @ViewChild(ChildComp) child!: ChildComp;
@@ -2113,8 +2010,6 @@ describe('di', () => {
               selector: 'root',
               template: '<ng-template dirA></ng-template>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComp {}
 
@@ -2146,8 +2041,6 @@ describe('di', () => {
               selector: 'root',
               template: '<ng-template dirA></ng-template>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComp {}
 
@@ -2176,8 +2069,6 @@ describe('di', () => {
               selector: 'root',
               template: '<ng-template dirA></ng-template>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComp {}
 
@@ -2218,8 +2109,6 @@ describe('di', () => {
             @Component({
               template: '<div parent>parent <span child>child</span></div>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComp {}
 
@@ -2263,8 +2152,6 @@ describe('di', () => {
             @Component({
               template: '<div parent>parent <span child>child</span></div>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComp {}
 
@@ -2297,8 +2184,6 @@ describe('di', () => {
             @Component({
               template: '<div parent>parent</div>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComp {}
 
@@ -2314,8 +2199,6 @@ describe('di', () => {
             @Component({
               template: '<span>component</span>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComp {
               constructor(@SkipSelf() vc: ViewContainerRef) {}
@@ -2357,8 +2240,6 @@ describe('di', () => {
             @Component({
               template: '<div parent>parent <span child>child</span></div>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComp {}
 
@@ -2381,8 +2262,6 @@ describe('di', () => {
               selector: 'child',
               template: '...',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class ChildComp {
               constructor(@SkipSelf() cdr: ChangeDetectorRef) {
@@ -2393,8 +2272,6 @@ describe('di', () => {
             @Component({
               template: '<div><child></child></div>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComp {
               constructor(public cdr: ChangeDetectorRef) {}
@@ -2414,8 +2291,6 @@ describe('di', () => {
             @Component({
               template: '<div></div>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComponent {
               constructor(@SkipSelf() public injector: ChangeDetectorRef) {}
@@ -2442,8 +2317,6 @@ describe('di', () => {
               selector: 'child',
               template: '...',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComponent {
               constructor(@SkipSelf() public injector: ChangeDetectorRef) {
@@ -2488,8 +2361,6 @@ describe('di', () => {
                 {provide: 'Bar', useValue: 'Bar as ViewProvider'},
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class Child {
               constructor(
@@ -2511,8 +2382,6 @@ describe('di', () => {
                 {provide: 'Bar', useValue: 'Bar as ViewProvider'},
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class Parent {}
 
@@ -2520,8 +2389,6 @@ describe('di', () => {
               selector: 'my-app',
               template: '<parent><child></child></parent>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyApp {
               @ViewChild(Parent) parent!: Parent;
@@ -2546,8 +2413,6 @@ describe('di', () => {
                 {provide: 'Bar', useValue: 'Bar as ViewProvider'},
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class Child {
               constructor(
@@ -2566,8 +2431,6 @@ describe('di', () => {
                 {provide: 'Bar', useValue: 'Bar as ViewProvider'},
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class Parent {}
 
@@ -2575,8 +2438,6 @@ describe('di', () => {
               selector: 'my-app',
               template: '<parent><child></child></parent>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyApp {}
 
@@ -2597,8 +2458,6 @@ describe('di', () => {
                 {provide: 'Bar', useValue: 'Bar as ViewProvider'},
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class Child {
               constructor(
@@ -2617,8 +2476,6 @@ describe('di', () => {
                 {provide: 'Bar', useValue: 'Bar as ViewProvider'},
               ],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class Parent {}
 
@@ -2626,8 +2483,6 @@ describe('di', () => {
               selector: 'my-app',
               template: '<parent><child></child></parent>',
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyApp {}
 
@@ -2663,8 +2518,6 @@ describe('di', () => {
             template: '<div dirString></div>',
             viewProviders: [{provide: String, useValue: 'Foo'}],
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyComp {
             @ViewChild(DirectiveString) dirString!: DirectiveString;
@@ -2673,8 +2526,6 @@ describe('di', () => {
           @Component({
             template: '<my-comp></my-comp>',
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyApp {
             @ViewChild(MyComp) myComp!: MyComp;
@@ -2694,22 +2545,18 @@ describe('di', () => {
             template: '<div dirString></div>',
             providers: [{provide: String, useValue: 'Foo'}],
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyComp {}
 
           @Component({
             template: '<my-comp></my-comp>',
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyApp {}
 
           TestBed.configureTestingModule({declarations: [DirectiveString, MyComp, MyApp]});
           expect(() => TestBed.createComponent(MyApp)).toThrowError(
-            `NG0201: No provider for String found in NodeInjector. Find more at ${ERROR_DETAILS_PAGE_BASE_URL}/NG0201`,
+            'NG0201: No provider for String found in NodeInjector. Find more at https://angular.dev/errors/NG0201',
           );
         });
 
@@ -2718,16 +2565,12 @@ describe('di', () => {
             selector: 'my-comp',
             template: '<div dirA></div>',
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyComp {}
 
           @Component({
             template: '<my-comp dirB></my-comp>',
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyApp {}
 
@@ -2742,8 +2585,6 @@ describe('di', () => {
             selector: 'my-comp',
             template: '<ng-container *ngIf="showing"><div dirA></div></ng-container>',
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyComp {
             showing = false;
@@ -2752,8 +2593,6 @@ describe('di', () => {
           @Component({
             template: '<my-comp dirB></my-comp>',
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyApp {
             @ViewChild(MyComp) myComp!: MyComp;
@@ -2772,8 +2611,6 @@ describe('di', () => {
           @Component({
             template: '<div dirB><div *ngIf="showing" dirA></div></div>',
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyApp {
             showing = false;
@@ -2797,8 +2634,6 @@ describe('di', () => {
           @Component({
             template: '<my-comp></my-comp>',
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyApp {}
 
@@ -2814,14 +2649,12 @@ describe('di', () => {
             selector: 'my-comp',
             template: '<div dirComp></div>',
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyComp {}
 
           TestBed.configureTestingModule({declarations: [DirectiveComp, MyComp, MyApp]});
           expect(() => TestBed.createComponent(MyApp)).toThrowError(
-            `NG0201: No provider for MyApp found in NodeInjector. Find more at ${ERROR_DETAILS_PAGE_BASE_URL}/NG0201`,
+            'NG0201: No provider for MyApp found in NodeInjector. Find more at https://angular.dev/errors/NG0201',
           );
         });
 
@@ -2858,20 +2691,16 @@ describe('di', () => {
               template: '<input control>',
               viewProviders: [{provide: ControlContainer, useExisting: GroupDirective}],
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyComp {}
 
             @Component({
               template: `
-                <div group>
-                  <my-comp></my-comp>
-                </div>
-              `,
+                   <div group>
+                     <my-comp></my-comp>
+                   </div>
+                 `,
               standalone: false,
-
-              changeDetection: ChangeDetectionStrategy.Eager,
             })
             class MyApp {}
 
@@ -2893,8 +2722,6 @@ describe('di', () => {
           @Component({
             template: '...',
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyComp {
             tokenViaInjector;
@@ -2927,8 +2754,6 @@ describe('di', () => {
               },
             ],
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class ParentComponent {}
 
@@ -2942,8 +2767,6 @@ describe('di', () => {
               },
             ],
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class ChildComponent {
             tokenViaInjector;
@@ -2987,8 +2810,6 @@ describe('di', () => {
             template: '<div dirString></div>',
             viewProviders: [{provide: TOKEN, useValue: 'Foo'}],
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyComp {
             @ViewChild(DirectiveString) dirString!: DirectiveString;
@@ -3034,8 +2855,6 @@ describe('di', () => {
           @Component({
             template: '<div dirB></div>',
             standalone: false,
-
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class MyComp {
             @ViewChild(DirectiveB) dirB!: DirectiveB;
@@ -3104,7 +2923,6 @@ describe('di', () => {
       @Component({
         template: '',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Comp {
         constructor(public provider: Provider) {}
@@ -3128,7 +2946,6 @@ describe('di', () => {
       @Component({
         template: '<div>{{myService.value}}</div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         constructor(public myService: MyService) {}
@@ -3157,7 +2974,6 @@ describe('di', () => {
       @Component({
         template: '',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         constructor(public myService: SuperClass) {}
@@ -3190,7 +3006,6 @@ describe('di', () => {
       @Component({
         template: '',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {}
 
@@ -3220,7 +3035,6 @@ describe('di', () => {
       @Component({
         template: '',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         constructor(myService: MyService);
@@ -3271,7 +3085,6 @@ describe('di', () => {
       @Component({
         template: '',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         constructor(service: FooService) {
@@ -3293,7 +3106,6 @@ describe('di', () => {
       @Component({
         template: '',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         constructor(service: FooService) {
@@ -3318,7 +3130,6 @@ describe('di', () => {
       @Component({
         template: '',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         constructor(@Inject('stringToken') overriddenService: FooService, service: FooService) {
@@ -3346,7 +3157,6 @@ describe('di', () => {
       @Component({
         template: '',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         constructor(service: FooService) {
@@ -3398,13 +3208,10 @@ describe('di', () => {
       @Component({
         template: `<div parentDir>
           <ng-container *ngIf="showing">
-            <span childDir child2Dir #child1="childDir" #child2="child2Dir"
-              >{{ child1.value }}-{{ child2.value }}</span
-            >
+            <span childDir child2Dir #child1="childDir" #child2="child2Dir">{{ child1.value }}-{{ child2.value }}</span>
           </ng-container>
         </div>`,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         showing = true;
@@ -3445,8 +3252,6 @@ describe('di', () => {
         @Component({
           template: '<div injectorDir otherInjectorDir></div>',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyComp {
           @ViewChild(InjectorDir) injectorDir!: InjectorDir;
@@ -3479,8 +3284,6 @@ describe('di', () => {
         @Component({
           template: '<div injectorDir></div>',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyComp {
           @ViewChild(InjectorDir) injectorDir!: InjectorDir;
@@ -3529,8 +3332,6 @@ describe('di', () => {
         @Component({
           template: '<div dir otherDir></div>',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyComp {
           @ViewChild(MyDir) directive!: MyDir;
@@ -3568,8 +3369,6 @@ describe('di', () => {
         @Component({
           template: '<ng-template dir></ng-template>',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyComp {
           @ViewChild(MyDir) directive!: MyDir;
@@ -3614,8 +3413,6 @@ describe('di', () => {
           selector: 'child',
           template: `<div id="test-id" dir></div>`,
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ChildComp {
           @ViewChild(DirectiveA) directive!: DirectiveA;
@@ -3625,8 +3422,6 @@ describe('di', () => {
           selector: 'root',
           template: '...',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class RootComp {
           public childCompRef!: ComponentRef<ChildComp>;
@@ -3686,8 +3481,6 @@ describe('di', () => {
         @Component({
           template: '<ng-template dir otherDir #dir="dir" #otherDir="otherDir"></ng-template>',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyComp {
           @ViewChild(MyDir) directive!: MyDir;
@@ -3713,8 +3506,6 @@ describe('di', () => {
         @Component({
           template: '<div dir></div>',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyComp {}
 
@@ -3726,8 +3517,6 @@ describe('di', () => {
         @Component({
           template: '<ng-container dir></ng-container>',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyComp {}
 
@@ -3747,8 +3536,6 @@ describe('di', () => {
         @Component({
           template: '<div optionalDir></div>',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyComp {
           @ViewChild(OptionalDir) directive!: OptionalDir;
@@ -3791,8 +3578,6 @@ describe('di', () => {
         @Component({
           template: '<div dir otherDir #dir="dir" #otherDir="otherDir"></div>',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyComp {
           @ViewChild(MyDir) directive!: MyDir;
@@ -3819,8 +3604,6 @@ describe('di', () => {
           selector: 'root',
           template: `<ng-template #tmpl>Test</ng-template>`,
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Root {
           @ViewChild(TemplateRef, {static: true}) tmpl!: TemplateRef<any>;
@@ -3877,7 +3660,6 @@ describe('di', () => {
         selector: 'my-comp',
         template: '<ng-content></ng-content>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         constructor(public cdr: ChangeDetectorRef) {}
@@ -3904,8 +3686,6 @@ describe('di', () => {
           selector: 'my-app',
           template: `<div *ngIf="showing | pipe">Visible</div>`,
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyApp {
           showing = true;
@@ -3926,8 +3706,6 @@ describe('di', () => {
           selector: 'my-app',
           template: '<my-comp dir otherDir #dir="dir"></my-comp>',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyApp {
           @ViewChild(MyComp) component!: MyComp;
@@ -3953,8 +3731,6 @@ describe('di', () => {
           selector: 'my-comp',
           template: '<div dir otherDir #dir="dir"></div>',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyComp {
           constructor(public cdr: ChangeDetectorRef) {}
@@ -3978,11 +3754,10 @@ describe('di', () => {
         @Component({
           selector: 'my-app',
           template: `<my-comp>
-            <div dir otherDir #dir="dir"></div>
-          </my-comp> `,
+               <div dir otherDir #dir="dir"></div>
+             </my-comp>
+              `,
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyApp {
           constructor(public cdr: ChangeDetectorRef) {}
@@ -4011,8 +3786,6 @@ describe('di', () => {
             <div dir otherDir #dir="dir" *ngIf="showing"></div>
           </ng-container>`,
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyComp {
           showing = true;
@@ -4039,8 +3812,6 @@ describe('di', () => {
           selector: 'my-comp',
           template: '<div dir otherDir #dir="dir" *ngIf="showing"></div>',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyComp {
           showing = true;
@@ -4079,8 +3850,6 @@ describe('di', () => {
           selector: 'my-app',
           template: `<ng-container getCDR>Visible</ng-container>`,
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MyApp {
           constructor(public cdr: ChangeDetectorRef) {}
@@ -4110,7 +3879,6 @@ describe('di', () => {
       @Component({
         template: '<div injectorDir></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         @ViewChild(InjectorDir) injectorDirInstance!: InjectorDir;
@@ -4143,16 +3911,14 @@ describe('di', () => {
           },
         ],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         constructor(@Inject(TOKEN) readonly token: string) {}
       }
 
       @Component({
-        template: `<my-comp token="token"></my-comp>`,
+        template: `<my-comp token='token'></my-comp>`,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class WrapperComp {
         @ViewChild(MyComp) myComp!: MyComp;
@@ -4174,7 +3940,6 @@ describe('di', () => {
         selector: 'test-cmp',
         template: '{{value}}',
         providers: [{provide: TOKEN, useValue: 'injected value'}],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         value: string;
@@ -4203,7 +3968,6 @@ describe('di', () => {
         selector: 'test-cmp',
         template: '{{service.value}}',
         providers: [Service, {provide: TOKEN, useValue: 'injected value'}],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         constructor(readonly service: Service) {}
@@ -4220,7 +3984,6 @@ describe('di', () => {
       @Component({
         selector: 'test-cmp',
         template: '{{value}}',
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         cdr = inject(ChangeDetectorRef);
@@ -4298,7 +4061,6 @@ describe('di', () => {
         selector: 'test-cmp',
         template: '{{service.value}}',
         providers: [{provide: TOKEN, useValue: 'injected value'}],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         service: Service;
@@ -4322,8 +4084,6 @@ describe('di', () => {
 
         @Component({
           template: '',
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class TestCmp {
           value = inject(TOKEN, {optional: true});
@@ -4340,8 +4100,6 @@ describe('di', () => {
         @Component({
           template: '',
           providers: [{provide: TOKEN, useValue: 'from component'}],
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class TestCmp {
           value = inject(TOKEN, {skipSelf: true});
@@ -4358,8 +4116,6 @@ describe('di', () => {
 
         @Component({
           template: '',
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class TestCmp {
           value = inject(TOKEN, {self: true, optional: true});
@@ -4374,8 +4130,6 @@ describe('di', () => {
         @Component({
           selector: 'child',
           template: '{{value}}',
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ChildCmp {
           value = inject(TOKEN, {host: true, optional: true}) ?? 'not found';
@@ -4386,8 +4140,6 @@ describe('di', () => {
           template: '<child></child>',
           providers: [{provide: TOKEN, useValue: 'from parent'}],
           encapsulation: ViewEncapsulation.None,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ParentCmp {}
 
@@ -4404,8 +4156,6 @@ describe('di', () => {
 
         @Component({
           template: '',
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class TestCmp {
           // TypeScript will check if this assignment is legal, which won't be the case if
@@ -4425,8 +4175,6 @@ describe('di', () => {
 
         @Component({
           template: '',
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class TestCmp {
           nodeInjector = inject(Injector);
@@ -4443,8 +4191,6 @@ describe('di', () => {
 
         @Component({
           template: '',
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class TestCmp {
           nodeInjector = inject(Injector);
@@ -4480,8 +4226,6 @@ describe('di', () => {
         @Component({
           template: '',
           providers: [{provide: TOKEN, useValue: 'from component'}],
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class TestCmp {
           nodeInjector = inject(Injector);
@@ -4509,8 +4253,6 @@ describe('di', () => {
 
         @Component({
           template: '',
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class TestCmp {
           nodeInjector = inject(Injector);
@@ -4535,8 +4277,6 @@ describe('di', () => {
         @Component({
           selector: 'child',
           template: '{{ value }}',
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ChildCmp {
           nodeInjector = inject(Injector);
@@ -4548,8 +4288,6 @@ describe('di', () => {
           template: '<child></child>',
           providers: [{provide: TOKEN, useValue: 'from parent'}],
           encapsulation: ViewEncapsulation.None,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ParentCmp {}
 
@@ -4618,7 +4356,6 @@ describe('di', () => {
       @Component({
         template: '',
         providers: [{provide: TOKEN, useValue: 'from component'}],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         envInjector = inject(EnvironmentInjector);
@@ -4642,7 +4379,6 @@ describe('di', () => {
     it('should support node injectors', () => {
       @Component({
         template: '',
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         injector = inject(Injector);
@@ -4710,8 +4446,6 @@ describe('di', () => {
         @Component({
           template: '',
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class EmptyCmp {}
 
@@ -4741,7 +4475,6 @@ describe('di', () => {
         template: '<div dir></div>',
         imports: [Dir],
         providers: [{provide: token, useExisting: existing}],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {}
 
@@ -4761,7 +4494,6 @@ describe('di', () => {
         template: '<div dir></div>',
         imports: [Dir],
         providers: [{provide: token, useExisting: existing}],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {}
 
@@ -4780,11 +4512,7 @@ describe('di', () => {
         }
       }
 
-      @Component({
-        template: '<div dir></div>',
-        standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
-      })
+      @Component({template: '<div dir></div>', standalone: false})
       class App {}
 
       TestBed.configureTestingModule({
@@ -4803,11 +4531,7 @@ describe('di', () => {
         }
       }
 
-      @Component({
-        template: '<div dir></div>',
-        standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
-      })
+      @Component({template: '<div dir></div>', standalone: false})
       class App {}
 
       TestBed.configureTestingModule({
@@ -4837,8 +4561,6 @@ describe('di', () => {
         },
       ],
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Root {}
 
@@ -4853,8 +4575,6 @@ describe('di', () => {
         },
       ],
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Comp {
       constructor(@Inject('B') readonly token: string) {}
@@ -4863,8 +4583,6 @@ describe('di', () => {
     @Component({
       template: `<root></root>`,
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {}
 
@@ -4894,8 +4612,6 @@ describe('di', () => {
         },
       ],
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Root {}
 
@@ -4903,8 +4619,6 @@ describe('di', () => {
       selector: 'intermediate',
       template: '<comp></comp>',
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Intermediate {}
 
@@ -4920,8 +4634,6 @@ describe('di', () => {
         },
       ],
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Comp {
       constructor(@Inject('B') readonly token: string) {}
@@ -4930,8 +4642,6 @@ describe('di', () => {
     @Component({
       template: `<root></root>`,
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {}
 
@@ -4960,8 +4670,6 @@ describe('di', () => {
         },
       ],
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyComp {
       constructor(@Inject(LOCALE_ID) public localeId: string) {}
@@ -4984,8 +4692,6 @@ describe('di', () => {
         },
       ],
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyComp {
       constructor(@Inject(LOCALE_ID) public localeId: string) {}
@@ -5013,8 +4719,6 @@ describe('di', () => {
       template: '...',
       providers: [{provide: LOCALE_ID, useFactory: () => 'en-GB'}],
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyComp {
       constructor(@SkipSelf() @Inject(LOCALE_ID) public localeId: string) {}
@@ -5041,8 +4745,6 @@ describe('di', () => {
       template: '<div dir></div>',
       providers: [{provide: LOCALE_ID, useValue: 'en-GB'}],
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyComp {
       @ViewChild(MyDir) myDir!: MyDir;
@@ -5071,7 +4773,6 @@ describe('di', () => {
       @Component({
         template: '<div dir exist="existValue" other="ignore"></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         @ViewChild(MyDir) directiveInstance!: MyDir;
@@ -5102,7 +4803,6 @@ describe('di', () => {
       @Component({
         template: '<ng-template dir="initial" exist="existValue" other="ignore"></ng-template>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         @ViewChild(MyDir) directiveInstance!: MyDir;
@@ -5133,7 +4833,6 @@ describe('di', () => {
       @Component({
         template: '<ng-container dir="initial" exist="existValue" other="ignore"></ng-container>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         @ViewChild(MyDir) directiveInstance!: MyDir;
@@ -5166,7 +4865,6 @@ describe('di', () => {
         template:
           '<div dir style="margin: 1px; color: red;" class="hello there" other-attr="value"></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         @ViewChild(MyDir) directiveInstance!: MyDir;
@@ -5201,7 +4899,6 @@ describe('di', () => {
         template:
           '<div dir exist="existValue" svg:exist="testExistValue" other="otherValue"></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         @ViewChild(MyDir) directiveInstance!: MyDir;
@@ -5238,7 +4935,6 @@ describe('di', () => {
         template:
           '<div dir exist="existValue" [binding]="bindingValue" (output)="outputValue" other="otherValue" ignore="ignoreValue"></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         @ViewChild(MyDir) directiveInstance!: MyDir;
@@ -5268,7 +4964,6 @@ describe('di', () => {
       @Component({
         template: '<div dir title="title {{ value }}"></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         @ViewChild(MyDir) directiveInstance!: MyDir;
@@ -5294,7 +4989,6 @@ describe('di', () => {
       @Component({
         template: '<div dir some-attr="foo" other="ignore"></div>',
         imports: [Dir],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         @ViewChild(Dir) dir!: Dir;
@@ -5314,7 +5008,6 @@ describe('di', () => {
       @Component({
         template: '<ng-template dir some-attr="foo" other="ignore"></ng-template>',
         imports: [Dir],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         @ViewChild(Dir) dir!: Dir;
@@ -5334,7 +5027,6 @@ describe('di', () => {
       @Component({
         template: '<ng-container dir some-attr="foo" other="ignore"></ng-container>',
         imports: [Dir],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         @ViewChild(Dir) dir!: Dir;
@@ -5360,11 +5052,9 @@ describe('di', () => {
             style="margin: 1px; color: red;"
             class="hello there"
             some-attr="foo"
-            other="ignore"
-          ></div>
+            other="ignore"></div>
         `,
         imports: [Dir],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         @ViewChild(Dir) dir!: Dir;
@@ -5389,7 +5079,6 @@ describe('di', () => {
       @Component({
         template: '<div dir other="ignore"></div>',
         imports: [Dir],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         @ViewChild(Dir) dir!: Dir;
@@ -5409,7 +5098,6 @@ describe('di', () => {
       @Component({
         template: '<div dir other="ignore"></div>',
         imports: [Dir],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         @ViewChild(Dir) dir!: Dir;
@@ -5433,7 +5121,6 @@ describe('di', () => {
           <div dir some-attr="foo" svg:exists="testExistValue" other="otherValue"></div>
         `,
         imports: [Dir],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         @ViewChild(Dir) dir!: Dir;
@@ -5462,15 +5149,14 @@ describe('di', () => {
 
       @Component({
         imports: [Dir],
-        template: ` <div
-          dir
-          exists="existsValue"
-          [binding]="bindingValue"
-          (output)="noop()"
-          other="otherValue"
-          ignore="ignoreValue"
-        ></div>`,
-        changeDetection: ChangeDetectionStrategy.Eager,
+        template: `
+          <div
+            dir
+            exists="existsValue"
+            [binding]="bindingValue"
+            (output)="noop()"
+            other="otherValue"
+            ignore="ignoreValue"></div>`,
       })
       class TestCmp {
         @ViewChild(Dir) dir!: Dir;
@@ -5497,7 +5183,6 @@ describe('di', () => {
       @Component({
         template: '<div dir title="foo {{value}}" other="ignore"></div>',
         imports: [Dir],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         @ViewChild(Dir) dir!: Dir;
@@ -5522,7 +5207,6 @@ describe('di', () => {
       @Component({
         template: '<div dir some-attr="foo" other="ignore"></div>',
         imports: [Dir],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         @ViewChild(Dir) dir!: Dir;
@@ -5544,7 +5228,6 @@ describe('di', () => {
       @Component({
         template: '<div dir other="ignore"></div>',
         imports: [Dir],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         @ViewChild(Dir) dir!: Dir;
@@ -5566,7 +5249,6 @@ describe('di', () => {
       @Component({
         template: '<div dir other="ignore"></div>',
         imports: [Dir],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         @ViewChild(Dir) dir!: Dir;
@@ -5594,7 +5276,6 @@ describe('di', () => {
           <video dir #v5></video>
         `,
         imports: [Dir],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         @ViewChild('v1', {read: Dir}) value1!: Dir;
@@ -5622,7 +5303,6 @@ describe('di', () => {
       @Component({
         template: '<ng-container dir></ng-container>',
         imports: [Dir],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestNgContainer {
         @ViewChild(Dir) dir!: Dir;
@@ -5631,7 +5311,6 @@ describe('di', () => {
       @Component({
         template: '<ng-template dir></ng-template>',
         imports: [Dir],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestNgTemplate {
         @ViewChild(Dir) dir!: Dir;
@@ -5655,7 +5334,6 @@ describe('di', () => {
       @Component({
         template: '<ng-container dir></ng-container>',
         imports: [Dir],
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         @ViewChild(Dir) dir!: Dir;
@@ -5688,11 +5366,13 @@ describe('di', () => {
 
     @Component({
       template: `
-        <div i18n>{count, select, =1 {One} other {Other value is: {{count | somePipe}}}}</div>
+        <div i18n>{
+          count, select,
+          =1 {One}
+          other {Other value is: {{count | somePipe}}}
+        }</div>
       `,
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyComp {
       count = '2';
@@ -5729,12 +5409,12 @@ describe('di', () => {
 
     @Component({
       template: `
-        <ng-template #source i18n> {{ count | somePipe }} <span>items</span> </ng-template>
+        <ng-template #source i18n>
+          {{count | somePipe}} <span>items</span>
+        </ng-template>
         <ng-container #target></ng-container>
       `,
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyComp {
       count = '2';
@@ -5781,18 +5461,14 @@ describe('di', () => {
       template: '',
       providers: [PROVIDER],
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Child {
       constructor(readonly base: Base) {}
     }
 
     @Component({
-      template: `<div dirA><child></child></div>`,
+      template: `<div dirA> <child></child> </div>`,
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       @ViewChild(DirA) dirA!: DirA;
@@ -5830,7 +5506,6 @@ describe('di', () => {
         template: '{{value}}',
         providers: [{provide: token, useValue: 'child'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class ChildComp {
         @Input() value: any;
@@ -5840,7 +5515,6 @@ describe('di', () => {
         template: `<child-comp [value]="'' | token"></child-comp>`,
         providers: [{provide: token, useValue: 'parent'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {}
 
@@ -5869,7 +5543,6 @@ describe('di', () => {
         template: '{{value}}',
         viewProviders: [{provide: token, useValue: 'child'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class ChildComp {
         @Input() value: any;
@@ -5879,7 +5552,6 @@ describe('di', () => {
         template: `<child-comp [value]="'' | token"></child-comp>`,
         viewProviders: [{provide: token, useValue: 'parent'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {}
 
@@ -5904,7 +5576,6 @@ describe('di', () => {
         template: '',
         providers: [{provide: token, useValue: 'child'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class ChildComp {}
 
@@ -5912,7 +5583,6 @@ describe('di', () => {
         template: '<child-comp dir></child-comp>',
         providers: [{provide: token, useValue: 'parent'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(Dir) dir!: Dir;
@@ -5939,7 +5609,6 @@ describe('di', () => {
         template: '',
         viewProviders: [{provide: token, useValue: 'child'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class ChildComp {}
 
@@ -5947,7 +5616,6 @@ describe('di', () => {
         template: '<child-comp dir></child-comp>',
         viewProviders: [{provide: token, useValue: 'parent'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(Dir) dir!: Dir;
@@ -5965,8 +5633,6 @@ describe('di', () => {
     @Component({
       template: '',
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       constructor(_viewRef: ViewRef) {}
@@ -6010,9 +5676,8 @@ describe('di', () => {
           <ng-template #menuTemplate>
             <menu></menu>
           </ng-template>
-        `,
+      `,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6048,7 +5713,6 @@ describe('di', () => {
         `,
         providers: [{provide: token, useValue: 'root'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6066,51 +5730,6 @@ describe('di', () => {
       expect(fixture.componentInstance.menu.tokenValue).toBeNull();
     });
 
-    it('should skip only the current node with @SkipSelf when providing an injection token through an embedded view injector', () => {
-      @Directive({
-        selector: 'menu',
-        providers: [{provide: token, useValue: 'hello from menu'}],
-        standalone: false,
-      })
-      class Menu {}
-
-      @Directive({
-        selector: 'menu-item',
-        providers: [{provide: token, useValue: 'hello from menu item'}],
-        standalone: false,
-      })
-      class MenuItem {
-        constructor(@Inject(token) @SkipSelf() public tokenValue: string) {}
-      }
-
-      @Component({
-        template: `
-          <menu-trigger [triggerFor]="menuTemplate"></menu-trigger>
-          <ng-template #menuTemplate>
-            <menu>
-              <menu-item></menu-item>
-            </menu>
-          </ng-template>
-        `,
-        standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
-      })
-      class App {
-        @ViewChild(MenuTrigger) trigger!: MenuTrigger;
-        @ViewChild(MenuItem) menuItem!: MenuItem;
-      }
-
-      TestBed.configureTestingModule({declarations: [App, MenuTrigger, Menu, MenuItem]});
-      const injector = Injector.create({providers: [{provide: token, useValue: 'hello'}]});
-      const fixture = TestBed.createComponent(App);
-      fixture.detectChanges();
-
-      fixture.componentInstance.trigger.open(injector);
-      fixture.detectChanges();
-
-      expect(fixture.componentInstance.menuItem.tokenValue).toBe('hello from menu');
-    });
-
     it('should be able to provide an injection token to a nested template through a custom injector', () => {
       @Directive({
         selector: 'menu',
@@ -6122,18 +5741,17 @@ describe('di', () => {
 
       @Component({
         template: `
-          <menu-trigger #outerTrigger [triggerFor]="outerTemplate"></menu-trigger>
-          <ng-template #outerTemplate>
-            <menu></menu>
+            <menu-trigger #outerTrigger [triggerFor]="outerTemplate"></menu-trigger>
+            <ng-template #outerTemplate>
+              <menu></menu>
 
-            <menu-trigger #innerTrigger [triggerFor]="innerTemplate"></menu-trigger>
-            <ng-template #innerTemplate>
-              <menu #innerMenu></menu>
+              <menu-trigger #innerTrigger [triggerFor]="innerTemplate"></menu-trigger>
+              <ng-template #innerTemplate>
+                <menu #innerMenu></menu>
+              </ng-template>
             </ng-template>
-          </ng-template>
-        `,
+          `,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild('outerTrigger', {read: MenuTrigger}) outerTrigger!: MenuTrigger;
@@ -6167,23 +5785,22 @@ describe('di', () => {
 
       @Component({
         template: `
-          <menu-trigger #grandparentTrigger [triggerFor]="grandparentTemplate"></menu-trigger>
-          <ng-template #grandparentTemplate>
-            <menu></menu>
-
-            <menu-trigger #parentTrigger [triggerFor]="parentTemplate"></menu-trigger>
-            <ng-template #parentTemplate>
+            <menu-trigger #grandparentTrigger [triggerFor]="grandparentTemplate"></menu-trigger>
+            <ng-template #grandparentTemplate>
               <menu></menu>
 
-              <menu-trigger #childTrigger [triggerFor]="childTemplate"></menu-trigger>
-              <ng-template #childTemplate>
-                <menu #childMenu></menu>
+              <menu-trigger #parentTrigger [triggerFor]="parentTemplate"></menu-trigger>
+              <ng-template #parentTemplate>
+                <menu></menu>
+
+                <menu-trigger #childTrigger [triggerFor]="childTemplate"></menu-trigger>
+                <ng-template #childTemplate>
+                  <menu #childMenu></menu>
+                </ng-template>
               </ng-template>
             </ng-template>
-          </ng-template>
-        `,
+          `,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild('grandparentTrigger', {read: MenuTrigger}) grandparentTrigger!: MenuTrigger;
@@ -6229,7 +5846,6 @@ describe('di', () => {
           </ng-template>
         `,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Wrapper {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6244,7 +5860,6 @@ describe('di', () => {
           </ng-template>
         `,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6281,9 +5896,8 @@ describe('di', () => {
           <ng-template #menuTemplate>
             <menu></menu>
           </ng-template>
-        `,
+      `,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6323,9 +5937,8 @@ describe('di', () => {
           <ng-template #menuTemplate>
             <menu></menu>
           </ng-template>
-        `,
+      `,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6367,10 +5980,9 @@ describe('di', () => {
           <ng-template #menuTemplate>
             <menu></menu>
           </ng-template>
-        `,
+      `,
         providers: [{provide: token, useValue: 'hello from parent'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6414,9 +6026,8 @@ describe('di', () => {
           <ng-template #menuTemplate>
             <menu></menu>
           </ng-template>
-        `,
+      `,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6448,14 +6059,13 @@ describe('di', () => {
 
       @Component({
         template: `
-          <menu-trigger [triggerFor]="menuTemplate"></menu-trigger>
-          <ng-template #menuTemplate>
-            <menu></menu>
-          </ng-template>
-        `,
+            <menu-trigger [triggerFor]="menuTemplate"></menu-trigger>
+            <ng-template #menuTemplate>
+              <menu></menu>
+            </ng-template>
+          `,
         providers: [{provide: token, useValue: 'hello from parent'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6504,9 +6114,8 @@ describe('di', () => {
           <ng-template #menuTemplate>
             <menu></menu>
           </ng-template>
-        `,
+      `,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6548,13 +6157,12 @@ describe('di', () => {
       @Component({
         selector: 'parent',
         template: `
-          <menu-trigger [triggerFor]="menuTemplate"></menu-trigger>
-          <ng-template #menuTemplate>
-            <menu></menu>
-          </ng-template>
-        `,
+            <menu-trigger [triggerFor]="menuTemplate"></menu-trigger>
+            <ng-template #menuTemplate>
+              <menu></menu>
+            </ng-template>
+           `,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Parent {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6565,7 +6173,6 @@ describe('di', () => {
         template: '<parent></parent>',
         providers: [{provide: token, useValue: 'hello from grandparent'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class GrandParent {
         @ViewChild(Parent) parent!: Parent;
@@ -6602,7 +6209,6 @@ describe('di', () => {
           </ng-template>
         `,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(TemplateRef) template!: TemplateRef<unknown>;
@@ -6649,7 +6255,6 @@ describe('di', () => {
         template: '<ng-template><menu></menu></ng-template>',
         providers: [{provide: declarerToken, useValue: 'hello from declarer'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Declarer {
         @ViewChild(Menu) menu!: Menu;
@@ -6661,7 +6266,6 @@ describe('di', () => {
         template: '<menu-trigger></menu-trigger>',
         providers: [{provide: creatorToken, useValue: 'hello from creator'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Creator {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6669,11 +6273,10 @@ describe('di', () => {
 
       @Component({
         template: `
-          <declarer></declarer>
-          <creator></creator>
-        `,
+              <declarer></declarer>
+              <creator></creator>
+            `,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(Declarer) declarer!: Declarer;
@@ -6724,7 +6327,6 @@ describe('di', () => {
         `,
         providers: [{provide: token, useValue: 'hello from parent'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6768,16 +6370,15 @@ describe('di', () => {
 
       @Component({
         template: `
-          <menu-trigger [triggerFor]="menuTemplate"></menu-trigger>
-          <div provide-token>
-            <ng-template #menuTemplate>
-              <menu></menu>
-            </ng-template>
-          </div>
-        `,
+              <menu-trigger [triggerFor]="menuTemplate"></menu-trigger>
+              <div provide-token>
+                <ng-template #menuTemplate>
+                  <menu></menu>
+                </ng-template>
+              </div>
+            `,
         providers: [{provide: token, useValue: 'hello from parent'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6823,7 +6424,6 @@ describe('di', () => {
         selector: 'wrapper',
         template: `<div><menu></menu></div>`,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Wrapper {
         @ViewChild(Menu) menu!: Menu;
@@ -6831,16 +6431,15 @@ describe('di', () => {
 
       @Component({
         template: `
-          <menu-trigger [triggerFor]="menuTemplate"></menu-trigger>
-          <ng-template #menuTemplate>
-            <section provide-token>
-              <wrapper></wrapper>
-            </section>
-          </ng-template>
-        `,
+              <menu-trigger [triggerFor]="menuTemplate"></menu-trigger>
+              <ng-template #menuTemplate>
+                <section provide-token>
+                  <wrapper></wrapper>
+                </section>
+              </ng-template>
+            `,
         providers: [{provide: token, useValue: 'hello from parent'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6886,7 +6485,6 @@ describe('di', () => {
         selector: 'wrapper',
         template: `<div><menu></menu></div>`,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Wrapper {
         @ViewChild(Menu) menu!: Menu;
@@ -6894,16 +6492,15 @@ describe('di', () => {
 
       @Component({
         template: `
-          <menu-trigger [triggerFor]="menuTemplate"></menu-trigger>
-          <div provide-token>
-            <ng-template #menuTemplate>
-              <wrapper></wrapper>
-            </ng-template>
-          </div>
-        `,
+              <menu-trigger [triggerFor]="menuTemplate"></menu-trigger>
+              <div provide-token>
+                <ng-template #menuTemplate>
+                  <wrapper></wrapper>
+                </ng-template>
+              </div>
+            `,
         providers: [{provide: token, useValue: 'hello from parent'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -6957,7 +6554,6 @@ describe('di', () => {
         `,
         providers: [{provide: token, useValue: 'hello from parent'}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         @ViewChild(MenuTrigger) trigger!: MenuTrigger;
@@ -7035,7 +6631,6 @@ describe('di', () => {
       @Component({
         selector: 'my-comp',
         template: '...',
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         constructor(@Inject(A) svc: any) {}
@@ -7052,7 +6647,7 @@ describe('di', () => {
         'NG0200: Circular dependency detected for `InjectionToken A`. ' +
           'Source: DynamicTestModule. ' +
           'Path: InjectionToken A -> InjectionToken B -> InjectionToken A. ' +
-          `Find more at ${ERROR_DETAILS_PAGE_BASE_URL}/NG0200`,
+          'Find more at https://angular.dev/errors/NG0200',
       );
     });
 
@@ -7072,7 +6667,6 @@ describe('di', () => {
       @Component({
         selector: 'my-comp',
         template: '...',
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         a = inject(A);
@@ -7089,7 +6683,7 @@ describe('di', () => {
         'NG0200: Circular dependency detected for `InjectionToken A`. ' +
           'Source: DynamicTestModule. ' +
           'Path: InjectionToken A -> InjectionToken B -> InjectionToken A. ' +
-          `Find more at ${ERROR_DETAILS_PAGE_BASE_URL}/NG0200`,
+          'Find more at https://angular.dev/errors/NG0200',
       );
     });
 
@@ -7109,7 +6703,6 @@ describe('di', () => {
       @Component({
         selector: 'my-comp',
         template: '...',
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         constructor(private injector: Injector) {}
@@ -7133,7 +6726,7 @@ describe('di', () => {
         'NG0200: Circular dependency detected for `InjectionToken A`. ' +
           'Source: DynamicTestModule. ' +
           'Path: InjectionToken A -> InjectionToken B -> InjectionToken A. ' +
-          `Find more at ${ERROR_DETAILS_PAGE_BASE_URL}/NG0200`,
+          'Find more at https://angular.dev/errors/NG0200',
       );
     });
 
@@ -7151,11 +6744,11 @@ describe('di', () => {
       expect(() => createInjector(AModule)).toThrowError(
         'NG0200: Circular dependency detected for `AModule`. ' +
           'Path: AModule -> BModule -> AModule. ' +
-          `Find more at ${ERROR_DETAILS_PAGE_BASE_URL}/NG0200`,
+          'Find more at https://angular.dev/errors/NG0200',
       );
     });
 
-    it('should detect cyclic dependency in Module/Environment injector when `Injector.get` is used (multi=true)', () => {
+    it('should detect cyclic dependency in Module/Environment injector when `Injector.get` is used', () => {
       const A = new InjectionToken('A');
       const B = new InjectionToken('B');
       @Injectable()
@@ -7171,7 +6764,6 @@ describe('di', () => {
       @Component({
         selector: 'my-comp',
         template: '...',
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         constructor(private injector: Injector) {}
@@ -7196,7 +6788,7 @@ describe('di', () => {
         'NG0200: Circular dependency detected for `InjectionToken A`. ' +
           'Source: DynamicTestModule. ' +
           'Path: InjectionToken A -> InjectionToken B -> InjectionToken A. ' +
-          `Find more at ${ERROR_DETAILS_PAGE_BASE_URL}/NG0200`,
+          'Find more at https://angular.dev/errors/NG0200',
       );
     });
 
@@ -7225,7 +6817,6 @@ describe('di', () => {
           {provide: B, useClass: BService, multi: true},
         ],
         template: ``,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         a = inject(A);
@@ -7234,7 +6825,7 @@ describe('di', () => {
       expect(() => TestBed.createComponent(App)).toThrowError(
         'NG0200: Circular dependency detected for `InjectionToken A`. ' +
           "Path: App -> ('InjectionToken A':AService) -> ('InjectionToken B':BService) -> ('InjectionToken A':AService). " +
-          `Find more at ${ERROR_DETAILS_PAGE_BASE_URL}/NG0200`,
+          'Find more at https://angular.dev/errors/NG0200',
       );
     });
   });

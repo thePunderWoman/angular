@@ -25,30 +25,15 @@ describe('markdown to html', () => {
     expect(samePageEl.textContent?.trim()).toBe('Same Page');
   });
 
-  it('should render external links with _blank target', () => {
+  it('should render external links with _blank target and iconography', () => {
     const samePageEl = markdownDocument.querySelectorAll('a.docs-pill')[1];
     expect(samePageEl.getAttribute('target')).toBe('_blank');
-    expect(samePageEl.textContent?.trim()).toBe('External Page');
+    expect(samePageEl.textContent?.trim()).toContain('External Page');
+    expect(samePageEl.querySelector('docs-icon')?.textContent).toBe('open_in_new');
   });
 
   it('should render internal links that are relative paths', () => {
     const samePageEl = markdownDocument.querySelectorAll('a.docs-pill')[2];
     expect(samePageEl.textContent?.trim()).toBe('Another Page');
-  });
-
-  it('should render links with a specific target', () => {
-    const pageElement = markdownDocument.querySelectorAll('a.docs-pill')[3];
-    expect(pageElement.getAttribute('target')).toBe('_some_target');
-  });
-
-  it('should render links with a specific download attribute', () => {
-    const pageElement = markdownDocument.querySelectorAll('a.docs-pill')[4];
-    expect(pageElement.getAttribute('download')).toBe('file.ics');
-  });
-
-  it('should render links with both a specific target and specific download attribute', () => {
-    const pageElement = markdownDocument.querySelectorAll('a.docs-pill')[5];
-    expect(pageElement.getAttribute('download')).toBe('file.ics');
-    expect(pageElement.getAttribute('target')).toBe('_some_target');
   });
 });

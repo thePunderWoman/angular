@@ -64,9 +64,8 @@ export declare class Navigation extends EventTarget {
 }
 
 export declare class NavigationTransition {
-  readonly navigationType: NavigationType;
+  readonly navigationType: NavigationTypeString;
   readonly from: NavigationHistoryEntry;
-  readonly to: NavigationDestination;
   readonly finished: Promise<void>;
   readonly committed: Promise<void>;
 }
@@ -108,7 +107,7 @@ export declare class NavigationHistoryEntry extends EventTarget {
   ): void;
 }
 
-export type NavigationType = 'push' | 'reload' | 'replace' | 'traverse';
+export type NavigationTypeString = 'reload' | 'push' | 'replace' | 'traverse';
 
 export interface NavigationUpdateCurrentEntryOptions {
   state: unknown;
@@ -130,69 +129,54 @@ export interface NavigationReloadOptions extends NavigationOptions {
 export declare class NavigationCurrentEntryChangeEvent extends Event {
   constructor(type: string, eventInit?: NavigationCurrentEntryChangeEventInit);
 
-  readonly navigationType: NavigationType | null;
+  readonly navigationType: NavigationTypeString | null;
   readonly from: NavigationHistoryEntry;
 }
 
 export interface NavigationCurrentEntryChangeEventInit extends EventInit {
-  navigationType?: NavigationType | null;
+  navigationType?: NavigationTypeString | null;
   from: NavigationHistoryEntry;
 }
 
 export declare class NavigateEvent extends Event {
   constructor(type: string, eventInit?: NavigateEventInit);
 
-  readonly navigationType: NavigationType;
+  readonly navigationType: NavigationTypeString;
   readonly canIntercept: boolean;
   readonly userInitiated: boolean;
   readonly hashChange: boolean;
-  readonly hasUAVisualTransition: boolean;
   readonly destination: NavigationDestination;
   readonly signal: AbortSignal;
   readonly formData: FormData | null;
   readonly downloadRequest: string | null;
   readonly info?: unknown;
-  readonly sourceElement: Element | null;
 
   intercept(options?: NavigationInterceptOptions): void;
   scroll(): void;
 }
 
 export interface NavigateEventInit extends EventInit {
-  navigationType?: NavigationType;
+  navigationType?: NavigationTypeString;
   canIntercept?: boolean;
   userInitiated?: boolean;
   hashChange?: boolean;
-  hasUAVisualTransition?: boolean;
   destination: NavigationDestination;
   signal: AbortSignal;
   formData?: FormData | null;
   downloadRequest?: string | null;
   info?: unknown;
-  sourceElement?: Element | null;
-}
-
-export type NavigationInterceptHandler = () => PromiseLike<void> | void;
-export type NavigationPrecommitHandler = (
-  controller: NavigationPrecommitController,
-) => PromiseLike<void> | void;
-
-export interface NavigationPrecommitController {
-  redirect: (url: string, options?: NavigationNavigateOptions) => void;
-  addHandler: (handler: NavigationInterceptHandler) => void;
 }
 
 export interface NavigationInterceptOptions {
-  precommitHandler?: NavigationPrecommitHandler;
-  handler?: NavigationInterceptHandler;
+  handler?: () => Promise<void>;
   focusReset?: 'after-transition' | 'manual';
   scroll?: 'after-transition' | 'manual';
 }
 
 export declare class NavigationDestination {
   readonly url: string;
-  readonly key: string;
-  readonly id: string;
+  readonly key: string | null;
+  readonly id: string | null;
   readonly index: number;
   readonly sameDocument: boolean;
 

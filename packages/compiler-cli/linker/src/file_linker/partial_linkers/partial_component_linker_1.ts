@@ -36,10 +36,10 @@ import {AstObject, AstValue} from '../../ast/ast_value';
 import {FatalLinkerError} from '../../fatal_linker_error';
 import {GetSourceFileFn} from '../get_source_file';
 
-import {AbsoluteFsPath} from '../../../../src/ngtsc/file_system/src/types';
 import {toR3DirectiveMeta} from './partial_directive_linker_1';
 import {LinkedDefinition, PartialLinker} from './partial_linker';
 import {extractForwardRef, PLACEHOLDER_VERSION} from './util';
+import {AbsoluteFsPath} from '../../../../src/ngtsc/file_system/src/types';
 
 function makeDirectiveMetadata<TExpression>(
   directiveExpr: AstObject<R3DeclareDirectiveDependencyMetadata, TExpression>,
@@ -68,10 +68,9 @@ function makeDirectiveMetadata<TExpression>(
 /**
  * A `PartialLinker` that is designed to process `ɵɵngDeclareComponent()` call expressions.
  */
-export class PartialComponentLinkerVersion1<
-  TStatement,
-  TExpression,
-> implements PartialLinker<TExpression> {
+export class PartialComponentLinkerVersion1<TStatement, TExpression>
+  implements PartialLinker<TExpression>
+{
   constructor(
     private readonly getSourceFile: GetSourceFileFn,
     private sourceUrl: AbsoluteFsPath,
@@ -104,7 +103,6 @@ export class PartialComponentLinkerVersion1<
     const enableBlockSyntax = major >= 17 || version === PLACEHOLDER_VERSION;
     const enableLetSyntax =
       major > 18 || (major === 18 && minor >= 1) || version === PLACEHOLDER_VERSION;
-    const hasOnPushByDefault = major >= 22 || version === PLACEHOLDER_VERSION;
 
     const template = parseTemplate(templateInfo.code, templateInfo.sourceUrl, {
       escapedString: templateInfo.isEscaped,
@@ -229,7 +227,6 @@ export class PartialComponentLinkerVersion1<
 
     return {
       ...baseMeta,
-      legacyOptionalChaining: major < 22 && version !== PLACEHOLDER_VERSION,
       viewProviders: metaObj.has('viewProviders') ? metaObj.getOpaque('viewProviders') : null,
       template: {
         nodes: template.nodes,
@@ -245,17 +242,13 @@ export class PartialComponentLinkerVersion1<
         : ViewEncapsulation.Emulated,
       changeDetection: metaObj.has('changeDetection')
         ? parseChangeDetectionStrategy(metaObj.getValue('changeDetection'))
-        : hasOnPushByDefault
-          ? ChangeDetectionStrategy.OnPush
-          : ChangeDetectionStrategy.Eager,
+        : ChangeDetectionStrategy.Default,
       animations: metaObj.has('animations') ? metaObj.getOpaque('animations') : null,
       relativeContextFilePath: this.sourceUrl,
       relativeTemplatePath: null,
       i18nUseExternalIds: false,
       declarations,
       hasDirectiveDependencies: !baseMeta.isStandalone || hasDirectiveDependencies,
-      foreignImports: null,
-      enableTemplateSourceLocations: false,
     };
   }
 

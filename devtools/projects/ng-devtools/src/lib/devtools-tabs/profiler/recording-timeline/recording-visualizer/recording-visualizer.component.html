@@ -12,34 +12,19 @@
         <ng-tree-map-visualizer [frame]="frame()" />
       }
       @case (cmpVisualizationModes.BarGraph) {
-        <ng-bargraph-visualizer
-          [frame]="frame()"
-          [highlighted]="selectedEntry()?.original ?? null"
-          (nodeSelect)="selectNode($event)"
-        />
+        <ng-bargraph-visualizer [frame]="frame()" (nodeSelect)="selectNode($event)" />
       }
     }
   </as-split-area>
 
   @if (selectedEntry(); as entry) {
     <as-split-area size="30" minSize="25" class="selected-entry">
-      <div class="header">
-        <p class="title">{{ entry.label }} details</p>
-        <button
-          ng-button
-          btnType="icon"
-          class="close-btn"
-          title="Close details"
-          (click)="selectNode(null)"
-        >
-          <mat-icon>close</mat-icon>
-        </button>
-      </div>
+      <p class="title">{{ entry.label }} details</p>
       <div class="entry-statistics">
         <p class="total-time">
           Total time spent: <span>{{ entry.value | number }} ms</span>
         </p>
-        @if (selectedDirectives().length) {
+        @if (entry.value > 0) {
           <ng-execution-details [data]="selectedDirectives()" />
         }
         @if (parentHierarchy().length > 0) {

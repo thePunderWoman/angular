@@ -6,9 +6,9 @@ As background for this guide, you should already be familiar with [Angular React
 
 ## Overview of Typed Forms
 
-<docs-video src="https://www.youtube.com/embed/L-odCf4MfJc" title="Typed Forms in Angular" />
+<docs-video src="https://www.youtube.com/embed/L-odCf4MfJc" alt="Typed Forms in Angular" />
 
-With Angular reactive forms, you explicitly specify a _form model_. As a simple example, consider this basic user login form:
+With Angular reactive forms, you explicitly specify a *form model*. As a simple example, consider this basic user login form:
 
 ```ts
 const login = new FormGroup({
@@ -27,9 +27,9 @@ const emailDomain = login.value.email.domain;
 
 With strictly typed reactive forms, the above code does not compile, because there is no `domain` property on `email`.
 
-In addition to the added safety, the types enable a variety of other improvements, such as better autocomplete in IDEs and an explicit way to specify form structure.
+In addition to the added safety, the types enable a variety of other improvements, such as better autocomplete in IDEs, and an explicit way to specify form structure.
 
-These improvements currently apply only to _reactive_ forms (not [_template-driven_ forms](guide/forms/template-driven-forms)).
+These improvements currently apply only to *reactive* forms (not [*template-driven* forms](guide/forms/template-driven-forms)).
 
 ## Untyped Forms
 
@@ -42,7 +42,7 @@ const login = new UntypedFormGroup({
 });
 ```
 
-Each `Untyped` symbol has exactly the same semantics as in previous Angular versions. By removing the `Untyped` prefixes, you can incrementally enable the types.
+Each `Untyped` symbol has exactly the same semantics as in previous Angular version. By removing the `Untyped` prefixes, you can incrementally enable the types.
 
 ## `FormControl`: Getting Started
 
@@ -52,11 +52,11 @@ The simplest possible form consists of a single control:
 const email = new FormControl('angularrox@gmail.com');
 ```
 
-This control will be automatically inferred to have the type `FormControl<string|null>`. TypeScript will automatically enforce this type throughout the [`FormControl` API](api/forms/FormControl), such as `email.value`, `email.valueChanges`, and `email.setValue(...)`.
+This control will be automatically inferred to have the type `FormControl<string|null>`. TypeScript will automatically enforce this type throughout the [`FormControl` API](api/forms/FormControl), such as `email.value`, `email.valueChanges`, `email.setValue(...)`, etc.
 
 ### Nullability
 
-You might wonder: why does the type of this control include `null`? This is because the control can become `null` at any time, by calling reset:
+You might wonder: why does the type of this control include `null`?  This is because the control can become `null` at any time, by calling reset:
 
 ```ts
 const email = new FormControl('angularrox@gmail.com');
@@ -86,7 +86,7 @@ email.setValue('angularrox@gmail.com'); // Error!
 To prevent this, we explicitly specify the type as `string|null`:
 
 ```ts
-const email = new FormControl<string | null>(null);
+const email = new FormControl<string|null>(null);
 email.setValue('angularrox@gmail.com');
 ```
 
@@ -99,24 +99,9 @@ const names = new FormArray([new FormControl('Alex')]);
 names.push(new FormControl('Jess'));
 ```
 
-Pass an array of controls to `aliases.push()` when you need to add several entries at once.
-
-```ts
-const aliases = new FormArray([new FormControl('ng')]);
-aliases.push([new FormControl('ngDev'), new FormControl('ngAwesome')]);
-```
-
 This `FormArray` will have the inner controls type `FormControl<string|null>`.
 
 If you want to have multiple different element types inside the array, you must use `UntypedFormArray`, because TypeScript cannot infer which element type will occur at which position.
-
-A `FormArray` also provides a `clear()` method to remove all controls it contains:
-
-```ts
-const aliases = new FormArray([new FormControl('ngDev'), new FormControl('ngAwesome')]);
-aliases.clear();
-console.log(aliases.length); // 0
-```
 
 ## `FormGroup` and `FormRecord`
 
@@ -128,8 +113,8 @@ Consider again a login form:
 
 ```ts
 const login = new FormGroup({
-  email: new FormControl('', {nonNullable: true}),
-  password: new FormControl('', {nonNullable: true}),
+    email: new FormControl('', {nonNullable: true}),
+    password: new FormControl('', {nonNullable: true}),
 });
 ```
 
@@ -139,11 +124,11 @@ As a consequence, the type of `login.value` is `Partial<{email: string, password
 
 More specifically, the type of `login.value.email` is `string|undefined`, and TypeScript will enforce that you handle the possibly `undefined` value (if you have `strictNullChecks` enabled).
 
-If you want to access the value _including_ disabled controls, and thus bypass possible `undefined` fields, you can use `login.getRawValue()`.
+If you want to access the value *including* disabled controls, and thus bypass possible `undefined` fields, you can use `login.getRawValue()`.
 
 ### Optional Controls and Dynamic Groups
 
-Some forms have controls that may or may not be present, which can be added and removed at runtime. You can represent these controls using _optional fields_:
+Some forms have controls that may or may not be present, which can be added and removed at runtime. You can represent these controls using *optional fields*:
 
 ```ts
 interface LoginForm {
@@ -166,7 +151,7 @@ In this form, we explicitly specify the type, which allows us to make the `passw
 Some `FormGroup` usages do not fit the above pattern because the keys are not known ahead of time. The `FormRecord` class is designed for that case:
 
 ```ts
-const addresses = new FormRecord<FormControl<string | null>>({});
+const addresses = new FormRecord<FormControl<string|null>>({});
 addresses.addControl('Andrew', new FormControl('2340 Folsom St'));
 ```
 

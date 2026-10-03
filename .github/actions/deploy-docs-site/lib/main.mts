@@ -2,18 +2,19 @@ import {getInput, setFailed} from '@actions/core';
 import {context} from '@actions/github';
 import {deployToFirebase, setupRedirect} from './deploy.mjs';
 import {getDeployments} from './deployments.mjs';
-import {generateSitemap} from './sitemap.mjs';
-import {assertValidGithubConfig, AuthenticatedGitClient, getConfig} from '@angular/ng-dev';
+import {AuthenticatedGitClient, GithubConfig, setConfig} from '@angular/ng-dev';
 import {githubReleaseTrainReadToken} from './credential.mjs';
-import {spawnSync} from 'child_process';
-import {cp, mkdtemp} from 'fs/promises';
-import {tmpdir} from 'os';
-import {join} from 'path';
 
 const refMatcher = /refs\/heads\/(.*)/;
 
 async function deployDocs() {
-  getConfig([assertValidGithubConfig]);
+  setConfig({
+    github: {
+      mainBranchName: 'main',
+      name: 'angular',
+      owner: 'angular',
+    } as GithubConfig,
+  });
 
   AuthenticatedGitClient.configure(githubReleaseTrainReadToken);
 
@@ -27,11 +28,7 @@ async function deployDocs() {
 
   const currentBranch = matchedRef[1];
   const configPath = getInput('configPath');
-  const stagingDir = await mkdtemp(join(tmpdir(), 'deploy-directory'));
-
-  // Copy all files from the distDir into stagingDir and modify the permissions for editing
-  await cp(getInput('distDir'), stagingDir, {recursive: true});
-  spawnSync(`chmod 777 -R ${stagingDir}`, {encoding: 'utf-8', shell: true});
+  const distDir = getInput('distDir');
 
   const deployment = (await getDeployments()).get(currentBranch);
   if (deployment === undefined) {
@@ -60,8 +57,7 @@ async function deployDocs() {
     console.log(`  To: ${deployment.redirect.to}`);
   }
 
-  await generateSitemap(deployment, stagingDir);
-  await deployToFirebase(deployment, configPath, stagingDir);
+  await deployToFirebase(deployment, configPath, distDir);
   await setupRedirect(deployment);
 }
 

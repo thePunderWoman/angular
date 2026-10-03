@@ -28,7 +28,7 @@ export async function getEnumRenderable(
 ): Promise<EnumEntryRenderable> {
   return setEntryFlags(
     await addRenderableCodeToc(
-      await addRenderableMembers(
+      addRenderableMembers(
         addHtmlAdditionalLinks(
           addHtmlUsageNotes(
             addHtmlJsDocTagComments(
@@ -36,7 +36,6 @@ export async function getEnumRenderable(
             ),
           ),
         ),
-        classEntry.name,
       ),
     ),
   );

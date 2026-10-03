@@ -6,10 +6,10 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
+import {NgCompiler} from '@angular/compiler-cli/src/ngtsc/core';
+import ts from 'typescript';
 import {ApplyRefactoringProgressFn, ApplyRefactoringResult} from '../../api';
-import {CompilerOptions, NgCompiler} from '@angular/compiler-cli';
-import type ts from 'typescript';
-
+import {CompilerOptions} from '@angular/compiler-cli';
 import {
   ConvertFieldToSignalInputBestEffortRefactoring,
   ConvertFieldToSignalInputRefactoring,

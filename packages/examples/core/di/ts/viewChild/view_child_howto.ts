@@ -11,14 +11,16 @@ import {AfterViewInit, Component, Directive, ViewChild} from '@angular/core';
 
 @Directive({
   selector: 'child-directive',
+  standalone: false,
 })
-export class ChildDirective {}
+class ChildDirective {}
 
 @Component({
   selector: 'someCmp',
   templateUrl: 'someCmp.html',
+  standalone: false,
 })
-export class SomeCmp implements AfterViewInit {
+class SomeCmp implements AfterViewInit {
   @ViewChild(ChildDirective) child!: ChildDirective;
 
   ngAfterViewInit() {

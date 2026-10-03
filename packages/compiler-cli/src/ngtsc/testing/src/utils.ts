@@ -10,7 +10,13 @@
 
 import ts from 'typescript';
 
-import {AbsoluteFsPath, dirname, getFileSystem, getSourceFileOrError} from '../../file_system';
+import {
+  AbsoluteFsPath,
+  dirname,
+  getFileSystem,
+  getSourceFileOrError,
+  NgtscCompilerHost,
+} from '../../file_system';
 import {DeclarationNode} from '../../reflection';
 import {getTokenAtPosition} from '../../util/src/typescript';
 
@@ -31,7 +37,6 @@ export function makeProgram(
   const compilerOptions = {
     noLib: true,
     experimentalDecorators: true,
-    strict: false,
     moduleResolution: ts.ModuleResolutionKind.Bundler,
     ...options,
   };

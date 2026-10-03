@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {DestroyRef, inject, signal, Service} from '@angular/core';
+import {DestroyRef, Injectable, inject, signal} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Subject, Subscription, debounceTime, filter, map} from 'rxjs';
 
@@ -19,8 +19,6 @@ import {NodeRuntimeSandbox} from '../node-runtime-sandbox.service';
 import {TypingsLoader} from '../typings-loader.service';
 
 import {FileAndContentRecord} from '@angular/docs';
-import {DomSanitizer} from '@angular/platform-browser';
-import {NodeRuntimeState} from '../node-runtime-state.service';
 import {CODE_EDITOR_EXTENSIONS} from './constants/code-editor-extensions';
 import {LANGUAGES} from './constants/code-editor-languages';
 import {getAutocompleteExtension} from './extensions/autocomplete';
@@ -28,9 +26,9 @@ import {getDiagnosticsExtension} from './extensions/diagnostics';
 import {getTooltipExtension} from './extensions/tooltip';
 import {DiagnosticsState} from './services/diagnostics-state.service';
 import {TsVfsWorkerActions} from './workers/enums/actions';
-import {TYPESCRIPT_VFS_WORKER_FACTORY} from './workers/factory-provider';
 import {CodeChangeRequest} from './workers/interfaces/code-change-request';
 import {ActionMessage} from './workers/interfaces/message';
+import {NodeRuntimeState} from '../node-runtime-state.service';
 
 export interface EditorFile {
   filename: string;
@@ -64,7 +62,7 @@ const INITIAL_STATES = {
   createdFile$: undefined,
 };
 
-@Service()
+@Injectable({providedIn: 'root'})
 export class CodeMirrorEditor {
   // TODO: handle files created by the user, e.g. after running `ng generate component`
   readonly files = signal<EditorFile[]>(INITIAL_STATES.files);
@@ -73,6 +71,7 @@ export class CodeMirrorEditor {
 
   // An instance of web worker used to run virtual TypeScript environment in the browser.
   // It allows to enrich CodeMirror UX for TypeScript files.
+  private tsVfsWorker: Worker | null = null;
   // EventManager gives ability to communicate between tsVfsWorker and CodeMirror instance
   private readonly eventManager$ = new Subject<ActionMessage>();
 
@@ -82,9 +81,6 @@ export class CodeMirrorEditor {
   private readonly typingsLoader = inject(TypingsLoader);
   private readonly destroyRef = inject(DestroyRef);
   private readonly diagnosticsState = inject(DiagnosticsState);
-  private readonly domSanitizer = inject(DomSanitizer);
-  private readonly tsVfsWorkerFactory = inject(TYPESCRIPT_VFS_WORKER_FACTORY);
-  private tsVfsWorker: Worker | null = null;
 
   private _editorView: EditorView | null = INITIAL_STATES._editorView;
   private readonly _editorStates = new Map<EditorFile['filename'], EditorState>();
@@ -185,34 +181,15 @@ export class CodeMirrorEditor {
     this._editorView.setState(editorState);
   }
 
-  scrollToLine(line: number, character: number = 0): void {
-    if (!this._editorView) return;
-
-    const state = this._editorView.state;
-    const doc = state.doc;
-
-    if (line < 0 || line >= doc.lines) {
-      console.warn(`Line ${line} is out of bounds (0-${doc.lines - 1})`);
+  private initTypescriptVfsWorker(): void {
+    if (this.tsVfsWorker) {
       return;
     }
 
-    const lineObj = doc.line(line + 1);
-    const pos = lineObj.from + Math.min(character, lineObj.length);
-
-    this._editorView.dispatch({
-      selection: {anchor: pos, head: pos},
-      scrollIntoView: true,
+    this.tsVfsWorker = new Worker(new URL('./workers/typescript-vfs.worker', import.meta.url), {
+      type: 'module',
     });
 
-    this._editorView.focus();
-  }
-
-  private initTypescriptVfsWorker(): void {
-    if (this.tsVfsWorker || !this.tsVfsWorkerFactory) {
-      return;
-    }
-
-    this.tsVfsWorker = this.tsVfsWorkerFactory();
     this.tsVfsWorker.addEventListener('message', ({data}: MessageEvent<ActionMessage>) => {
       this.eventManager$.next(data);
     });
@@ -237,22 +214,10 @@ export class CodeMirrorEditor {
 
   // Method is responsible for sending request to Typescript VFS worker.
   private sendRequestToTsVfs = <T>(request: ActionMessage<T>) => {
-    if (!this.tsVfsWorker) {
-      console.warn('TypeScript VFS worker not available');
-      return;
-    }
+    if (!this.tsVfsWorker) return;
 
-    // Always allow infrastructure/setup requests to go through, regardless of current file type.
-    const infraActions = new Set<unknown>([
-      TsVfsWorkerActions.CREATE_VFS_ENV_REQUEST,
-      TsVfsWorkerActions.UPDATE_VFS_ENV_REQUEST,
-      TsVfsWorkerActions.DEFINE_TYPES_REQUEST,
-    ]);
-
-    if (!infraActions.has(request.action)) {
-      // For language-service operations, ensure the current file is a TypeScript file.
-      if (!this.currentFile()?.filename.endsWith('.ts')) return;
-    }
+    // Send message to tsVfsWorker only when current file is TypeScript file.
+    if (!this.currentFile().filename.endsWith('.ts')) return;
 
     this.tsVfsWorker.postMessage(request);
   };
@@ -450,12 +415,7 @@ export class CodeMirrorEditor {
           this.sendRequestToTsVfs,
           this.diagnosticsState,
         ),
-        getTooltipExtension(
-          this.eventManager$,
-          this.currentFile,
-          this.sendRequestToTsVfs,
-          this.domSanitizer,
-        ),
+        getTooltipExtension(this.eventManager$, this.currentFile, this.sendRequestToTsVfs),
       ];
     }
 

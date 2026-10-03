@@ -6,7 +6,7 @@ Components are the foundational building blocks for any Angular application. Eac
 - HTML template
 - CSS styles
 
-NOTE: Learn more about [components in the essentials guide](/essentials/components).
+Note: Learn more about [components in the essentials guide](/essentials/components).
 
 In this activity, you'll learn how to update the template and styles of a component.
 

@@ -12,7 +12,6 @@ import {
   AfterViewChecked,
   AfterViewInit,
   ApplicationRef,
-  ChangeDetectionStrategy,
   Compiler,
   Component,
   destroyPlatform,
@@ -29,7 +28,6 @@ import {
   OnChanges,
   OnDestroy,
   OnInit,
-  provideZoneChangeDetection,
   StaticProvider,
   Type,
   ViewRef,
@@ -93,9 +91,7 @@ withEachNg1Version(() => {
 
         const doDowngradeModule = (module: Type<any>) => {
           const bootstrapFn = (extraProviders: StaticProvider[]) =>
-            (getPlatform() || platformBrowserDynamic(extraProviders)).bootstrapModule(module, {
-              applicationProviders: [provideZoneChangeDetection()],
-            });
+            (getPlatform() || platformBrowserDynamic(extraProviders)).bootstrapModule(module);
           return downgradeModule(bootstrapFn);
         };
 
@@ -230,9 +226,7 @@ withEachNg1Version(() => {
         const doDowngradeModule = (module: Type<any>) => {
           const bootstrapFn = (extraProviders: StaticProvider[]) => {
             const platformRef = getPlatform() || platformBrowserDynamic(extraProviders);
-            return platformRef.bootstrapModule(module, {
-              applicationProviders: [provideZoneChangeDetection()],
-            });
+            return platformRef.bootstrapModule(module);
           };
           return downgradeModule(bootstrapFn);
         };
@@ -311,9 +305,7 @@ withEachNg1Version(() => {
         const doDowngradeModule = (module: Type<any>) => {
           const bootstrapFn = (extraProviders: StaticProvider[]) => {
             const platformRef = getPlatform() || platformBrowserDynamic(extraProviders);
-            return platformRef.bootstrapModule(module, {
-              applicationProviders: [provideZoneChangeDetection()],
-            });
+            return platformRef.bootstrapModule(module);
           };
           return downgradeModule(bootstrapFn);
         };
@@ -403,9 +395,7 @@ withEachNg1Version(() => {
           const bootstrapFn = (extraProviders: StaticProvider[]) => {
             if (!rootInjectorPromise) {
               rootInjectorPromise = platformBrowserDynamic(extraProviders)
-                .bootstrapModule(Ng2ModuleRoot, {
-                  applicationProviders: [provideZoneChangeDetection()],
-                })
+                .bootstrapModule(Ng2ModuleRoot)
                 .then((ref) => ref.injector);
             }
 
@@ -513,9 +503,7 @@ withEachNg1Version(() => {
               {provide: 'BAZ', useValue: 'Plat-baz'},
               {provide: 'QUX', useValue: 'Plat-qux'},
             ]);
-          return platformRef.bootstrapModule(Ng2Module, {
-            applicationProviders: [provideZoneChangeDetection()],
-          });
+          return platformRef.bootstrapModule(Ng2Module);
         };
 
         const downMod = downgradeModule(bootstrapFn);
@@ -616,9 +604,7 @@ withEachNg1Version(() => {
                 {provide: 'QUX', useValue: 'Plat-qux'},
                 {provide: 'QUUX', useValue: 'Plat-quux'},
               ]);
-            return platformRef.bootstrapModule(module, {
-              applicationProviders: [provideZoneChangeDetection()],
-            });
+            return platformRef.bootstrapModule(module);
           };
           return downgradeModule(bootstrapFn);
         };
@@ -704,9 +690,7 @@ withEachNg1Version(() => {
         }
 
         const bootstrapFn = (extraProviders: StaticProvider[]) =>
-          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module, {
-            applicationProviders: [provideZoneChangeDetection()],
-          });
+          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module);
         const lazyModuleName = downgradeModule<Ng2Module>(bootstrapFn);
         const ng1Module = angular
           .module_('ng1', [lazyModuleName])
@@ -776,9 +760,7 @@ withEachNg1Version(() => {
         }
 
         const bootstrapFn = (extraProviders: StaticProvider[]) =>
-          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module, {
-            applicationProviders: [provideZoneChangeDetection()],
-          });
+          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module);
         const lazyModuleName = downgradeModule<Ng2Module>(bootstrapFn);
         const ng1Module = angular
           .module_('ng1', [lazyModuleName])
@@ -827,9 +809,7 @@ withEachNg1Version(() => {
         }
 
         const bootstrapFn = (extraProviders: StaticProvider[]) =>
-          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module, {
-            applicationProviders: [provideZoneChangeDetection()],
-          });
+          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module);
         const lazyModuleName = downgradeModule<Ng2Module>(bootstrapFn);
         const ng1Module = angular
           .module_('ng1', [lazyModuleName])
@@ -868,9 +848,7 @@ withEachNg1Version(() => {
         }
 
         const bootstrapFn = (extraProviders: StaticProvider[]) =>
-          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module, {
-            applicationProviders: [provideZoneChangeDetection()],
-          });
+          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module);
         const lazyModuleName = downgradeModule<Ng2Module>(bootstrapFn);
         const ng1Module = angular
           .module_('ng1', [lazyModuleName])
@@ -914,9 +892,7 @@ withEachNg1Version(() => {
         }
 
         const bootstrapFn = (extraProviders: StaticProvider[]) =>
-          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module, {
-            applicationProviders: [provideZoneChangeDetection()],
-          });
+          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module);
         const lazyModuleName = downgradeModule<Ng2Module>(bootstrapFn);
         const ng1Module = angular
           .module_('ng1', [lazyModuleName])
@@ -990,9 +966,7 @@ withEachNg1Version(() => {
         }
 
         const bootstrapFn = (extraProviders: StaticProvider[]) =>
-          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module, {
-            applicationProviders: [provideZoneChangeDetection()],
-          });
+          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module);
         const lazyModuleName = downgradeModule<Ng2Module>(bootstrapFn);
         const ng1Module = angular
           .module_('ng1', [lazyModuleName])
@@ -1042,9 +1016,7 @@ withEachNg1Version(() => {
         }
 
         const bootstrapFn = (extraProviders: StaticProvider[]) =>
-          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module, {
-            applicationProviders: [provideZoneChangeDetection()],
-          });
+          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module);
         const lazyModuleName = downgradeModule<Ng2Module>(bootstrapFn);
         const ng1Module = angular
           .module_('ng1', [lazyModuleName])
@@ -1098,9 +1070,7 @@ withEachNg1Version(() => {
         }
 
         const bootstrapFn = (extraProviders: StaticProvider[]) =>
-          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module, {
-            applicationProviders: [provideZoneChangeDetection()],
-          });
+          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module);
         const lazyModuleName = downgradeModule<Ng2Module>(bootstrapFn);
         const ng1Module = angular
           .module_('ng1', [lazyModuleName])
@@ -1140,7 +1110,6 @@ withEachNg1Version(() => {
             <ng-content></ng-content>
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component
           implements
@@ -1194,9 +1163,7 @@ withEachNg1Version(() => {
         }
 
         const bootstrapFn = (extraProviders: StaticProvider[]) =>
-          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module, {
-            applicationProviders: [provideZoneChangeDetection()],
-          });
+          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module);
         const lazyModuleName = downgradeModule<Ng2Module>(bootstrapFn);
         const ng1Module = angular
           .module_('ng1', [lazyModuleName])
@@ -1338,9 +1305,7 @@ withEachNg1Version(() => {
         }
 
         const bootstrapFn = (extraProviders: StaticProvider[]) =>
-          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module, {
-            applicationProviders: [provideZoneChangeDetection()],
-          });
+          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module);
         const lazyModuleName = downgradeModule<Ng2Module>(bootstrapFn);
         const ng1Module = angular
           .module_('ng1', [lazyModuleName])
@@ -1391,9 +1356,7 @@ withEachNg1Version(() => {
         }
 
         const bootstrapFn = (extraProviders: StaticProvider[]) =>
-          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module, {
-            applicationProviders: [provideZoneChangeDetection()],
-          });
+          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module);
         const lazyModuleName = downgradeModule<Ng2Module>(bootstrapFn);
         const ng1Module = angular
           .module_('ng1', [lazyModuleName])
@@ -1470,9 +1433,7 @@ withEachNg1Version(() => {
         }
 
         const bootstrapFn = (extraProviders: StaticProvider[]) =>
-          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module, {
-            applicationProviders: [provideZoneChangeDetection()],
-          });
+          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module);
         const lazyModuleName = downgradeModule<Ng2Module>(bootstrapFn);
         const ng1Module = angular
           .module_('ng1', [lazyModuleName])
@@ -1528,9 +1489,7 @@ withEachNg1Version(() => {
         }
 
         const bootstrapFn = (extraProviders: StaticProvider[]) =>
-          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module, {
-            applicationProviders: [provideZoneChangeDetection()],
-          });
+          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module);
         const lazyModuleName = downgradeModule<Ng2Module>(bootstrapFn);
         const ng1Module = angular
           .module_('ng1', [lazyModuleName])
@@ -1560,9 +1519,7 @@ withEachNg1Version(() => {
         }
 
         const bootstrapFn = (extraProviders: StaticProvider[]) =>
-          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module, {
-            applicationProviders: [provideZoneChangeDetection()],
-          });
+          platformBrowserDynamic(extraProviders).bootstrapModule(Ng2Module);
         const lazyModuleName = downgradeModule<Ng2Module>(bootstrapFn);
         const ng1Module = angular
           .module_('ng1', [lazyModuleName])
@@ -1618,9 +1575,7 @@ withEachNg1Version(() => {
 
         const doDowngradeModule = (module: Type<any>) => {
           const bootstrapFn = (extraProviders: StaticProvider[]) =>
-            (getPlatform() || platformBrowserDynamic(extraProviders)).bootstrapModule(module, {
-              applicationProviders: [provideZoneChangeDetection()],
-            });
+            (getPlatform() || platformBrowserDynamic(extraProviders)).bootstrapModule(module);
           return downgradeModule(bootstrapFn);
         };
 

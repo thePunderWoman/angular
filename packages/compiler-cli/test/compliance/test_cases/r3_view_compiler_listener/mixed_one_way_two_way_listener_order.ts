@@ -1,16 +1,16 @@
-import { Component, Directive, EventEmitter, Input, Output } from '@angular/core';
+import {Component, Directive, Input, Output} from '@angular/core';
 
 @Directive({selector: '[dir]'})
 export class Dir {
-  @Input() a: string = '';
-  @Output() aChange = new EventEmitter<string>();
+  @Input() a: unknown;
+  @Output() aChange: unknown;
 
-  @Output() b = new EventEmitter();
+  @Output() b: unknown;
 
-  @Input() c: string = '';
-  @Output() cChange = new EventEmitter<string>();
+  @Input() c: unknown;
+  @Output() cChange: unknown;
 
-  @Output() d = new EventEmitter();
+  @Output() d: unknown;
 }
 
 @Component({

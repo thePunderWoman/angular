@@ -14,6 +14,7 @@ describe('StackBlitzOpener', () => {
   let service: StackBlitzOpener;
 
   beforeEach(() => {
+    TestBed.configureTestingModule({});
     service = TestBed.inject(StackBlitzOpener);
   });
 

@@ -56,11 +56,17 @@ import {getCurrentTNode, getLView, getTView} from './state';
 export function providersResolver<T>(
   def: DirectiveDef<T>,
   providers: Provider[],
-  isViewProviders: boolean,
+  viewProviders: Provider[],
 ): void {
   const tView = getTView();
   if (tView.firstCreatePass) {
-    resolveProvider(providers, tView.data, tView.blueprint, isComponentDef(def), isViewProviders);
+    const isComponent = isComponentDef(def);
+
+    // The list of view providers is processed first, and the flags are updated
+    resolveProvider(viewProviders, tView.data, tView.blueprint, isComponent, true);
+
+    // Then, the list of providers is processed, and the flags are updated
+    resolveProvider(providers, tView.data, tView.blueprint, isComponent, false);
   }
 }
 

@@ -14,26 +14,23 @@ import {splitNsName} from '../../../ml_parser/tags';
 import * as o from '../../../output/output_ast';
 import {ParseSourceSpan} from '../../../parse_util';
 import * as t from '../../../render3/r3_ast';
-import {
-  DeferBlockDepsEmitMode,
-  R3ComponentDeferMetadata,
-  R3ForeignComponentMetadata,
-} from '../../../render3/view/api';
+import {DeferBlockDepsEmitMode, R3ComponentDeferMetadata} from '../../../render3/view/api';
 import {icuFromI18nMessage} from '../../../render3/view/i18n/util';
 import {DomElementSchemaRegistry} from '../../../schema/dom_element_schema_registry';
-import {BindingParser, calcPossibleSecurityContexts} from '../../../template_parser/binding_parser';
+import {BindingParser} from '../../../template_parser/binding_parser';
 import * as ir from '../ir';
 
 import {
+  TemplateCompilationMode,
   CompilationUnit,
   ComponentCompilationJob,
   HostBindingCompilationJob,
-  TemplateCompilationMode,
   type CompilationJob,
   type ViewCompilationUnit,
 } from './compilation';
 import {BINARY_OPERATORS, namespaceForKey, prefixWithNamespace} from './conversion';
-import {MATH_ML_NAMESPACE, SVG_NAMESPACE} from './namespaces';
+
+const compatibilityMode = ir.CompatibilityMode.TemplateDefinitionBuilder;
 
 // Schema containing DOM elements and their properties.
 const domSchema = new DomElementSchemaRegistry();
@@ -48,7 +45,7 @@ export function isI18nRootNode(meta?: i18n.I18nMeta): meta is i18n.Message {
   return meta instanceof i18n.Message;
 }
 
-function isSingleI18nIcu(meta?: i18n.I18nMeta): meta is i18n.I18nMeta & {nodes: [i18n.Icu]} {
+export function isSingleI18nIcu(meta?: i18n.I18nMeta): meta is i18n.I18nMeta & {nodes: [i18n.Icu]} {
   return isI18nRootNode(meta) && meta.nodes.length === 1 && meta.nodes[0] instanceof i18n.Icu;
 }
 
@@ -68,12 +65,11 @@ export function ingestComponent(
   allDeferrableDepsFn: o.ReadVarExpr | null,
   relativeTemplatePath: string | null,
   enableDebugLocations: boolean,
-  legacyOptionalChaining: boolean,
-  foreignImports: R3ForeignComponentMetadata[] | null,
 ): ComponentCompilationJob {
   const job = new ComponentCompilationJob(
     componentName,
     constantPool,
+    compatibilityMode,
     compilationMode,
     relativeContextFilePath,
     i18nUseExternalIds,
@@ -81,8 +77,6 @@ export function ingestComponent(
     allDeferrableDepsFn,
     relativeTemplatePath,
     enableDebugLocations,
-    legacyOptionalChaining,
-    foreignImports,
   );
   ingestNodes(job.root, template);
   return job;
@@ -94,7 +88,6 @@ export interface HostBindingInput {
   properties: e.ParsedProperty[] | null;
   attributes: {[key: string]: o.Expression};
   events: e.ParsedEvent[] | null;
-  legacyOptionalChaining: boolean;
 }
 
 /**
@@ -109,8 +102,8 @@ export function ingestHostBinding(
   const job = new HostBindingCompilationJob(
     input.componentName,
     constantPool,
+    compatibilityMode,
     TemplateCompilationMode.DomOnly,
-    input.legacyOptionalChaining,
   );
   for (const property of input.properties ?? []) {
     let bindingKind = ir.BindingKind.Property;
@@ -125,21 +118,19 @@ export function ingestHostBinding(
     if (property.isAnimation) {
       bindingKind = ir.BindingKind.Animation;
     }
-    const securityContexts = calcHostBindingSecurityContexts(
-      bindingParser,
-      input.componentSelector,
-      property.name,
-      bindingKind === ir.BindingKind.Attribute,
-    );
+    const securityContexts = bindingParser
+      .calcPossibleSecurityContexts(
+        input.componentSelector,
+        property.name,
+        bindingKind === ir.BindingKind.Attribute,
+      )
+      .filter((context) => context !== SecurityContext.NONE);
     ingestDomProperty(job, property, bindingKind, securityContexts);
   }
   for (const [name, expr] of Object.entries(input.attributes) ?? []) {
-    const securityContexts = calcHostBindingSecurityContexts(
-      bindingParser,
-      input.componentSelector,
-      name,
-      true,
-    );
+    const securityContexts = bindingParser
+      .calcPossibleSecurityContexts(input.componentSelector, name, true)
+      .filter((context) => context !== SecurityContext.NONE);
     ingestHostAttribute(job, name, expr, securityContexts);
   }
   for (const event of input.events ?? []) {
@@ -148,45 +139,9 @@ export function ingestHostBinding(
   return job;
 }
 
-function calcHostBindingSecurityContexts(
-  bindingParser: BindingParser,
-  selector: string,
-  name: string,
-  isAttribute: boolean,
-): SecurityContext[] {
-  const declaringSelectorContexts = bindingParser.calcPossibleSecurityContexts(
-    selector,
-    name,
-    isAttribute,
-  );
-  const concreteHostContexts = calcPossibleSecurityContexts(
-    domSchema,
-    null,
-    domSchema.getMappedPropName(name),
-    isAttribute,
-  );
-  const concreteHostNonNoneContexts = concreteHostContexts.filter(
-    (context) => context !== SecurityContext.NONE,
-  );
-  const concreteHostNonNoneCount = concreteHostNonNoneContexts.length;
-  const hasConcreteHostNoneContext = concreteHostNonNoneCount !== concreteHostContexts.length;
-
-  // Host bindings can run against a concrete host whose element name differs from the declaring
-  // selector, including dynamic root components whose TNode name is `#host`.
-  if (hasConcreteHostNoneContext && concreteHostNonNoneCount > 0) {
-    return concreteHostContexts;
-  }
-
-  if (concreteHostNonNoneContexts.some((context) => !declaringSelectorContexts.includes(context))) {
-    return concreteHostContexts;
-  }
-
-  return declaringSelectorContexts.filter((context) => context !== SecurityContext.NONE);
-}
-
 // TODO: We should refactor the parser to use the same types and structures for host bindings as
 // with ordinary components. This would allow us to share a lot more ingestion code.
-function ingestDomProperty(
+export function ingestDomProperty(
   job: HostBindingCompilationJob,
   property: e.ParsedProperty,
   bindingKind: ir.BindingKind,
@@ -220,7 +175,7 @@ function ingestDomProperty(
   );
 }
 
-function ingestHostAttribute(
+export function ingestHostAttribute(
   job: HostBindingCompilationJob,
   name: string,
   value: o.Expression,
@@ -244,7 +199,7 @@ function ingestHostAttribute(
   job.root.update.push(attrBinding);
 }
 
-function ingestHostEvent(job: HostBindingCompilationJob, event: e.ParsedEvent) {
+export function ingestHostEvent(job: HostBindingCompilationJob, event: e.ParsedEvent) {
   let eventBinding: ir.CreateOp;
   if (event.type === e.ParsedEventType.Animation) {
     eventBinding = ir.createAnimationListenerOp(
@@ -306,8 +261,6 @@ function ingestNodes(unit: ViewCompilationUnit, template: t.Node[]): void {
       ingestForBlock(unit, node);
     } else if (node instanceof t.LetDeclaration) {
       ingestLetDeclaration(unit, node);
-    } else if (node instanceof t.BoundaryBlock) {
-      ingestBoundaryBlock(unit, node);
     } else if (node instanceof t.Component) {
       // TODO(crisbeto): account for selectorless nodes.
     } else {
@@ -329,13 +282,8 @@ function ingestElement(unit: ViewCompilationUnit, element: t.Element): void {
 
   const id = unit.job.allocateXrefId();
 
-  const foreignComp = unit.job.getForeignComponent(element);
-  if (foreignComp) {
-    ingestForeignComponent(unit, id, element, foreignComp);
-    return;
-  }
-
   const [namespaceKey, elementName] = splitNsName(element.name);
+
   const startOp = ir.createElementStartOp(
     elementName,
     id,
@@ -375,73 +323,6 @@ function ingestElement(unit: ViewCompilationUnit, element: t.Element): void {
       endOp,
     );
   }
-}
-
-/**
- * Ingest a foreign component's element AST from the template into the given `ViewCompilation`.
- */
-function ingestForeignComponent(
-  unit: ViewCompilationUnit,
-  id: ir.XrefId,
-  element: t.Element,
-  foreignComp: R3ForeignComponentMetadata,
-): void {
-  const props = new Map<string, o.Expression>();
-  for (const attr of element.attributes) {
-    props.set(attr.name, o.literal(attr.value));
-  }
-  for (const input of element.inputs) {
-    props.set(input.name, convertAst(input.value, unit.job, input.sourceSpan));
-  }
-
-  const contentBlocks: t.ContentBlock[] = [];
-  const childNodes: t.Node[] = [];
-
-  for (const child of element.children) {
-    if (child instanceof t.ContentBlock) {
-      contentBlocks.push(child);
-    } else {
-      childNodes.push(child);
-    }
-  }
-
-  for (const block of contentBlocks) {
-    const blockView = unit.job.allocateView(unit.xref);
-
-    // @content block variables map directly to the arguments array passed to the calling render
-    // function. We set the context variable's value to its index in the block's variables list
-    // so that code generation resolves it to its corresponding index in the arguments array.
-    for (let i = 0; i < block.variables.length; i++) {
-      blockView.contextVariables.set(block.variables[i].name, i);
-    }
-
-    ingestNodes(blockView, block.children);
-
-    unit.create.push(
-      ir.createContentOp(id, blockView.xref, block.name, block.startSourceSpan, block.sourceSpan),
-    );
-  }
-
-  if (childNodes.length > 0) {
-    const childView = unit.job.allocateView(unit.xref);
-    ingestNodes(childView, childNodes);
-
-    unit.create.push(
-      ir.createContentOp(
-        id,
-        childView.xref,
-        'children',
-        element.startSourceSpan,
-        element.sourceSpan,
-      ),
-    );
-  }
-
-  // Foreign components are created in the creation block. Updates are triggered reactively
-  // through directly passed signal properties, alleviating the need for any explicit update
-  // operations.
-  const constIndex = unit.job.addConst(foreignComp.component);
-  unit.create.push(ir.createForeignComponentOp(id, constIndex, props, element.startSourceSpan));
 }
 
 /**
@@ -605,12 +486,16 @@ function ingestBoundText(
 
   const textXref = unit.job.allocateXrefId();
   unit.create.push(ir.createTextOp(textXref, '', icuPlaceholder, text.sourceSpan));
+  // TemplateDefinitionBuilder does not generate source maps for sub-expressions inside an
+  // interpolation. We copy that behavior in compatibility mode.
+  // TODO: is it actually correct to generate these extra maps in modern mode?
+  const baseSourceSpan = unit.job.compatibility ? null : text.sourceSpan;
   unit.update.push(
     ir.createInterpolateTextOp(
       textXref,
       new ir.Interpolation(
         value.strings,
-        value.expressions.map((expr) => convertAst(expr, unit.job, null)),
+        value.expressions.map((expr) => convertAst(expr, unit.job, baseSourceSpan)),
         i18nPlaceholders,
       ),
       text.sourceSpan,
@@ -673,126 +558,28 @@ function ingestIfBlock(unit: ViewCompilationUnit, ifBlock: t.IfBlock): void {
 }
 
 /**
- * Ingest an `@boundary` block into the given `ViewCompilation`.
- */
-function ingestBoundaryBlock(unit: ViewCompilationUnit, boundaryBlock: t.BoundaryBlock): void {
-  // 1. Process primary block first to get its view xref for BoundaryCreateOp
-  const primaryView = unit.job.allocateView(unit.xref);
-  const primaryTagName = ingestControlFlowInsertionPoint(unit, primaryView.xref, boundaryBlock);
-
-  // Create BoundaryCreateOp for the container itself, using the primary view xref!
-  const createOp = ir.createBoundaryCreateOp(
-    unit.job.allocateXrefId(),
-    ir.TemplateKind.Block,
-    primaryTagName,
-    'Boundary',
-    ir.Namespace.HTML,
-    undefined,
-    boundaryBlock.startSourceSpan,
-    boundaryBlock.sourceSpan,
-  );
-  unit.create.push(createOp);
-  const primaryCreateOp = ir.createConditionalBranchCreateOp(
-    primaryView.xref,
-    ir.TemplateKind.Block,
-    primaryTagName,
-    'Primary',
-    ir.Namespace.HTML,
-    undefined,
-    boundaryBlock.startSourceSpan,
-    boundaryBlock.sourceSpan,
-  );
-  unit.create.push(primaryCreateOp);
-
-  let conditions: Array<ir.ConditionalCaseExpr> = [];
-
-  // 2. Process @error blocks (fallbacks)
-  for (const errorBlock of boundaryBlock.errorBlocks) {
-    const errorView = unit.job.allocateView(unit.xref);
-
-    // Create branch creation operation
-    const branchCreateOp = ir.createBoundaryErrorCreateOp(
-      errorView.xref,
-      ir.TemplateKind.Block,
-      'Error',
-      undefined,
-      errorBlock.startSourceSpan,
-      errorBlock.sourceSpan,
-      createOp.xref,
-      errorBlock.contextVariables,
-    );
-    unit.create.push(branchCreateOp);
-
-    // Expression case
-    const caseExpr = errorBlock.expression
-      ? convertAst(errorBlock.expression, unit.job, null)
-      : null;
-
-    const errorVar = errorBlock.contextVariables.find((v) => v.value === '$error');
-
-    const conditionalCaseExpr = new ir.ConditionalCaseExpr(
-      caseExpr,
-      branchCreateOp.xref,
-      branchCreateOp.handle,
-      errorVar || null,
-    );
-    conditions.push(conditionalCaseExpr);
-
-    for (const variable of errorBlock.contextVariables) {
-      errorView.aliases.add({
-        kind: ir.SemanticVariableKind.Alias,
-        name: null,
-        identifier: variable.name,
-        expression: new o.ReadPropExpr(new ir.ContextExpr(errorView.xref), variable.value),
-      });
-    }
-    ingestNodes(errorView, errorBlock.children);
-  }
-
-  const primaryCaseExpr = new ir.ConditionalCaseExpr(
-    null,
-    primaryCreateOp.xref,
-    primaryCreateOp.handle,
-    null,
-  );
-
-  ingestNodes(primaryView, boundaryBlock.children);
-
-  unit.update.push(
-    ir.createBoundaryOp(
-      createOp.xref,
-      createOp.handle,
-      primaryCreateOp.xref,
-      primaryCaseExpr,
-      conditions,
-      boundaryBlock.sourceSpan,
-    ),
-  );
-}
-
-/**
  * Ingest an `@switch` block into the given `ViewCompilation`.
  */
 function ingestSwitchBlock(unit: ViewCompilationUnit, switchBlock: t.SwitchBlock): void {
   // Don't ingest empty switches since they won't render anything.
-  if (switchBlock.groups.length === 0) {
+  if (switchBlock.cases.length === 0) {
     return;
   }
 
   let firstXref: ir.XrefId | null = null;
   let conditions: Array<ir.ConditionalCaseExpr> = [];
-  for (let i = 0; i < switchBlock.groups.length; i++) {
-    const switchCaseGroup = switchBlock.groups[i];
+  for (let i = 0; i < switchBlock.cases.length; i++) {
+    const switchCase = switchBlock.cases[i];
     const cView = unit.job.allocateView(unit.xref);
-    const tagName = ingestControlFlowInsertionPoint(unit, cView.xref, switchCaseGroup);
+    const tagName = ingestControlFlowInsertionPoint(unit, cView.xref, switchCase);
     let switchCaseI18nMeta: i18n.BlockPlaceholder | undefined = undefined;
-    if (switchCaseGroup.i18n !== undefined) {
-      if (!(switchCaseGroup.i18n instanceof i18n.BlockPlaceholder)) {
+    if (switchCase.i18n !== undefined) {
+      if (!(switchCase.i18n instanceof i18n.BlockPlaceholder)) {
         throw Error(
-          `Unhandled i18n metadata type for switch block: ${switchCaseGroup.i18n?.constructor.name}`,
+          `Unhandled i18n metadata type for switch block: ${switchCase.i18n?.constructor.name}`,
         );
       }
-      switchCaseI18nMeta = switchCaseGroup.i18n;
+      switchCaseI18nMeta = switchCase.i18n;
     }
 
     const createOp = i === 0 ? ir.createConditionalCreateOp : ir.createConditionalBranchCreateOp;
@@ -804,27 +591,24 @@ function ingestSwitchBlock(unit: ViewCompilationUnit, switchBlock: t.SwitchBlock
       'Case',
       ir.Namespace.HTML,
       switchCaseI18nMeta,
-      switchCaseGroup.startSourceSpan,
-      switchCaseGroup.sourceSpan,
+      switchCase.startSourceSpan,
+      switchCase.sourceSpan,
     );
     unit.create.push(conditionalCreateOp);
 
     if (firstXref === null) {
       firstXref = cView.xref;
     }
-
-    for (const switchCase of switchCaseGroup.cases) {
-      const caseExpr = switchCase.expression
-        ? convertAst(switchCase.expression, unit.job, switchBlock.startSourceSpan)
-        : null;
-      const conditionalCaseExpr = new ir.ConditionalCaseExpr(
-        caseExpr,
-        conditionalCreateOp.xref,
-        conditionalCreateOp.handle,
-      );
-      conditions.push(conditionalCaseExpr);
-    }
-    ingestNodes(cView, switchCaseGroup.children);
+    const caseExpr = switchCase.expression
+      ? convertAst(switchCase.expression, unit.job, switchBlock.startSourceSpan)
+      : null;
+    const conditionalCaseExpr = new ir.ConditionalCaseExpr(
+      caseExpr,
+      conditionalCreateOp.xref,
+      conditionalCreateOp.handle,
+    );
+    conditions.push(conditionalCaseExpr);
+    ingestNodes(cView, switchCase.children);
   }
   unit.update.push(
     ir.createConditionalOp(
@@ -970,7 +754,7 @@ function ingestDeferBlock(unit: ViewCompilationUnit, deferBlock: t.DeferredBlock
     deferOnOps.push(
       ir.createDeferOnOp(
         deferXref,
-        {kind: ir.DeferTriggerKind.Idle, timeout: null},
+        {kind: ir.DeferTriggerKind.Idle},
         ir.DeferOpModifierKind.NONE,
         null!,
       ),
@@ -999,7 +783,7 @@ function ingestDeferTriggers(
   if (triggers.idle !== undefined) {
     const deferOnOp = ir.createDeferOnOp(
       deferXref,
-      {kind: ir.DeferTriggerKind.Idle, timeout: triggers.idle.timeout ?? null},
+      {kind: ir.DeferTriggerKind.Idle},
       modifier,
       triggers.idle.sourceSpan,
     );
@@ -1065,9 +849,6 @@ function ingestDeferTriggers(
         targetSlot: null,
         targetView: null,
         targetSlotViewSteps: null,
-        options: triggers.viewport.options
-          ? convertAst(triggers.viewport.options, unit.job, triggers.viewport.sourceSpan)
-          : null,
       },
       modifier,
       triggers.viewport.sourceSpan,
@@ -1152,19 +933,8 @@ function ingestForBlock(unit: ViewCompilationUnit, forBlock: t.ForLoopBlock): vo
     }
   }
 
-  let track: o.Expression;
-
-  if (forBlock.trackBy === null) {
-    // `@for` without a `track` is invalid and it produces a parser error.
-    // Put a placeholder here so we don't need to account for it throughout the pipeline.
-    track = o.variable('$index');
-  } else {
-    track = convertAst(
-      forBlock.trackBy,
-      unit.job,
-      convertSourceSpan(forBlock.trackBy.span, forBlock.sourceSpan),
-    );
-  }
+  const sourceSpan = convertSourceSpan(forBlock.trackBy.span, forBlock.sourceSpan);
+  const track = convertAst(forBlock.trackBy, unit.job, sourceSpan);
 
   ingestNodes(repeaterView, forBlock.children);
 
@@ -1284,7 +1054,10 @@ function convertAst(
   if (ast instanceof e.ASTWithSource) {
     return convertAst(ast.ast, job, baseSourceSpan);
   } else if (ast instanceof e.PropertyRead) {
-    if (ast.receiver instanceof e.ImplicitReceiver) {
+    // Whether this is an implicit receiver, *excluding* explicit reads of `this`.
+    const isImplicitReceiver =
+      ast.receiver instanceof e.ImplicitReceiver && !(ast.receiver instanceof e.ThisReceiver);
+    if (isImplicitReceiver) {
       return new ir.LexicalReadExpr(ast.name);
     } else {
       return new o.ReadPropExpr(
@@ -1352,13 +1125,10 @@ function convertAst(
     throw new Error(`AssertionError: Chain in unknown context`);
   } else if (ast instanceof e.LiteralMap) {
     const entries = ast.keys.map((key, idx) => {
-      const value = convertAst(ast.values[idx], job, baseSourceSpan);
-
+      const value = ast.values[idx];
       // TODO: should literals have source maps, or do we just map the whole surrounding
       // expression?
-      return key.kind === 'spread'
-        ? new o.LiteralMapSpreadAssignment(value)
-        : new o.LiteralMapPropertyAssignment(key.key, value, key.quoted);
+      return new o.LiteralMapEntry(key.key, convertAst(value, job, baseSourceSpan), key.quoted);
     });
     return new o.LiteralMapExpr(entries, undefined, convertSourceSpan(ast.span, baseSourceSpan));
   } else if (ast instanceof e.LiteralArray) {
@@ -1394,14 +1164,9 @@ function convertAst(
     return new ir.SafePropertyReadExpr(convertAst(ast.receiver, job, baseSourceSpan), ast.name);
   } else if (ast instanceof e.SafeCall) {
     // TODO: source span
-    return new o.InvokeFunctionExpr(
+    return new ir.SafeInvokeFunctionExpr(
       convertAst(ast.receiver, job, baseSourceSpan),
       ast.args.map((a) => convertAst(a, job, baseSourceSpan)),
-      null,
-      convertSourceSpan(ast.span, baseSourceSpan),
-      false,
-      [],
-      true,
     );
   } else if (ast instanceof e.EmptyExpr) {
     return new ir.EmptyExpr(convertSourceSpan(ast.span, baseSourceSpan));
@@ -1434,16 +1199,7 @@ function convertAst(
       convertSourceSpan(ast.span, baseSourceSpan),
     );
   } else if (ast instanceof e.RegularExpressionLiteral) {
-    return new o.RegularExpressionLiteralExpr(ast.body, ast.flags, baseSourceSpan);
-  } else if (ast instanceof e.SpreadElement) {
-    return new o.SpreadElementExpr(convertAst(ast.expression, job, baseSourceSpan));
-  } else if (ast instanceof e.ArrowFunction) {
-    return updateParameterReferences(
-      o.arrowFn(
-        ast.parameters.map((arg) => new o.FnParam(arg.name, o.DYNAMIC_TYPE)),
-        convertAst(ast.body, job, baseSourceSpan),
-      ),
-    );
+    return new o.RegularExpressionLiteral(ast.body, ast.flags, baseSourceSpan);
   } else {
     throw new Error(
       `Unhandled expression type "${ast.constructor.name}" in file "${baseSourceSpan?.start.file.url}"`,
@@ -1545,24 +1301,7 @@ function ingestElementBindings(
 
   for (const attr of element.attributes) {
     // Attribute literal bindings, such as `attr.foo="bar"`.
-    const [ns, elementName] = splitNsName(element.name);
-    let namespace = ns;
-    if (!ns) {
-      switch (op.namespace) {
-        case ir.Namespace.SVG:
-          namespace = SVG_NAMESPACE;
-          break;
-        case ir.Namespace.Math:
-          namespace = MATH_ML_NAMESPACE;
-          break;
-      }
-    }
-
-    const securityContext = domSchema.securityContext(
-      namespace ? `:${namespace}:${elementName}` : elementName,
-      attr.name,
-      true,
-    );
+    const securityContext = domSchema.securityContext(element.name, attr.name, true);
     bindings.push(
       ir.createBindingOp(
         op.xref,
@@ -2082,13 +1821,7 @@ function convertSourceSpan(
 function ingestControlFlowInsertionPoint(
   unit: ViewCompilationUnit,
   xref: ir.XrefId,
-  node:
-    | t.IfBlockBranch
-    | t.SwitchBlockCaseGroup
-    | t.ForLoopBlock
-    | t.ForLoopBlockEmpty
-    | t.BoundaryBlock
-    | t.BoundaryErrorBlock,
+  node: t.IfBlockBranch | t.SwitchBlockCase | t.ForLoopBlock | t.ForLoopBlockEmpty,
 ): string | null {
   let root: t.Element | t.Template | null = null;
 
@@ -2105,10 +1838,7 @@ function ingestControlFlowInsertionPoint(
     }
 
     // Root nodes can only elements or templates with a tag name (e.g. `<div *foo></div>`).
-    if (
-      (child instanceof t.Element && unit.job.getForeignComponent(child) === null) ||
-      (child instanceof t.Template && child.tagName !== null)
-    ) {
+    if (child instanceof t.Element || (child instanceof t.Template && child.tagName !== null)) {
       root = child;
     } else {
       return null;
@@ -2172,30 +1902,4 @@ function ingestControlFlowInsertionPoint(
   }
 
   return null;
-}
-
-/**
- * When an arrow function in the expression AST is converted into the output AST, all of its
- * top-level reads become `LexicalReadExpr` because the output AST doesn't have a concept of a
- * variable read. This function corrects the ones that point to parameters.
- *
- * @param root Root arrow function.
- */
-function updateParameterReferences(root: o.ArrowFunctionExpr): o.ArrowFunctionExpr {
-  const parameterNames = new Set(root.params.map((param) => param.name));
-
-  return ir.transformExpressionsInExpression(
-    root,
-    (expr) => {
-      if (expr instanceof o.ArrowFunctionExpr) {
-        for (const param of expr.params) {
-          parameterNames.add(param.name);
-        }
-      } else if (expr instanceof ir.LexicalReadExpr && parameterNames.has(expr.name)) {
-        return o.variable(expr.name);
-      }
-      return expr;
-    },
-    ir.VisitorContextFlag.None,
-  ) as o.ArrowFunctionExpr;
 }

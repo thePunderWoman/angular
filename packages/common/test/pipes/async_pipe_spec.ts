@@ -6,6 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
+import {AsyncPipe} from '../../index';
 import {
   ChangeDetectorRef,
   Component,
@@ -15,17 +16,14 @@ import {
   signal,
 } from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {useAutoTick} from '@angular/private/testing';
 import {Observable, of, Subscribable, Unsubscribable} from 'rxjs';
-import {AsyncPipe} from '../../index';
 
 describe('AsyncPipe', () => {
   let pipe: AsyncPipe;
   let ref: ChangeDetectorRef & jasmine.SpyObj<ChangeDetectorRef>;
-  useAutoTick();
 
   function getChangeDetectorRefSpy() {
-    return jasmine.createSpyObj('ChangeDetectorRef', ['markForCheck']);
+    return jasmine.createSpyObj('ChangeDetectorRef', ['markForCheck', 'detectChanges']);
   }
 
   beforeEach(() => {
@@ -178,7 +176,10 @@ describe('AsyncPipe', () => {
     let promise: Promise<any>;
 
     beforeEach(() => {
-      ({promise, resolve, reject} = Promise.withResolvers<any>());
+      promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
     });
 
     describe('transform', () => {
@@ -205,17 +206,13 @@ describe('AsyncPipe', () => {
       });
 
       it('should report rejections to error handler', async () => {
-        // TestBed rethrows errors that are handled by ErrorHandler so they aren't swallowed/unnoticed
-        await jasmine.spyOnGlobalErrorsAsync(async function () {
-          const spy = spyOn(TestBed.inject(ErrorHandler), 'handleError');
-          pipe.transform(promise);
-          reject(message);
-          try {
-            // clear microtask queue (process all promise rejections)
-            await new Promise((r) => setTimeout(r));
-          } catch {}
-          expect(spy).toHaveBeenCalledWith(message);
-        });
+        const spy = spyOn(TestBed.inject(ErrorHandler), 'handleError');
+        pipe.transform(promise);
+        reject(message);
+        try {
+          await promise;
+        } catch {}
+        expect(spy).toHaveBeenCalledWith(message);
       });
 
       it('should dispose of the existing subscription when subscribing to a new promise', async () => {
@@ -293,7 +290,7 @@ describe('AsyncPipe', () => {
     });
   });
 
-  it('should be available as a standalone pipe', async () => {
+  it('should be available as a standalone pipe', () => {
     @Component({
       selector: 'test-component',
       imports: [AsyncPipe],
@@ -304,7 +301,7 @@ describe('AsyncPipe', () => {
     }
 
     const fixture = TestBed.createComponent(TestComponent);
-    await fixture.whenStable();
+    fixture.detectChanges();
 
     const content = fixture.nativeElement.textContent;
     expect(content).toBe('foo');

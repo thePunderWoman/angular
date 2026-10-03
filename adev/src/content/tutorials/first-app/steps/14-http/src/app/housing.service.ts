@@ -1,7 +1,9 @@
-import {Service} from '@angular/core';
+import {Injectable} from '@angular/core';
 import {HousingLocationInfo} from './housinglocation';
 
-@Service()
+@Injectable({
+  providedIn: 'root',
+})
 export class HousingService {
   readonly baseUrl = 'https://angular.dev/assets/images/tutorials/common';
 

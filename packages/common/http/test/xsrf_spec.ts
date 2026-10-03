@@ -6,8 +6,6 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {MockPlatformLocation} from '@angular/common/testing';
-import {DOCUMENT, PlatformLocation} from '../..';
 import {HttpHeaders} from '../src/headers';
 import {HttpRequest} from '../src/request';
 import {
@@ -48,77 +46,30 @@ describe('HttpXsrfInterceptor', () => {
           provide: XSRF_ENABLED,
           useValue: true,
         },
-        {
-          provide: PlatformLocation,
-          useFactory: () =>
-            new MockPlatformLocation({
-              startUrl: 'http://sub.example.com/',
-            }),
-        },
-        HttpClientTestingBackend,
         HttpXsrfInterceptor,
       ],
     });
-
     interceptor = TestBed.inject(HttpXsrfInterceptor);
-    backend = TestBed.inject(HttpClientTestingBackend);
+    backend = new HttpClientTestingBackend();
   });
-
   it('applies XSRF protection to outgoing requests', () => {
     interceptor.intercept(new HttpRequest('POST', '/test', {}), backend).subscribe();
     const req = backend.expectOne('/test');
     expect(req.request.headers.get('X-XSRF-TOKEN')).toEqual('test');
     req.flush({});
   });
-
   it('does not apply XSRF protection when request is a GET', () => {
     interceptor.intercept(new HttpRequest('GET', '/test'), backend).subscribe();
     const req = backend.expectOne('/test');
     expect(req.request.headers.has('X-XSRF-TOKEN')).toEqual(false);
     req.flush({});
   });
-
   it('does not apply XSRF protection when request is a HEAD', () => {
     interceptor.intercept(new HttpRequest('HEAD', '/test'), backend).subscribe();
     const req = backend.expectOne('/test');
     expect(req.request.headers.has('X-XSRF-TOKEN')).toEqual(false);
     req.flush({});
   });
-
-  it('does not apply XSRF protection when request is absolute and cross-origin', () => {
-    interceptor
-      .intercept(new HttpRequest('POST', 'https://example.com/test', {}), backend)
-      .subscribe();
-    const req = backend.expectOne('https://example.com/test');
-    expect(req.request.headers.has('X-XSRF-TOKEN')).toBeFalse();
-    req.flush({});
-  });
-
-  it('does not apply XSRF protection when request is protocol relative and cross-origin', () => {
-    interceptor.intercept(new HttpRequest('POST', '//example.com/test', {}), backend).subscribe();
-    const req = backend.expectOne('//example.com/test');
-    expect(req.request.headers.has('X-XSRF-TOKEN')).toBeFalse();
-    req.flush({});
-  });
-
-  it('does apply XSRF protection when request is same-origin', () => {
-    interceptor
-      .intercept(new HttpRequest('POST', 'http://sub.example.com/test', {}), backend)
-      .subscribe();
-    const req = backend.expectOne('http://sub.example.com/test');
-    expect(req.request.headers.has('X-XSRF-TOKEN')).toBeTrue();
-    req.flush({});
-  });
-
-  it('does apply XSRF protection when request is protocol relative and same-origin', () => {
-    interceptor
-      .intercept(new HttpRequest('POST', '//sub.example.com/test', {}), backend)
-      .subscribe();
-    const req = backend.expectOne('//sub.example.com/test');
-    expect(req.request.headers.has('X-XSRF-TOKEN')).toBeTrue();
-    req.flush({});
-  });
-
   it('does not overwrite existing header', () => {
     interceptor
       .intercept(
@@ -135,7 +86,6 @@ describe('HttpXsrfInterceptor', () => {
     expect(req.request.headers.get('X-XSRF-TOKEN')).toEqual('blah');
     req.flush({});
   });
-
   it('does not set the header for a null token', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -161,12 +111,10 @@ describe('HttpXsrfInterceptor', () => {
     expect(req.request.headers.has('X-XSRF-TOKEN')).toEqual(false);
     req.flush({});
   });
-
   afterEach(() => {
     backend.verify();
   });
 });
-
 describe('HttpXsrfCookieExtractor', () => {
   let document: {[key: string]: string};
   let extractor: HttpXsrfCookieExtractor;
@@ -174,47 +122,21 @@ describe('HttpXsrfCookieExtractor', () => {
     document = {
       cookie: 'XSRF-TOKEN=test',
     };
-    TestBed.configureTestingModule({
-      providers: [
-        {
-          provide: DOCUMENT,
-          useValue: document,
-        },
-      ],
-    });
-    extractor = TestBed.inject(HttpXsrfCookieExtractor);
+    extractor = new HttpXsrfCookieExtractor(document, 'XSRF-TOKEN');
   });
-
   it('parses the cookie from document.cookie', () => {
     expect(extractor.getToken()).toEqual('test');
   });
-
   it('does not re-parse if document.cookie has not changed', () => {
     expect(extractor.getToken()).toEqual('test');
     expect(extractor.getToken()).toEqual('test');
     expect(getParseCount(extractor)).toEqual(1);
   });
-
   it('re-parses if document.cookie changes', () => {
     expect(extractor.getToken()).toEqual('test');
     document['cookie'] = 'XSRF-TOKEN=blah';
     expect(extractor.getToken()).toEqual('blah');
     expect(getParseCount(extractor)).toEqual(2);
-  });
-
-  it('extracts token without quotes when value is enclosed in DQUOTE characters', () => {
-    document['cookie'] = 'XSRF-TOKEN="quoted-token-value"';
-    expect(extractor.getToken()).toEqual('quoted-token-value');
-  });
-
-  it('extracts token without quotes when value is enclosed in URL-encoded DQUOTE characters (%22)', () => {
-    document['cookie'] = 'XSRF-TOKEN=%22quoted-token-value%22';
-    expect(extractor.getToken()).toEqual('quoted-token-value');
-  });
-
-  it('extracts token without crashing when value has malformed percent-encoding', () => {
-    document['cookie'] = 'XSRF-TOKEN=%ZZ';
-    expect(extractor.getToken()).toEqual('%ZZ');
   });
 });
 

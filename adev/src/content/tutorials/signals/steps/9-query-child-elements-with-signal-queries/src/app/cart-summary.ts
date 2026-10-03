@@ -1,4 +1,12 @@
-import {Component, DestroyRef, inject, input, signal} from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  inject,
+  input,
+  signal,
+  OnDestroy,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 @Component({
   selector: 'cart-summary',
@@ -13,8 +21,9 @@ import {Component, DestroyRef, inject, input, signal} from '@angular/core';
     </div>
   `,
   styleUrl: './app.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class CartSummary {
+export class CartSummary implements OnDestroy {
   itemCount = input.required<number>();
   total = input.required<number>();
 
@@ -26,7 +35,7 @@ export class CartSummary {
   // Public method for parent interaction
   initiateCheckout() {
     this.isAnimating.set(true);
-    this.timeoutId = setTimeout(() => this.isAnimating.set(false), 2000);
+    const timeoutId = setTimeout(() => this.isAnimating.set(false), 2000);
     this.destroyRef.onDestroy(() => clearTimeout(this.timeoutId));
   }
 }

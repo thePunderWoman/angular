@@ -19,19 +19,14 @@ module.exports = (gulp) => () => {
       conventionalChangelog(
         {
           preset: 'angular',
-          tagPrefix: 'zone.js-',
         },
         {linkCompare: true, previousTag: ptag, currentTag: tag, version: version},
         {
+          // Ignore commits that have a different scope than `zone.js`.
+          extendedRegexp: true,
+          grep: '^[^(]+\\(zone\\.js\\)',
           from: ptag,
           to: 'HEAD',
-        },
-        undefined,
-        {
-          transform: (commit) => {
-            if (commit.scope !== 'zone.js') return undefined;
-            return commit;
-          },
         },
       ),
     )

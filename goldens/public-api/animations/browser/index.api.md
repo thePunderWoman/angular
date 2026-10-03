@@ -42,7 +42,7 @@ export class NoopAnimationDriver implements AnimationDriver {
     // (undocumented)
     static ɵfac: i0.ɵɵFactoryDeclaration<NoopAnimationDriver, never>;
     // (undocumented)
-    static ɵprov: i0.ɵɵInjectableDeclaration<any>;
+    static ɵprov: i0.ɵɵInjectableDeclaration<NoopAnimationDriver>;
 }
 
 // (No @packageDocumentation comment for this package)

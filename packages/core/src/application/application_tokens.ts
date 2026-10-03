@@ -8,8 +8,8 @@
 
 import {ENVIRONMENT_INITIALIZER, inject, StaticProvider} from '../di';
 import {InjectionToken} from '../di/injection_token';
-import {DOCUMENT} from '../document';
 import {RuntimeError, RuntimeErrorCode} from '../errors';
+import {getDocument} from '../render3/interfaces/document';
 
 /**
  * A DI token representing a string ID, used
@@ -42,8 +42,9 @@ import {RuntimeError, RuntimeErrorCode} from '../errors';
  * @publicApi
  */
 export const APP_ID = new InjectionToken<string>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'AppId' : '',
+  typeof ngDevMode !== undefined && ngDevMode ? 'AppId' : '',
   {
+    providedIn: 'root',
     factory: () => DEFAULT_APP_ID,
   },
 );
@@ -79,7 +80,7 @@ export const validAppIdInitializer: StaticProvider = {
  * @publicApi
  */
 export const PLATFORM_INITIALIZER = new InjectionToken<ReadonlyArray<() => void>>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'Platform Initializer' : '',
+  typeof ngDevMode !== undefined && ngDevMode ? 'Platform Initializer' : '',
 );
 
 /**
@@ -87,7 +88,7 @@ export const PLATFORM_INITIALIZER = new InjectionToken<ReadonlyArray<() => void>
  * @publicApi
  */
 export const PLATFORM_ID = new InjectionToken<Object>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'Platform ID' : '',
+  typeof ngDevMode !== undefined && ngDevMode ? 'Platform ID' : '',
   {
     providedIn: 'platform',
     factory: () => 'unknown', // set a default platform name, when none set explicitly
@@ -104,7 +105,7 @@ export const PLATFORM_ID = new InjectionToken<Object>(
  * @publicApi
  */
 export const ANIMATION_MODULE_TYPE = new InjectionToken<'NoopAnimations' | 'BrowserAnimations'>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'AnimationModuleType' : '',
+  typeof ngDevMode !== undefined && ngDevMode ? 'AnimationModuleType' : '',
 );
 
 // TODO(crisbeto): link to CSP guide here.
@@ -113,13 +114,12 @@ export const ANIMATION_MODULE_TYPE = new InjectionToken<'NoopAnimations' | 'Brow
  * Angular will apply when inserting inline styles. If not provided, Angular will look up its value
  * from the `ngCspNonce` attribute of the application root node.
  *
- * @see [Content security policy](best-practices/security#content-security-policy)
- *
  * @publicApi
  */
 export const CSP_NONCE = new InjectionToken<string | null>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'CSP nonce' : '',
+  typeof ngDevMode !== undefined && ngDevMode ? 'CSP nonce' : '',
   {
+    providedIn: 'root',
     factory: () => {
       // Ideally we wouldn't have to use `querySelector` here since we know that the nonce will be on
       // the root node, but because the token value is used in renderers, it has to be available
@@ -138,9 +138,7 @@ export const CSP_NONCE = new InjectionToken<string | null>(
       // 4. Have the `ComponentFactory` read the attribute and provide it to the injector under the
       // hood - has the same problem as #1 and #2 in that the renderer is used to query for the root
       // node and the nonce value needs to be available when the renderer is created.
-      return (
-        inject(DOCUMENT).body?.querySelector('[ngCspNonce]')?.getAttribute('ngCspNonce') || null
-      );
+      return getDocument().body?.querySelector('[ngCspNonce]')?.getAttribute('ngCspNonce') || null;
     },
   },
 );
@@ -179,13 +177,12 @@ export const IMAGE_CONFIG_DEFAULTS: ImageConfig = {
  *
  * @see {@link NgOptimizedImage}
  * @see {@link ImageConfig}
- * @see [Responsive images](guide/image-optimization#responsive-images)
- * @see [Using placeholders](guide/image-optimization#using-placeholders)
  * @publicApi
  */
 export const IMAGE_CONFIG = new InjectionToken<ImageConfig>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'ImageConfig' : '',
+  typeof ngDevMode !== undefined && ngDevMode ? 'ImageConfig' : '',
   {
+    providedIn: 'root',
     factory: () => IMAGE_CONFIG_DEFAULTS,
   },
 );

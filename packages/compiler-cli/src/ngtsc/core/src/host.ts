@@ -35,10 +35,9 @@ import {
  * If a new method is added to `ts.CompilerHost` which is not delegated, a type error will be
  * generated for this class.
  */
-export class DelegatingCompilerHost implements Omit<
-  RequiredDelegations<ExtendedTsCompilerHost>,
-  'getSourceFile' | 'fileExists'
-> {
+export class DelegatingCompilerHost
+  implements Omit<RequiredDelegations<ExtendedTsCompilerHost>, 'getSourceFile' | 'fileExists'>
+{
   createHash;
   directoryExists;
   fileNameToModuleName;
@@ -70,10 +69,13 @@ export class DelegatingCompilerHost implements Omit<
   resolveTypeReferenceDirectiveReferences;
 
   // jsDocParsingMode is not a method like the other elements above
+  // TODO: ignore usage can be dropped once 5.2 support is dropped
   get jsDocParsingMode() {
+    // @ts-ignore
     return this.delegate.jsDocParsingMode;
   }
   set jsDocParsingMode(mode) {
+    // @ts-ignore
     this.delegate.jsDocParsingMode = mode;
   }
 

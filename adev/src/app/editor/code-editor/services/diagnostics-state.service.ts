@@ -6,21 +6,25 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {Service, signal} from '@angular/core';
+import {Injectable} from '@angular/core';
 import {Diagnostic} from '@codemirror/lint';
+import {BehaviorSubject, distinctUntilChanged} from 'rxjs';
 
 export interface DiagnosticWithLocation extends Diagnostic {
   lineNumber: number;
   characterPosition: number;
 }
 
-@Service()
+@Injectable({
+  providedIn: 'root',
+})
 export class DiagnosticsState {
-  private readonly _diagnostics = signal<DiagnosticWithLocation[]>([]);
+  private readonly _diagnostics$ = new BehaviorSubject<DiagnosticWithLocation[]>([]);
 
-  readonly diagnostics = this._diagnostics.asReadonly();
+  // TODO: use signals when zoneless will be turned off
+  diagnostics$ = this._diagnostics$.asObservable().pipe(distinctUntilChanged());
 
   setDiagnostics(diagnostics: DiagnosticWithLocation[]): void {
-    this._diagnostics.set(diagnostics);
+    this._diagnostics$.next(diagnostics);
   }
 }

@@ -7,17 +7,18 @@
  */
 
 import {
-  afterNextRender,
+  ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   ElementRef,
-  inject,
   input,
-  viewChild,
   ViewEncapsulation,
+  afterNextRender,
+  inject,
+  viewChild,
+  DestroyRef,
 } from '@angular/core';
-import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Subject} from 'rxjs';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {debounceTime} from 'rxjs/operators';
 
 import {TerminalHandler, TerminalType} from './terminal-handler.service';
@@ -26,6 +27,7 @@ import {TerminalHandler, TerminalType} from './terminal-handler.service';
   selector: 'docs-tutorial-terminal',
   template: '<div #terminalOutput class="adev-terminal-output"></div>',
   styleUrls: ['./terminal.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   // ViewEncapsulation is disabled to allow Xterm.js's styles to be applied
   // to the terminal element.
   encapsulation: ViewEncapsulation.None,

@@ -6,16 +6,17 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {Component, computed, inject} from '@angular/core';
-import {RouterLink} from '@angular/router';
-import {NavigationItem} from '../../interfaces/index';
+import {ChangeDetectionStrategy, Component, inject, computed} from '@angular/core';
 import {NavigationState} from '../../services/index';
+import {NavigationItem} from '../../interfaces/index';
+import {RouterLink} from '@angular/router';
 
 @Component({
   selector: 'docs-breadcrumb',
   imports: [RouterLink],
   templateUrl: './breadcrumb.component.html',
   styleUrls: ['./breadcrumb.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Breadcrumb {
   private readonly navigationState = inject(NavigationState);

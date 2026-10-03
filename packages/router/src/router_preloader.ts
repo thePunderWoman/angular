@@ -6,13 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {
-  createEnvironmentInjector,
-  EnvironmentInjector,
-  Injectable,
-  OnDestroy,
-  Service,
-} from '@angular/core';
+import {createEnvironmentInjector, EnvironmentInjector, Injectable, OnDestroy} from '@angular/core';
 import {from, Observable, of, Subscription} from 'rxjs';
 import {catchError, concatMap, filter, mergeAll, mergeMap} from 'rxjs/operators';
 
@@ -26,7 +20,6 @@ import {RouterConfigLoader} from './router_config_loader';
  *
  * Provides a preloading strategy.
  *
- * @see [Preloading strategy](guide/routing/customizing-route-behavior#preloading-strategy)
  * @publicApi
  */
 export abstract class PreloadingStrategy {
@@ -42,23 +35,9 @@ export abstract class PreloadingStrategy {
  * RouterModule.forRoot(ROUTES, {preloadingStrategy: PreloadAllModules})
  * ```
  *
- * ```ts
- * export const appConfig: ApplicationConfig = {
- * providers: [
- *   provideRouter(
- *     routes,
- *     withPreloading(PreloadAllModules)
- *   )
- * ]
- * };
- * ```
- *
- *
- * @see [Preloading strategy](guide/routing/customizing-route-behavior#preloading-strategy)
- *
  * @publicApi
  */
-@Service()
+@Injectable({providedIn: 'root'})
 export class PreloadAllModules implements PreloadingStrategy {
   preload(route: Route, fn: () => Observable<any>): Observable<any> {
     return fn().pipe(catchError(() => of(null)));
@@ -72,11 +51,9 @@ export class PreloadAllModules implements PreloadingStrategy {
  *
  * This strategy is enabled by default.
  *
- * @see [Preloading strategy](guide/routing/customizing-route-behavior#preloading-strategy)
- *
  * @publicApi
  */
-@Service()
+@Injectable({providedIn: 'root'})
 export class NoPreloading implements PreloadingStrategy {
   preload(route: Route, fn: () => Observable<any>): Observable<any> {
     return of(null);
@@ -121,25 +98,23 @@ export class RouterPreloader implements OnDestroy {
 
   /** @docs-private */
   ngOnDestroy(): void {
-    this.subscription?.unsubscribe();
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+    }
   }
 
   private processRoutes(injector: EnvironmentInjector, routes: Routes): Observable<void> {
-    const res: Observable<void>[] = [];
+    const res: Observable<any>[] = [];
     for (const route of routes) {
       if (route.providers && !route._injector) {
         route._injector = createEnvironmentInjector(
           route.providers,
           injector,
-          typeof ngDevMode === 'undefined' || ngDevMode ? `Route: ${route.path}` : '',
+          `Route: ${route.path}`,
         );
       }
 
       const injectorForCurrentRoute = route._injector ?? injector;
-      if (route._loadedNgModuleFactory && !route._loadedInjector) {
-        route._loadedInjector =
-          route._loadedNgModuleFactory.create(injectorForCurrentRoute).injector;
-      }
       const injectorForChildren = route._loadedInjector ?? injectorForCurrentRoute;
 
       // Note that `canLoad` is only checked as a condition that prevents `loadChildren` and not
@@ -165,12 +140,9 @@ export class RouterPreloader implements OnDestroy {
 
   private preloadConfig(injector: EnvironmentInjector, route: Route): Observable<void> {
     return this.preloadingStrategy.preload(route, () => {
-      if (injector.destroyed) {
-        return of(null);
-      }
       let loadedChildren$: Observable<LoadedRouterConfig | null>;
       if (route.loadChildren && route.canLoad === undefined) {
-        loadedChildren$ = from(this.loader.loadChildren(injector, route));
+        loadedChildren$ = this.loader.loadChildren(injector, route);
       } else {
         loadedChildren$ = of(null);
       }
@@ -182,7 +154,6 @@ export class RouterPreloader implements OnDestroy {
           }
           route._loadedRoutes = config.routes;
           route._loadedInjector = config.injector;
-          route._loadedNgModuleFactory = config.factory;
           // If the loaded config was a module, use that as the module/module injector going
           // forward. Otherwise, continue using the current module/module injector.
           return this.processRoutes(config.injector ?? injector, config.routes);

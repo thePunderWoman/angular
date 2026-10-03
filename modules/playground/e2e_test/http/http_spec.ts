@@ -6,40 +6,24 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import * as webdriver from 'selenium-webdriver';
-import {
-  createWebDriver,
-  verifyNoBrowserErrors,
-  waitForAngular,
-} from '../../../../packages/examples/test-utils/index.js';
+import {verifyNoBrowserErrors} from '../../../utilities/index';
+import {browser} from 'protractor';
 
 describe('http', function () {
-  let driver: webdriver.WebDriver;
-  let baseUrl: string;
-
-  beforeAll(async () => {
-    ({driver, baseUrl} = await createWebDriver());
-  });
-
-  afterAll(async () => {
-    await driver.quit();
-  });
-
-  afterEach(async () => {
-    await verifyNoBrowserErrors(driver);
-  });
+  afterEach(verifyNoBrowserErrors);
 
   describe('fetching', function () {
-    it('should fetch and display people', async function () {
-      await driver.get(`${baseUrl}/`);
-      await waitForAngular(driver);
-      expect(await getComponentText(driver, 'http-app', '.people')).toEqual('hello, Jeff');
+    const URL = '/';
+
+    it('should fetch and display people', function () {
+      browser.get(URL);
+      expect(getComponentText('http-app', '.people')).toEqual('hello, Jeff');
     });
   });
 });
 
-function getComponentText(driver: webdriver.WebDriver, selector: string, innerSelector: string) {
-  return driver.executeScript<string>(
+function getComponentText(selector: string, innerSelector: string) {
+  return browser.executeScript(
     `return document.querySelector("${selector}").querySelector("${innerSelector}").textContent.trim()`,
   );
 }

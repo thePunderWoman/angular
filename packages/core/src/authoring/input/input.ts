@@ -40,9 +40,6 @@ export function inputRequiredFunction<ReadT, WriteT = ReadT>(
  * The function exposes an API for also declaring required inputs via the
  * `input.required` function.
  *
- * @see [Accepting data with input properties](guide/components/inputs)
- * @see [Required inputs](guide/components/inputs#required-inputs)
- * @see [Input transforms](guide/components/inputs#input-transforms)
  * @publicAPI
  * @docsPrivate Ignored because `input` is the canonical API entry.
  */
@@ -77,22 +74,6 @@ export interface InputFunction {
     initialValue: undefined,
     opts: InputOptionsWithTransform<T | undefined, TransformT>,
   ): InputSignalWithTransform<T | undefined, TransformT>;
-  /**
-   * Declares an input of type `T` with an initial value and a transform function
-   * that accepts values of type `unknown`.
-   */
-  <T>(
-    initialValue: T,
-    opts: InputOptionsWithTransform<T, unknown>,
-  ): InputSignalWithTransform<T, unknown>;
-  /**
-   * Declares an input of type `T|undefined` without an initial value and with a transform
-   * function that accepts values of type `unknown`.
-   */
-  <T>(
-    initialValue: undefined,
-    opts: InputOptionsWithTransform<T | undefined, unknown>,
-  ): InputSignalWithTransform<T | undefined, unknown>;
 
   /**
    * Initializes a required input.
@@ -104,7 +85,6 @@ export interface InputFunction {
    */
   required: {
     /** Declares a required input of type `T`. */
-
     <T>(opts?: InputOptionsWithoutTransform<T>): InputSignal<T>;
     /**
      * Declares a required input of type `T` with a transform function.
@@ -165,8 +145,6 @@ export interface InputFunction {
  *
  * @publicAPI
  * @initializerApiFunction
- *
- * @see [Accepting data with input properties](guide/components/inputs)
  */
 export const input: InputFunction = (() => {
   // Note: This may be considered a side-effect, but nothing will depend on

@@ -15,8 +15,6 @@ import {RuntimeErrorCode} from './errors';
  *
  * Used by `HttpParams`.
  *
- * @see [Custom parameter encoding](guide/http/making-requests#custom-parameter-encoding)
- *
  * @publicApi
  **/
 export interface HttpParameterCodec {
@@ -131,9 +129,6 @@ interface Update {
 /**
  * Options used to construct an `HttpParams` instance.
  *
- * @see [Setting URL parameters](guide/http/making-requests#setting-url-parameters)
- * @see [Custom parameter encoding](guide/http/making-requests#custom-parameter-encoding)
- *
  * @publicApi
  */
 export interface HttpParamsOptions {
@@ -157,8 +152,6 @@ export interface HttpParamsOptions {
  * per the MIME type `application/x-www-form-urlencoded`.
  *
  * This class is immutable; all mutation operations return a new instance.
- *
- * @see [Setting URL parameters](guide/http/making-requests#setting-url-parameters)
  *
  * @publicApi
  */
@@ -324,22 +317,18 @@ export class HttpParams {
     }
     if (this.cloneFrom !== null) {
       this.cloneFrom.init();
-
-      for (const [key, values] of this.cloneFrom.map!.entries()) {
-        this.map!.set(key, values);
-      }
-
+      this.cloneFrom.keys().forEach((key) => this.map!.set(key, this.cloneFrom!.map!.get(key)!));
       this.updates!.forEach((update) => {
         switch (update.op) {
           case 'a':
           case 's':
-            const base = update.op === 'a' ? (this.map!.get(update.param) || []).slice() : [];
+            const base = (update.op === 'a' ? this.map!.get(update.param) : undefined) || [];
             base.push(valueToString(update.value!));
             this.map!.set(update.param, base);
             break;
           case 'd':
             if (update.value !== undefined) {
-              const base = (this.map!.get(update.param) || []).slice();
+              let base = this.map!.get(update.param) || [];
               const idx = base.indexOf(valueToString(update.value));
               if (idx !== -1) {
                 base.splice(idx, 1);

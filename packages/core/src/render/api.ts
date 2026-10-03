@@ -12,7 +12,6 @@ import {getCurrentTNode, getLView} from '../render3/state';
 import {getComponentLViewByIndex} from '../render3/util/view_utils';
 
 import {RendererStyleFlags2, RendererType2} from './api_flags';
-import {registerSpecialProvider} from '../render3/debug/special_providers';
 
 /**
  * Creates and initializes a custom renderer that implements the `Renderer2` base class.
@@ -247,10 +246,6 @@ export abstract class Renderer2 {
    * @nocollapse
    */
   static __NG_ELEMENT_ID__: () => Renderer2 = () => injectRenderer2();
-}
-
-if (typeof ngDevMode === 'undefined' || ngDevMode) {
-  registerSpecialProvider(Renderer2);
 }
 
 /** Injects a Renderer2 for the current component. */

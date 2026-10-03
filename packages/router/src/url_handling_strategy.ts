@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {inject, Service} from '@angular/core';
+import {inject, Injectable} from '@angular/core';
 
 import {UrlTree} from './url_tree';
 
@@ -15,11 +15,9 @@ import {UrlTree} from './url_tree';
  *
  * Provides a way to migrate AngularJS applications to Angular.
  *
- * @see [URL handling strategy](guide/routing/customizing-route-behavior#built-in-preloading-strategies)
- *
  * @publicApi
  */
-@Service({factory: () => inject(DefaultUrlHandlingStrategy)})
+@Injectable({providedIn: 'root', useFactory: () => inject(DefaultUrlHandlingStrategy)})
 export abstract class UrlHandlingStrategy {
   /**
    * Tells the router if this URL should be processed.
@@ -46,7 +44,7 @@ export abstract class UrlHandlingStrategy {
 /**
  * @publicApi
  */
-@Service()
+@Injectable({providedIn: 'root'})
 export class DefaultUrlHandlingStrategy implements UrlHandlingStrategy {
   shouldProcessUrl(url: UrlTree): boolean {
     return true;

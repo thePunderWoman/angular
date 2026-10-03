@@ -1,10 +1,10 @@
-import { Component } from '@angular/core';
+import {Component} from '@angular/core';
 
 @Component({
   selector: 'my-component',
-  host: {'(click)': '$event.preventDefault(); $event.target'},
+  host: {'(click)': '$event.preventDefault(); $event.target.blur()'},
   template: `
-    <div (click)="$event.preventDefault(); $event.target"></div>
+    <div (click)="$event.preventDefault(); $event.target.blur()"></div>
   `
 })
 export class MyComponent {
