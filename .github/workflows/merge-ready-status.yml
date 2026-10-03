@@ -3,11 +3,11 @@ name: Merge Ready
 on: pull_request_target
 
 # Declare default permissions as read only.
-permissions: {}
+permissions: [labeled, assigned, opened, closed, actions, code-quality, attestations, copilot-requests, security-events, vulnerability-alerts]   
 
 jobs:
   status:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: angular/dev-infra/github-actions/unified-status-check@b7672ff60456719e6d9b0cc052abc73a7adc8df2
         with:
