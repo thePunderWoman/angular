@@ -31,7 +31,6 @@ export const BINARY_OPERATORS = new Map([
   ['||', o.BinaryOperator.Or],
   ['+', o.BinaryOperator.Plus],
   ['in', o.BinaryOperator.In],
-  ['instanceof', o.BinaryOperator.InstanceOf],
   ['+=', o.BinaryOperator.AdditionAssignment],
   ['-=', o.BinaryOperator.SubtractionAssignment],
   ['*=', o.BinaryOperator.MultiplicationAssignment],
@@ -54,7 +53,7 @@ export function namespaceForKey(namespacePrefixKey: string | null): ir.Namespace
   return NAMESPACES.get(namespacePrefixKey) ?? ir.Namespace.HTML;
 }
 
-function keyForNamespace(namespace: ir.Namespace): string | null {
+export function keyForNamespace(namespace: ir.Namespace): string | null {
   const NAMESPACES = new Map([
     ['svg', ir.Namespace.SVG],
     ['math', ir.Namespace.Math],

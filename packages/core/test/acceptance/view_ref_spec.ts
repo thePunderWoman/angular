@@ -15,6 +15,7 @@ import {
   ElementRef,
   EmbeddedViewRef,
   EnvironmentInjector,
+  Injector,
   TemplateRef,
   ViewChild,
   ViewContainerRef,
@@ -27,6 +28,7 @@ describe('ViewRef', () => {
     @Component({
       selector: 'dynamic-cpt',
       template: '<div></div>',
+      standalone: false,
     })
     class DynamicComponent {
       constructor(public elRef: ElementRef) {}
@@ -34,6 +36,7 @@ describe('ViewRef', () => {
 
     @Component({
       template: `<span></span>`,
+      standalone: false,
     })
     class App {
       componentRef!: ComponentRef<DynamicComponent>;
@@ -53,6 +56,7 @@ describe('ViewRef', () => {
       }
     }
 
+    TestBed.configureTestingModule({declarations: [App, DynamicComponent]});
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
 
@@ -71,6 +75,7 @@ describe('ViewRef', () => {
 
     @Component({
       template: '',
+      standalone: false,
     })
     class App {
       constructor(changeDetectorRef: ChangeDetectorRef) {
@@ -78,6 +83,7 @@ describe('ViewRef', () => {
       }
     }
 
+    TestBed.configureTestingModule({declarations: [App]});
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     fixture.destroy();
@@ -88,6 +94,7 @@ describe('ViewRef', () => {
   it('should remove view ref from view container when destroyed', () => {
     @Component({
       template: '',
+      standalone: false,
     })
     class DynamicComponent {
       constructor(public viewContainerRef: ViewContainerRef) {}
@@ -95,6 +102,7 @@ describe('ViewRef', () => {
 
     @Component({
       template: `<ng-template>Hello</ng-template>`,
+      standalone: false,
     })
     class App {
       @ViewChild(TemplateRef) templateRef!: TemplateRef<any>;
@@ -109,6 +117,7 @@ describe('ViewRef', () => {
       }
     }
 
+    TestBed.configureTestingModule({declarations: [App, DynamicComponent]});
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     fixture.componentInstance.create();
@@ -122,6 +131,7 @@ describe('ViewRef', () => {
   it('should mark a ViewRef as destroyed when the host view is destroyed', () => {
     @Component({
       template: '',
+      standalone: false,
     })
     class DynamicComponent {
       constructor(public viewContainerRef: ViewContainerRef) {}
@@ -129,6 +139,7 @@ describe('ViewRef', () => {
 
     @Component({
       template: `<ng-template>Hello</ng-template>`,
+      standalone: false,
     })
     class App {
       @ViewChild(TemplateRef) templateRef!: TemplateRef<any>;
@@ -143,6 +154,7 @@ describe('ViewRef', () => {
       }
     }
 
+    TestBed.configureTestingModule({declarations: [App, DynamicComponent]});
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     fixture.componentInstance.create();

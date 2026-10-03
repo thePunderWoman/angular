@@ -6,9 +6,9 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {computed, signal, Service} from '@angular/core';
+import {computed, Injectable, signal} from '@angular/core';
 
-@Service()
+@Injectable({providedIn: 'root'})
 export class SampleService {
   exampleBoolean = true;
   exampleString = 'John';

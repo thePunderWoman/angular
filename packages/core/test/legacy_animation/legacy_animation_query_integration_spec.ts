@@ -8,7 +8,6 @@
 import {
   animate,
   animateChild,
-  ɵAnimationGroupPlayer as AnimationGroupPlayer,
   AnimationPlayer,
   AUTO_STYLE,
   group,
@@ -19,27 +18,22 @@ import {
   style,
   transition,
   trigger,
+  ɵAnimationGroupPlayer as AnimationGroupPlayer,
 } from '@angular/animations';
 import {
   AnimationDriver,
-  ɵENTER_CLASSNAME as ENTER_CLASSNAME,
-  ɵLEAVE_CLASSNAME as LEAVE_CLASSNAME,
+  ɵAnimationEngine,
   ɵnormalizeKeyframes as normalizeKeyframes,
   ɵTransitionAnimationPlayer as TransitionAnimationPlayer,
-  ɵAnimationEngine,
+  ɵENTER_CLASSNAME as ENTER_CLASSNAME,
+  ɵLEAVE_CLASSNAME as LEAVE_CLASSNAME,
 } from '@angular/animations/browser';
 import {MockAnimationDriver, MockAnimationPlayer} from '@angular/animations/browser/testing';
 import {CommonModule} from '@angular/common';
+import {Component, HostBinding, ViewChild, provideZoneChangeDetection} from '../../src/core';
+import {fakeAsync, flushMicrotasks, TestBed} from '../../testing';
 import {BrowserAnimationsModule} from '@angular/platform-browser/animations';
 import {isNode} from '@angular/private/testing';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  HostBinding,
-  provideZoneChangeDetection,
-  ViewChild,
-} from '../../src/core';
-import {fakeAsync, flushMicrotasks, TestBed} from '../../testing';
 
 import {HostListener} from '../../src/metadata/directives';
 
@@ -99,7 +93,6 @@ import {HostListener} from '../../src/metadata/directives';
             trigger('c', [transition('* => 1', [animate(1000, style({opacity: 0}))])]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp0: any;
@@ -156,7 +149,6 @@ import {HostListener} from '../../src/metadata/directives';
             trigger('c', [transition('* => 1', [animate(1000, style({opacity: 0}))])]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp0: any;
@@ -230,7 +222,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp0: any;
@@ -280,7 +271,8 @@ import {HostListener} from '../../src/metadata/directives';
           selector: 'ani-cmp',
           template: `
             <div [@myAnimation]="exp" #parent>
-              <div *ngFor="let item of items" class="item e-{{ item }}"></div>
+              <div *ngFor="let item of items" class="item e-{{ item }}">
+              </div>
             </div>
           `,
           animations: [
@@ -297,7 +289,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: any;
@@ -352,7 +343,6 @@ import {HostListener} from '../../src/metadata/directives';
             trigger('child', [transition('* => *', [])]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp0: any;
@@ -434,7 +424,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: any;
@@ -538,7 +527,9 @@ import {HostListener} from '../../src/metadata/directives';
       it('should retain style values when :self is used inside of a query', () => {
         @Component({
           selector: 'ani-cmp',
-          template: ` <div [@myAnimation]="exp"></div> `,
+          template: `
+            <div [@myAnimation]="exp"></div>
+          `,
           animations: [
             trigger('myAnimation', [
               transition('* => go', [
@@ -548,7 +539,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: any;
@@ -617,7 +607,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: any;
@@ -651,12 +640,12 @@ import {HostListener} from '../../src/metadata/directives';
         @Component({
           selector: 'ani-cmp',
           template: `
-            <div [@myAnimation]="exp">
-              <div *ngFor="let item of items" class="item">
-                {{ item }}
-              </div>
+          <div [@myAnimation]="exp">
+            <div *ngFor="let item of items" class="item">
+              {{ item }}
             </div>
-          `,
+          </div>
+        `,
           animations: [
             trigger('myAnimation', [
               transition('* => go', [
@@ -668,7 +657,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: any;
@@ -724,12 +712,12 @@ import {HostListener} from '../../src/metadata/directives';
         @Component({
           selector: 'ani-cmp',
           template: `
-            <div [@myAnimation]="exp">
-              <div *ngFor="let item of items" class="item">
-                {{ item }}
-              </div>
+          <div [@myAnimation]="exp">
+            <div *ngFor="let item of items" class="item">
+              {{ item }}
             </div>
-          `,
+          </div>
+        `,
           animations: [
             trigger('myAnimation', [
               transition('* => go', [
@@ -744,7 +732,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: any;
@@ -789,7 +776,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp1: any;
@@ -844,7 +830,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public items: any[] = [0, 1, 2];
@@ -902,7 +887,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           @ViewChild('container') public container: any;
@@ -952,7 +936,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: any;
@@ -1015,7 +998,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: any;
@@ -1073,7 +1055,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public items: any[] | undefined;
@@ -1165,7 +1146,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: any;
@@ -1237,7 +1217,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp1: any = '';
@@ -1302,7 +1281,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp1: any = '';
@@ -1374,7 +1352,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: any;
@@ -1428,7 +1405,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: any;
@@ -1490,7 +1466,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp1: any;
@@ -1565,7 +1540,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: any;
@@ -1622,7 +1596,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: any;
@@ -1683,7 +1656,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ParentCmp {
           public exp: any;
@@ -1699,7 +1671,6 @@ import {HostListener} from '../../src/metadata/directives';
             </div>
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ChildCmp {
           public items: any[] = [];
@@ -1736,7 +1707,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ParentCmp {
           public exp: any;
@@ -1752,7 +1722,6 @@ import {HostListener} from '../../src/metadata/directives';
             </div>
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ChildCmp {
           public items: any[] = [];
@@ -1782,12 +1751,12 @@ import {HostListener} from '../../src/metadata/directives';
           @Component({
             selector: 'cmp',
             template: `
-              <div [@myAnimation]="exp">
-                <div *ngFor="let item of items" class="item">
-                  {{ item }}
-                </div>
+             <div [@myAnimation]="exp">
+              <div *ngFor="let item of items" class="item">
+                {{ item }}
               </div>
-            `,
+             </div>
+          `,
             animations: [
               trigger('myAnimation', [
                 transition('* => go', [
@@ -1798,7 +1767,6 @@ import {HostListener} from '../../src/metadata/directives';
               ]),
             ],
             standalone: false,
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class Cmp {
             public exp: any;
@@ -1824,12 +1792,12 @@ import {HostListener} from '../../src/metadata/directives';
           @Component({
             selector: 'cmp',
             template: `
-              <div [@myAnimation]="exp">
-                <div *ngFor="let item of items" class="item">
-                  {{ item }}
-                </div>
+             <div [@myAnimation]="exp">
+              <div *ngFor="let item of items" class="item">
+                {{ item }}
               </div>
-            `,
+             </div>
+          `,
             animations: [
               trigger('myAnimation', [
                 transition('* => go', [
@@ -1840,7 +1808,6 @@ import {HostListener} from '../../src/metadata/directives';
               ]),
             ],
             standalone: false,
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class Cmp {
             public exp: any;
@@ -1890,7 +1857,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp1: any;
@@ -1981,7 +1947,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: any;
@@ -2063,7 +2028,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: any;
@@ -2118,7 +2082,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp1: any;
@@ -2182,7 +2145,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp1: any;
@@ -2248,7 +2210,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp1: any;
@@ -2292,7 +2253,8 @@ import {HostListener} from '../../src/metadata/directives';
           template: `
             <div [@parent]="exp1" class="parent1" #parent>
               <div [@parent]="exp1" class="parent2">
-                <div [@child]="exp2" class="child"></div>
+                <div [@child]="exp2" class="child">
+                </div>
               </div>
             </div>
           `,
@@ -2309,7 +2271,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp1: any;
@@ -2362,7 +2323,6 @@ import {HostListener} from '../../src/metadata/directives';
             trigger('parent', [transition(':leave', [query(':leave', animateChild())])]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ParentCmp {
           public exp: boolean = true;
@@ -2384,7 +2344,6 @@ import {HostListener} from '../../src/metadata/directives';
             trigger('child', [transition(':leave', [animate(1000, style({color: 'gold'}))])]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ChildCmp {
           public childEvent: any;
@@ -2429,7 +2388,6 @@ import {HostListener} from '../../src/metadata/directives';
             trigger('myAnimation', [transition(':leave', [query('@*', animateChild())])]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ParentCmp {
           public exp: boolean = true;
@@ -2438,17 +2396,16 @@ import {HostListener} from '../../src/metadata/directives';
         @Component({
           selector: 'child-cmp',
           template: `
-            <section>
-              <div class="inner-div" @myChildAnimation></div>
-            </section>
-          `,
+               <section>
+                 <div class="inner-div" @myChildAnimation></div>
+               </section>
+             `,
           animations: [
             trigger('myChildAnimation', [
               transition(':leave', [style({opacity: 0}), animate('1s', style({opacity: 1}))]),
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ChildCmp {}
 
@@ -2498,7 +2455,6 @@ import {HostListener} from '../../src/metadata/directives';
             trigger('myAnimation', [transition(':leave', [query('@*', animateChild())])]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ParentCmp {
           public exp: boolean = true;
@@ -2506,26 +2462,26 @@ import {HostListener} from '../../src/metadata/directives';
 
         @Component({
           selector: 'child-cmp',
-          template: ` <nested-child-cmp></nested-child-cmp> `,
+          template: `
+               <nested-child-cmp></nested-child-cmp>
+             `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ChildCmp {}
 
         @Component({
           selector: 'nested-child-cmp',
           template: `
-            <section>
-              <div class="inner-div" @myChildAnimation></div>
-            </section>
-          `,
+               <section>
+                 <div class="inner-div" @myChildAnimation></div>
+               </section>
+             `,
           animations: [
             trigger('myChildAnimation', [
               transition(':leave', [style({opacity: 0}), animate('1s', style({opacity: 1}))]),
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class NestedChildCmp {}
 
@@ -2568,8 +2524,7 @@ import {HostListener} from '../../src/metadata/directives';
           selector: 'ani-cmp',
           template: `
             <div @parent *ngIf="exp" class="parent">
-              this
-              <div @child>child</div>
+              this <div @child>child</div>
             </div>
           `,
           animations: [
@@ -2584,7 +2539,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: boolean = true;
@@ -2623,16 +2577,19 @@ import {HostListener} from '../../src/metadata/directives';
             <section class="container" [@anim]="exp ? 'enter' : 'leave'">
               <div class="a" *ngIf="exp">
                 <div class="b" *ngIf="exp">
-                  <div class="c" *ngIf="exp">text</div>
+                  <div class="c" *ngIf="exp">
+                    text
+                  </div>
                 </div>
               </div>
               <div>
-                <div class="d" *ngIf="exp">text2</div>
+                <div class="d" *ngIf="exp">
+                  text2
+                </div>
               </div>
             </section>
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: boolean | undefined;
@@ -2701,7 +2658,6 @@ import {HostListener} from '../../src/metadata/directives';
             </div>
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           get title() {
@@ -2798,36 +2754,13 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           template: `
-            <div
-              data-name="p"
-              class="parent"
-              @parent
-              *ngIf="exp"
-              (@parent.start)="callback($event)"
-              (@parent.done)="callback($event)"
-            >
-              <div
-                data-name="c1"
-                @child
-                (@child.start)="callback($event)"
-                (@child.done)="callback($event)"
-              ></div>
-              <div
-                data-name="c2"
-                @child
-                (@child.start)="callback($event)"
-                (@child.done)="callback($event)"
-              ></div>
-              <div
-                data-name="c3"
-                @childWithAnimation
-                (@childWithAnimation.start)="callback($event)"
-                (@childWithAnimation.done)="callback($event)"
-              ></div>
+            <div data-name="p" class="parent" @parent *ngIf="exp" (@parent.start)="callback($event)" (@parent.done)="callback($event)">
+              <div data-name="c1" @child (@child.start)="callback($event)" (@child.done)="callback($event)"></div>
+              <div data-name="c2" @child (@child.start)="callback($event)" (@child.done)="callback($event)"></div>
+              <div data-name="c3" @childWithAnimation (@childWithAnimation.start)="callback($event)" (@childWithAnimation.done)="callback($event)"></div>
             </div>
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp: boolean | undefined;
@@ -2871,7 +2804,6 @@ import {HostListener} from '../../src/metadata/directives';
           ],
           template: '<div [@parent]="exp"><child-cmp #child></child-cmp></div>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ParentCmp {
           public exp: any;
@@ -2886,7 +2818,6 @@ import {HostListener} from '../../src/metadata/directives';
           ],
           template: '<div [@child]="exp"></div>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ChildCmp {
           public exp: any;
@@ -2929,17 +2860,14 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           template: `
-            <div
-              *ngIf="!remove"
-              [@parent]="exp"
-              (@parent.start)="track($event)"
-              (@parent.done)="track($event)"
-            >
-              <child-cmp #child></child-cmp>
+            <div *ngIf="!remove"
+                 [@parent]="exp"
+                 (@parent.start)="track($event)"
+                 (@parent.done)="track($event)">
+                 <child-cmp #child></child-cmp>
             </div>
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ParentCmp {
           @ViewChild('child') public childCmp: any;
@@ -2964,10 +2892,11 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           template: `
-            <div [@child]="exp" (@child.start)="track($event)" (@child.done)="track($event)"></div>
+            <div [@child]="exp"
+                 (@child.start)="track($event)"
+                 (@child.done)="track($event)"></div>
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ChildCmp {
           public exp: any;
@@ -3046,22 +2975,13 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           template: `
-            <div
-              [@parent1]="parent1Exp"
-              (@parent1.start)="track($event)"
-              [@parent2]="parent2Exp"
-              (@parent2.start)="track($event)"
-            >
-              <div
-                [@child1]="child1Exp"
-                (@child1.start)="track($event)"
-                [@child2]="child2Exp"
-                (@child2.start)="track($event)"
-              ></div>
-            </div>
+               <div [@parent1]="parent1Exp" (@parent1.start)="track($event)"
+                    [@parent2]="parent2Exp" (@parent2.start)="track($event)">
+                 <div [@child1]="child1Exp" (@child1.start)="track($event)"
+                      [@child2]="child2Exp" (@child2.start)="track($event)"></div>
+               </div>
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public parent1Exp = '';
@@ -3113,7 +3033,6 @@ import {HostListener} from '../../src/metadata/directives';
           ],
           template: '<div [@parent]="exp"><child-cmp #child></child-cmp></div>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ParentCmp {
           public exp: any;
@@ -3130,7 +3049,6 @@ import {HostListener} from '../../src/metadata/directives';
           ],
           template: '<div [@child]="exp" class="child"></div>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ChildCmp {
           public exp: any;
@@ -3188,7 +3106,6 @@ import {HostListener} from '../../src/metadata/directives';
           ],
           template: '<div [@parentAnimation]="exp"><child-cmp #child></child-cmp></div>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ParentCmp {
           public exp: any;
@@ -3200,7 +3117,6 @@ import {HostListener} from '../../src/metadata/directives';
           selector: 'child-cmp',
           template: '<grandchild-cmp #grandchild></grandchild-cmp>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class ChildCmp {
           @ViewChild('grandchild') public innerCmp: any;
@@ -3218,7 +3134,6 @@ import {HostListener} from '../../src/metadata/directives';
           ],
           template: '<div [@grandChildAnimation]="exp"></div>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class GrandChildCmp {
           public exp: any;
@@ -3293,18 +3208,17 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           template: `
-            <div @parent *ngIf="exp1" class="container">
-              <div *ngIf="exp2">
-                <div @child>
-                  <div *ngIf="exp3">
-                    <div class="item"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          `,
+               <div @parent *ngIf="exp1" class="container">
+                 <div *ngIf="exp2">
+                   <div @child>
+                     <div *ngIf="exp3">
+                       <div class="item"></div>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp1: any;
@@ -3357,18 +3271,17 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           template: `
-            <div @parent *ngIf="exp1" class="container">
-              <div *ngIf="exp2">
-                <div @child>
-                  <div *ngIf="exp3">
-                    <div class="item"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          `,
+               <div @parent *ngIf="exp1" class="container">
+                 <div *ngIf="exp2">
+                   <div @child>
+                     <div *ngIf="exp3">
+                       <div class="item"></div>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp1: any;
@@ -3408,7 +3321,7 @@ import {HostListener} from '../../src/metadata/directives';
           template: `
             <div class="grand-parent" [@grandParentAnimation]="childPresent">
               <div class="parent" [@parentAnimation]="childPresent">
-                <div *ngIf="childPresent" class="child"></div>
+              <div *ngIf="childPresent" class="child"></div>
               </div>
             </div>
           `,
@@ -3424,7 +3337,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public childPresent = true;
@@ -3454,10 +3366,10 @@ import {HostListener} from '../../src/metadata/directives';
         @Component({
           selector: 'cmp',
           template: `
-            <div class="parent" [@parent]="exp">
-              <div class="child" *ngIf="exp"></div>
-            </div>
-          `,
+          <div class="parent" [@parent]="exp">
+            <div class="child" *ngIf="exp"></div>
+          </div>
+        `,
           animations: [
             trigger('parent', [
               state('true', style({backgroundColor: 'red'})),
@@ -3474,7 +3386,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp = true;
@@ -3515,10 +3426,10 @@ import {HostListener} from '../../src/metadata/directives';
         @Component({
           selector: 'cmp',
           template: `
-            <div class="parent" [@parent]="exp">
-              <div class="child" *ngIf="exp"></div>
-            </div>
-          `,
+          <div class="parent" [@parent]="exp">
+            <div class="child" *ngIf="exp"></div>
+          </div>
+        `,
           animations: [
             trigger('parent', [
               state('true', style({backgroundColor: 'red'})),
@@ -3535,7 +3446,6 @@ import {HostListener} from '../../src/metadata/directives';
             ]),
           ],
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Cmp {
           public exp = false;
@@ -3595,7 +3505,6 @@ import {HostListener} from '../../src/metadata/directives';
               ]),
             ],
             standalone: false,
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class Cmp {
             exp: any = '';
@@ -3644,7 +3553,6 @@ import {HostListener} from '../../src/metadata/directives';
               ]),
             ],
             standalone: false,
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class Cmp {
             exp: any = '';
@@ -3697,7 +3605,6 @@ import {HostListener} from '../../src/metadata/directives';
               ]),
             ],
             standalone: false,
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class Cmp {
             exp: any = '';

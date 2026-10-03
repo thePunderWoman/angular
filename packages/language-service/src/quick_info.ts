@@ -13,13 +13,13 @@ import {
   TmplAstNode,
   TmplAstTextAttribute,
 } from '@angular/compiler';
+import {NgCompiler} from '@angular/compiler-cli/src/ngtsc/core';
 import {
   DirectiveSymbol,
   DomBindingSymbol,
   ElementSymbol,
   InputBindingSymbol,
   LetDeclarationSymbol,
-  NgCompiler,
   OutputBindingSymbol,
   PipeSymbol,
   ReferenceSymbol,
@@ -29,18 +29,15 @@ import {
   SymbolKind,
   TcbLocation,
   VariableSymbol,
-} from '@angular/compiler-cli';
-
+} from '@angular/compiler-cli/src/ngtsc/typecheck/api';
 import ts from 'typescript';
 
 import {DisplayInfoKind, SYMBOL_PUNC, SYMBOL_SPACE, SYMBOL_TEXT} from './utils/display_parts';
 import {
   createDollarAnyQuickInfo,
-  createDollarSafeNavigationMigration,
   createNgTemplateQuickInfo,
   createQuickInfoForBuiltIn,
   isDollarAny,
-  isDollarSafeNavigationMigration,
 } from './quick_info_built_ins';
 import {TemplateTarget} from './template_target';
 import {
@@ -88,18 +85,6 @@ export class QuickInfoBuilder {
       return createDollarAnyQuickInfo(this.parent);
     }
 
-    if (isDollarSafeNavigationMigration(this.node)) {
-      return createDollarSafeNavigationMigration(this.node);
-    }
-
-    if (
-      this.parent !== null &&
-      isDollarSafeNavigationMigration(this.parent) &&
-      this.parent.receiver === this.node
-    ) {
-      return createDollarSafeNavigationMigration(this.parent);
-    }
-
     return undefined;
   }
 
@@ -126,9 +111,8 @@ export class QuickInfoBuilder {
       case SymbolKind.SelectorlessDirective:
         return this.getQuickInfoForSelectorlessSymbol(symbol);
       case SymbolKind.Expression:
-        return this.getQuickInfoAtTcbLocation(symbol.tcbLocation);
       case SymbolKind.Directive:
-        return this.getQuickInfoForDirectiveSymbol(symbol);
+        return this.getQuickInfoAtTcbLocation(symbol.tcbLocation);
     }
   }
 
@@ -160,38 +144,31 @@ export class QuickInfoBuilder {
       DisplayInfoKind.ELEMENT,
       getTextSpanOfNode(templateNode),
       undefined /* containerName */,
-      this.typeChecker.typeToString(
-        this.compiler.getTemplateTypeChecker().getTypeOfSymbol(symbol)!,
-      ),
+      this.typeChecker.typeToString(symbol.tsType),
     );
   }
 
-  private getQuickInfoForVariableSymbol(symbol: VariableSymbol): ts.QuickInfo | undefined {
-    const quickInfo = this.getQuickInfoAtTcbLocation(symbol.localVarLocation);
-    if (quickInfo === undefined || quickInfo.displayParts === undefined) {
-      return quickInfo;
-    }
-
-    for (const part of quickInfo.displayParts) {
-      if (part.kind === 'localName') {
-        part.text = symbol.declaration.name;
-        break;
-      }
-    }
-
-    return updateQuickInfoKind(quickInfo, DisplayInfoKind.VARIABLE);
+  private getQuickInfoForVariableSymbol(symbol: VariableSymbol): ts.QuickInfo {
+    const info = this.getQuickInfoFromTypeDefAtLocation(symbol.initializerLocation);
+    return createQuickInfo(
+      symbol.declaration.name,
+      DisplayInfoKind.VARIABLE,
+      getTextSpanOfNode(this.node),
+      undefined /* containerName */,
+      this.typeChecker.typeToString(symbol.tsType),
+      info?.documentation,
+      info?.tags,
+    );
   }
 
   private getQuickInfoForLetDeclarationSymbol(symbol: LetDeclarationSymbol): ts.QuickInfo {
-    const info = this.getQuickInfoAtTcbLocation(symbol.localVarLocation);
+    const info = this.getQuickInfoFromTypeDefAtLocation(symbol.initializerLocation);
     return createQuickInfo(
       symbol.declaration.name,
       DisplayInfoKind.LET,
       getTextSpanOfNode(this.node),
       undefined /* containerName */,
-      this.typeChecker.typeToString(
-        this.compiler.getTemplateTypeChecker().getTypeOfSymbol(symbol)!,
-      ),
+      this.typeChecker.typeToString(symbol.tsType),
       info?.documentation,
       info?.tags,
     );
@@ -204,25 +181,21 @@ export class QuickInfoBuilder {
       DisplayInfoKind.REFERENCE,
       getTextSpanOfNode(this.node),
       undefined /* containerName */,
-      this.typeChecker.typeToString(
-        this.compiler.getTemplateTypeChecker().getTypeOfSymbol(symbol)!,
-      ),
+      this.typeChecker.typeToString(symbol.tsType),
       info?.documentation,
       info?.tags,
     );
   }
 
   private getQuickInfoForPipeSymbol(symbol: PipeSymbol): ts.QuickInfo | undefined {
-    if (this.compiler.getTemplateTypeChecker().getTsSymbolOfSymbol(symbol) !== null) {
+    if (symbol.tsSymbol !== null) {
       const quickInfo = this.getQuickInfoAtTcbLocation(symbol.tcbLocation);
       return quickInfo === undefined
         ? undefined
         : updateQuickInfoKind(quickInfo, DisplayInfoKind.PIPE);
     } else {
       return createQuickInfo(
-        this.typeChecker.typeToString(
-          this.compiler.getTemplateTypeChecker().getTypeOfSymbol(symbol.classSymbol)!,
-        ),
+        this.typeChecker.typeToString(symbol.classSymbol.tsType),
         DisplayInfoKind.PIPE,
         getTextSpanOfNode(this.node),
       );
@@ -253,17 +226,12 @@ export class QuickInfoBuilder {
     const kind = dir.isComponent ? DisplayInfoKind.COMPONENT : DisplayInfoKind.DIRECTIVE;
     const info = this.getQuickInfoFromTypeDefAtLocation(dir.tcbLocation);
     let containerName: string | undefined;
-    const tsSymbol = this.compiler.getTemplateTypeChecker().getTsSymbolOfSymbol(dir);
-    if (
-      tsSymbol?.valueDeclaration &&
-      ts.isClassDeclaration(tsSymbol.valueDeclaration) &&
-      dir.ngModule !== null
-    ) {
+    if (ts.isClassDeclaration(dir.tsSymbol.valueDeclaration) && dir.ngModule !== null) {
       containerName = dir.ngModule.name.getText();
     }
 
     return createQuickInfo(
-      this.typeChecker.typeToString(this.compiler.getTemplateTypeChecker().getTypeOfSymbol(dir)!),
+      this.typeChecker.typeToString(dir.tsType),
       kind,
       getTextSpanOfNode(this.node),
       containerName,
@@ -283,9 +251,7 @@ export class QuickInfoBuilder {
     const info = this.getQuickInfoFromTypeDefAtLocation(symbol.tcbLocation);
 
     return createQuickInfo(
-      this.typeChecker.typeToString(
-        this.compiler.getTemplateTypeChecker().getTypeOfSymbol(symbol)!,
-      ),
+      this.typeChecker.typeToString(symbol.tsType),
       kind,
       getTextSpanOfNode(this.node),
       undefined,

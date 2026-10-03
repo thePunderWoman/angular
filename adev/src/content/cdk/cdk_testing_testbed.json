@@ -6,6 +6,7 @@
   "entries": [
     {
       "name": "TestbedHarnessEnvironmentOptions",
+      "isAbstract": false,
       "entryType": "interface",
       "members": [
         {
@@ -21,32 +22,11 @@
       "description": "Options to configure the environment.",
       "jsdocTags": [],
       "rawComment": "/** Options to configure the environment. */",
-      "extends": [],
       "implements": [],
       "source": {
         "filePath": "/src/cdk/testing/testbed/testbed-harness-environment.ts",
         "startLine": 25,
         "endLine": 28
-      }
-    },
-    {
-      "name": "Fixture",
-      "type": "ComponentFixture<T> | DirectiveFixture<T>",
-      "entryType": "type_alias",
-      "generics": [
-        {
-          "name": "T",
-          "default": "unknown"
-        }
-      ],
-      "rawComment": "/** Covers all fixtures supported by `TestBed`. */",
-      "description": "Covers all fixtures supported by `TestBed`.",
-      "jsdocTags": [],
-      "members": [],
-      "source": {
-        "filePath": "/src/cdk/testing/testbed/testbed-harness-environment.ts",
-        "startLine": 36,
-        "endLine": 36
       }
     },
     {
@@ -69,7 +49,7 @@
               {
                 "name": "_fixture",
                 "description": "",
-                "type": "any",
+                "type": "ComponentFixture<unknown>",
                 "isOptional": false,
                 "isRestParam": false
               },
@@ -138,12 +118,12 @@
             {
               "name": "waitForTasksOutsideAngular",
               "entryType": "function",
-              "description": "Waits for all scheduled or running async tasks to complete. This allows harness\nauthors to wait for async tasks outside of the Angular zone.\n\nThis only works when Zone.js is present _and_ patches are applied to the test framework\nby `zone.js/testing` (Jasmine and Jest only) or another script.",
+              "description": "Waits for all scheduled or running async tasks to complete. This allows harness\nauthors to wait for async tasks outside of the Angular zone.",
               "generics": [],
               "isNewType": false,
               "jsdocTags": [],
               "params": [],
-              "rawComment": "/**\n   * Waits for all scheduled or running async tasks to complete. This allows harness\n   * authors to wait for async tasks outside of the Angular zone.\n   *\n   * This only works when Zone.js is present _and_ patches are applied to the test framework\n   * by `zone.js/testing` (Jasmine and Jest only) or another script.\n   */",
+              "rawComment": "/**\n   * Waits for all scheduled or running async tasks to complete. This allows harness\n   * authors to wait for async tasks outside of the Angular zone.\n   */",
               "returnType": "Promise<void>"
             }
           ],
@@ -153,15 +133,15 @@
             "returnType": "Promise<void>",
             "generics": [],
             "name": "waitForTasksOutsideAngular",
-            "description": "Waits for all scheduled or running async tasks to complete. This allows harness\nauthors to wait for async tasks outside of the Angular zone.\n\nThis only works when Zone.js is present _and_ patches are applied to the test framework\nby `zone.js/testing` (Jasmine and Jest only) or another script.",
+            "description": "Waits for all scheduled or running async tasks to complete. This allows harness\nauthors to wait for async tasks outside of the Angular zone.",
             "entryType": "function",
             "jsdocTags": [],
-            "rawComment": "/**\n   * Waits for all scheduled or running async tasks to complete. This allows harness\n   * authors to wait for async tasks outside of the Angular zone.\n   *\n   * This only works when Zone.js is present _and_ patches are applied to the test framework\n   * by `zone.js/testing` (Jasmine and Jest only) or another script.\n   */"
+            "rawComment": "/**\n   * Waits for all scheduled or running async tasks to complete. This allows harness\n   * authors to wait for async tasks outside of the Angular zone.\n   */"
           },
           "entryType": "function",
-          "description": "Waits for all scheduled or running async tasks to complete. This allows harness\nauthors to wait for async tasks outside of the Angular zone.\n\nThis only works when Zone.js is present _and_ patches are applied to the test framework\nby `zone.js/testing` (Jasmine and Jest only) or another script.",
+          "description": "Waits for all scheduled or running async tasks to complete. This allows harness\nauthors to wait for async tasks outside of the Angular zone.",
           "jsdocTags": [],
-          "rawComment": "/**\n   * Waits for all scheduled or running async tasks to complete. This allows harness\n   * authors to wait for async tasks outside of the Angular zone.\n   *\n   * This only works when Zone.js is present _and_ patches are applied to the test framework\n   * by `zone.js/testing` (Jasmine and Jest only) or another script.\n   */",
+          "rawComment": "/**\n   * Waits for all scheduled or running async tasks to complete. This allows harness\n   * authors to wait for async tasks outside of the Angular zone.\n   */",
           "memberType": "method",
           "memberTags": []
         },
@@ -367,7 +347,7 @@
                 {
                   "name": "fixture",
                   "description": "",
-                  "type": "any",
+                  "type": "ComponentFixture<unknown>",
                   "isOptional": false,
                   "isRestParam": false
                 },
@@ -388,7 +368,7 @@
               {
                 "name": "fixture",
                 "description": "",
-                "type": "any",
+                "type": "ComponentFixture<unknown>",
                 "isOptional": false,
                 "isRestParam": false
               },
@@ -432,7 +412,7 @@
                 {
                   "name": "fixture",
                   "description": "",
-                  "type": "any",
+                  "type": "ComponentFixture<unknown>",
                   "isOptional": false,
                   "isRestParam": false
                 },
@@ -453,7 +433,7 @@
               {
                 "name": "fixture",
                 "description": "",
-                "type": "any",
+                "type": "ComponentFixture<unknown>",
                 "isOptional": false,
                 "isRestParam": false
               },
@@ -553,7 +533,7 @@
                 {
                   "name": "fixture",
                   "description": "",
-                  "type": "any",
+                  "type": "ComponentFixture<unknown>",
                   "isOptional": false,
                   "isRestParam": false
                 },
@@ -581,7 +561,7 @@
               {
                 "name": "fixture",
                 "description": "",
-                "type": "any",
+                "type": "ComponentFixture<unknown>",
                 "isOptional": false,
                 "isRestParam": false
               },
@@ -632,8 +612,8 @@
       "implements": [],
       "source": {
         "filePath": "/src/cdk/testing/testbed/testbed-harness-environment.ts",
-        "startLine": 92,
-        "endLine": 232
+        "startLine": 89,
+        "endLine": 222
       }
     },
     {
@@ -858,9 +838,9 @@
             "rawComment": ""
           },
           "entryType": "function",
-          "description": "Click the element at the default location for the current environment. If you need to guarantee\nthe element is clicked at a specific location, consider using `click('center')` or\n`click(x, y)` instead.",
+          "description": "",
           "jsdocTags": [],
-          "rawComment": "/**\n   * Click the element at the default location for the current environment. If you need to guarantee\n   * the element is clicked at a specific location, consider using `click('center')` or\n   * `click(x, y)` instead.\n   */",
+          "rawComment": "",
           "memberType": "method",
           "memberTags": []
         },
@@ -934,22 +914,9 @@
             "rawComment": ""
           },
           "entryType": "function",
-          "description": "Right clicks on the element at the specified coordinates relative to the top-left of it.",
-          "jsdocTags": [
-            {
-              "name": "param",
-              "comment": "Coordinate within the element, along the X-axis at which to click."
-            },
-            {
-              "name": "param",
-              "comment": "Coordinate within the element, along the Y-axis at which to click."
-            },
-            {
-              "name": "param",
-              "comment": "Modifier keys held while clicking"
-            }
-          ],
-          "rawComment": "/**\n   * Right clicks on the element at the specified coordinates relative to the top-left of it.\n   * @param relativeX Coordinate within the element, along the X-axis at which to click.\n   * @param relativeY Coordinate within the element, along the Y-axis at which to click.\n   * @param modifiers Modifier keys held while clicking\n   */",
+          "description": "",
+          "jsdocTags": [],
+          "rawComment": "",
           "memberType": "method",
           "memberTags": []
         },
@@ -1170,9 +1137,9 @@
             "rawComment": ""
           },
           "entryType": "function",
-          "description": "Sends the given string to the input as a series of key presses. Also fires input events\nand attempts to add the string to the Element's value. Note that this cannot\nreproduce native browser behavior for keyboard shortcuts such as Tab, Ctrl + A, etc.",
+          "description": "",
           "jsdocTags": [],
-          "rawComment": "/**\n   * Sends the given string to the input as a series of key presses. Also fires input events\n   * and attempts to add the string to the Element's value. Note that this cannot\n   * reproduce native browser behavior for keyboard shortcuts such as Tab, Ctrl + A, etc.\n   */",
+          "rawComment": "",
           "memberType": "method",
           "memberTags": []
         },
@@ -1773,19 +1740,11 @@
       "@angular/core/testing"
     ],
     [
-      "DirectiveFixture",
-      "@angular/core/testing"
-    ],
-    [
       "flush",
       "@angular/core/testing"
     ],
     [
       "TestbedHarnessEnvironmentOptions",
-      "@angular/cdk/testing/testbed"
-    ],
-    [
-      "Fixture",
       "@angular/cdk/testing/testbed"
     ],
     [
@@ -1802,10 +1761,6 @@
     ],
     [
       "TestbedHarnessEnvironmentOptions.queryFn",
-      "@angular/cdk/testing/testbed"
-    ],
-    [
-      "Fixture",
       "@angular/cdk/testing/testbed"
     ],
     [

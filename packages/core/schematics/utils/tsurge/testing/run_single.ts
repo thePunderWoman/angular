@@ -6,12 +6,16 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {absoluteFrom, AbsoluteFsPath, getFileSystem} from '@angular/compiler-cli';
-import {MockFileSystem} from '@angular/compiler-cli/private/testing';
-import ts from 'typescript';
-import {groupReplacementsByFile} from '../helpers/group_replacements';
 import {TsurgeFunnelMigration, TsurgeMigration} from '../migration';
+import {MockFileSystem} from '@angular/compiler-cli/src/ngtsc/file_system/testing';
+import {
+  absoluteFrom,
+  AbsoluteFsPath,
+  getFileSystem,
+} from '@angular/compiler-cli/src/ngtsc/file_system';
+import {groupReplacementsByFile} from '../helpers/group_replacements';
 import {applyTextUpdates} from '../replacement';
+import ts from 'typescript';
 import {TestRun} from './test_run';
 
 /**
@@ -46,6 +50,7 @@ export async function runTsurgeMigration<Stats>(
     absoluteFrom('/tsconfig.json'),
     JSON.stringify({
       compilerOptions: {
+        strict: true,
         rootDir: '/',
         ...compilerOptions,
       },

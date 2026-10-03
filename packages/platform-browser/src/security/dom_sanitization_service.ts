@@ -8,6 +8,11 @@
 
 import {DOCUMENT} from '@angular/common';
 import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Sanitizer,
+  SecurityContext,
   ɵ_sanitizeHtml as _sanitizeHtml,
   ɵ_sanitizeUrl as _sanitizeUrl,
   ɵallowSanitizationBypassAndThrow as allowSanitizationBypassOrThrow,
@@ -17,13 +22,7 @@ import {
   ɵbypassSanitizationTrustStyle as bypassSanitizationTrustStyle,
   ɵbypassSanitizationTrustUrl as bypassSanitizationTrustUrl,
   ɵBypassType as BypassType,
-  forwardRef,
-  inject,
-  Injectable,
   ɵRuntimeError as RuntimeError,
-  Sanitizer,
-  SecurityContext,
-  Service,
   ɵunwrapSafeValue as unwrapSafeValue,
   ɵXSS_SECURITY_URL as XSS_SECURITY_URL,
 } from '@angular/core';
@@ -163,9 +162,12 @@ export abstract class DomSanitizer implements Sanitizer {
   abstract bypassSecurityTrustResourceUrl(value: string): SafeResourceUrl;
 }
 
-@Service()
+@Injectable({providedIn: 'root'})
 export class DomSanitizerImpl extends DomSanitizer {
-  private _doc = inject(DOCUMENT);
+  constructor(@Inject(DOCUMENT) private _doc: any) {
+    super();
+  }
+
   override sanitize(ctx: SecurityContext, value: SafeValue | string | null): string | null {
     if (value == null) return null;
     switch (ctx) {

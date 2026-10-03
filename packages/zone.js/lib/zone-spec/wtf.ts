@@ -165,7 +165,7 @@ export function patchWtf(Zone: ZoneType): void {
     if (!obj || !depth) return null;
     const out: {[k: string]: any} = {};
     for (const key in obj) {
-      if (Object.hasOwn(obj, key)) {
+      if (obj.hasOwnProperty(key)) {
         // explicit : any due to https://github.com/microsoft/TypeScript/issues/33191
         let value: any = obj[key];
         switch (typeof value) {

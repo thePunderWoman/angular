@@ -6,12 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {
-  ChangeDetectionStrategy,
-  Component,
-  NgModule,
-  provideZoneChangeDetection,
-} from '@angular/core';
+import {Component, NgModule, provideZoneChangeDetection} from '@angular/core';
 import {BrowserModule, DomSanitizer, SafeStyle} from '@angular/platform-browser';
 
 import {emptyTree, TreeNode} from '../util';
@@ -26,7 +21,6 @@ let trustedGreyColor: SafeStyle;
     ><tree *ngIf="data.right != null" [data]="data.right"></tree
     ><tree *ngIf="data.left != null" [data]="data.left"></tree>`,
   standalone: false,
-  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class TreeComponent {
   data: TreeNode = emptyTree;

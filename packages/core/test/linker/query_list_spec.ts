@@ -9,6 +9,7 @@
 import {ɵgetDOM as getDOM} from '@angular/common';
 import {QueryList} from '../../src/linker/query_list';
 import {iterateListLike} from '../../src/util/iterable';
+import {fakeAsync, tick} from '../../testing';
 
 describe('QueryList', () => {
   let queryList: QueryList<string>;
@@ -112,6 +113,10 @@ describe('QueryList', () => {
   it('should support toArray', () => {
     queryList.reset(['one', 'two']);
     expect(queryList.reduce((a: string, x: string) => a + x, 'start:')).toEqual('start:onetwo');
+  });
+
+  it('should support toArray', () => {
+    queryList.reset(['one', 'two']);
     expect(queryList.toArray()).toEqual(['one', 'two']);
   });
 
@@ -159,7 +164,7 @@ describe('QueryList', () => {
 
   if (getDOM().supportsDOMEvents) {
     describe('simple observable interface', () => {
-      it('should fire callbacks on change', () => {
+      it('should fire callbacks on change', fakeAsync(() => {
         let fires = 0;
         queryList.changes.subscribe({
           next: (_) => {
@@ -168,15 +173,17 @@ describe('QueryList', () => {
         });
 
         queryList.notifyOnChanges();
+        tick();
 
         expect(fires).toEqual(1);
 
         queryList.notifyOnChanges();
+        tick();
 
         expect(fires).toEqual(2);
-      });
+      }));
 
-      it('should provides query list as an argument', () => {
+      it('should provides query list as an argument', fakeAsync(() => {
         let recorded!: QueryList<string>;
         queryList.changes.subscribe({
           next: (v: QueryList<string>) => {
@@ -186,9 +193,10 @@ describe('QueryList', () => {
 
         queryList.reset(['one']);
         queryList.notifyOnChanges();
+        tick();
 
         expect(recorded).toBe(queryList);
-      });
+      }));
     });
   }
 });

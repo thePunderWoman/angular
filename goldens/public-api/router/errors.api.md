@@ -9,8 +9,6 @@ export const enum RuntimeErrorCode {
     // (undocumented)
     EMPTY_PATH_WITH_PARAMS = 4009,
     // (undocumented)
-    ERROR_PARSING_URL = 4018,
-    // (undocumented)
     FOR_ROOT_CALLED_TWICE = 4007,
     // (undocumented)
     INFINITE_REDIRECT = 4016,

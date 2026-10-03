@@ -15,14 +15,14 @@
  *
  * In the following example, `TruncatePipe` returns the shortened value with an added ellipses.
  *
- * {@example core/ts/pipes/simple_truncate.ts region='simple-truncate'}
+ * <code-example path="core/ts/pipes/simple_truncate.ts" header="simple_truncate.ts"></code-example>
  *
  * Invoking `{{ 'It was the best of times' | truncate }}` in a template will produce `It was...`.
  *
  * In the following example, `TruncatePipe` takes parameters that sets the truncated length and the
  * string to append with.
  *
- * {@example core/ts/pipes/truncate.ts region='truncate'}
+ * <code-example path="core/ts/pipes/truncate.ts" header="truncate.ts"></code-example>
  *
  * Invoking `{{ 'It was the best of times' | truncate:4:'....' }}` in a template will produce `It
  * was the best....`.

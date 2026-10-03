@@ -11,9 +11,7 @@ import {Property} from './property';
 /**
  * Map from jsaction annotation to a parsed map from event name to action name.
  */
-// tslint:disable-next-line:no-toplevel-property-access
-const parseCache: {[key: string]: {[key: string]: string | undefined}} =
-  /* @__PURE__ */ Object.create(null);
+const parseCache: {[key: string]: {[key: string]: string | undefined}} = {};
 
 /**
  * Reads the jsaction parser cache from the given DOM Element.
@@ -27,7 +25,7 @@ export function get(element: Element): {[key: string]: string | undefined} | und
  * creates an empty one.
  */
 export function getDefaulted(element: Element): {[key: string]: string | undefined} {
-  const cache = get(element) ?? Object.create(null);
+  const cache = get(element) ?? {};
   set(element, cache);
   return cache;
 }

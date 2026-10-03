@@ -368,6 +368,7 @@ export declare interface ZonePrivate {
     metaCreator: (self: any, args: any[]) => any,
   ) => void;
   patchEventPrototype: (_global: any, api: ZonePrivate) => void;
+  isIEOrEdge: () => boolean;
   ObjectDefineProperty: (
     o: any,
     p: PropertyKey,
@@ -628,7 +629,12 @@ export type TaskType = 'microTask' | 'macroTask' | 'eventTask';
  * Task type: `notScheduled`, `scheduling`, `scheduled`, `running`, `canceling`, 'unknown'.
  */
 export type TaskState =
-  'notScheduled' | 'scheduling' | 'scheduled' | 'running' | 'canceling' | 'unknown';
+  | 'notScheduled'
+  | 'scheduling'
+  | 'scheduled'
+  | 'running'
+  | 'canceling'
+  | 'unknown';
 
 /**
  */
@@ -757,12 +763,10 @@ export type AmbientZone = Zone;
 
 const global = globalThis as any;
 
-// __Zone_symbol_prefix can be set globally to override the default zone symbol prefix.
+// __Zone_symbol_prefix global can be used to override the default zone
+// symbol prefix with a custom one if needed.
 export function __symbol__(name: string) {
-  const rawPrefix = global['__Zone_symbol_prefix'];
-  // Guard against DOM clobbering: an attacker can set __Zone_symbol_prefix to an HTMLElement
-  // via e.g. <input name="__Zone_symbol_prefix">, so we only trust it if it's actually a string.
-  const symbolPrefix = typeof rawPrefix === 'string' ? rawPrefix : '__zone_symbol__';
+  const symbolPrefix = global['__Zone_symbol_prefix'] || '__zone_symbol__';
   return symbolPrefix + name;
 }
 
@@ -809,7 +813,7 @@ export function initZone(): ZoneType {
     }
 
     static __load_patch(name: string, fn: PatchFn, ignoreDuplicate = false): void {
-      if (Object.hasOwn(patches, name)) {
+      if (patches.hasOwnProperty(name)) {
         // `checkDuplicate` option is defined from global variable
         // so it works for all modules.
         // `ignoreDuplicate` can work for the specified module
@@ -857,7 +861,7 @@ export function initZone(): ZoneType {
     public getZoneWith(key: string): AmbientZone | null {
       let current: ZoneImpl | null = this;
       while (current) {
-        if (Object.hasOwn(current._properties, key)) {
+        if (current._properties.hasOwnProperty(key)) {
           return current;
         }
         current = current._parent;
@@ -1128,6 +1132,8 @@ export function initZone(): ZoneType {
       'eventTask': 0,
     };
 
+    private _parentDelegate: _ZoneDelegate | null;
+
     private _forkDlgt: _ZoneDelegate | null;
     private _forkZS: ZoneSpec | null;
     private _forkCurrZone: Zone | null;
@@ -1163,6 +1169,7 @@ export function initZone(): ZoneType {
 
     constructor(zone: Zone, parentDelegate: _ZoneDelegate | null, zoneSpec: ZoneSpec | null) {
       this._zone = zone as ZoneImpl;
+      this._parentDelegate = parentDelegate;
 
       this._forkZS = zoneSpec && (zoneSpec && zoneSpec.onFork ? zoneSpec : parentDelegate!._forkZS);
       this._forkDlgt = zoneSpec && (zoneSpec.onFork ? parentDelegate : parentDelegate!._forkDlgt);
@@ -1432,13 +1439,10 @@ export function initZone(): ZoneType {
         task.runCount++;
         return task.zone.runTask(task, target, args);
       } finally {
-        try {
-          if (_numberOfNestedTaskFrames === 1 && !global[enableNativeMicrotaskDraining]) {
-            drainMicroTaskQueueSynchronously();
-          }
-        } finally {
-          _numberOfNestedTaskFrames--;
+        if (_numberOfNestedTaskFrames == 1) {
+          drainMicroTaskQueue();
         }
+        _numberOfNestedTaskFrames--;
       }
     }
 
@@ -1500,63 +1504,47 @@ export function initZone(): ZoneType {
   const symbolSetTimeout = __symbol__('setTimeout');
   const symbolPromise = __symbol__('Promise');
   const symbolThen = __symbol__('then');
-  // To prevent any breaking changes resulting from this change, given that
-  // it was already causing a significant number of failures in g3, we have hidden
-  // that behavior behind a global configuration flag. Consumers can enable this
-  // flag explicitly if they want the microtask queue to be drained as defined
-  // in the specification.
-  const enableNativeMicrotaskDraining = __symbol__('enable_native_microtask_draining');
   let _microTaskQueue: Task[] = [];
-  let _isDrainingMicrotaskQueue = false;
+  let _isDrainingMicrotaskQueue: boolean = false;
   let nativeMicroTaskQueuePromise: any;
 
   function nativeScheduleMicroTask(func: Function) {
-    if (!nativeMicroTaskQueuePromise && global[symbolPromise]) {
-      nativeMicroTaskQueuePromise = global[symbolPromise].resolve(0);
+    if (!nativeMicroTaskQueuePromise) {
+      if (global[symbolPromise]) {
+        nativeMicroTaskQueuePromise = global[symbolPromise].resolve(0);
+      }
     }
-
     if (nativeMicroTaskQueuePromise) {
-      const thenFn = nativeMicroTaskQueuePromise[symbolThen] ?? nativeMicroTaskQueuePromise['then']; // fallback for non-patchable Promise
-      // Use the resolved native promise to schedule the microtask
-      thenFn.call(nativeMicroTaskQueuePromise, func);
+      let nativeThen = nativeMicroTaskQueuePromise[symbolThen];
+      if (!nativeThen) {
+        // native Promise is not patchable, we need to use `then` directly
+        // issue 1078
+        nativeThen = nativeMicroTaskQueuePromise['then'];
+      }
+      nativeThen.call(nativeMicroTaskQueuePromise, func);
     } else {
-      // Fallback to setTimeout if native promise is unavailable
       global[symbolSetTimeout](func, 0);
     }
   }
 
   function scheduleMicroTask(task?: MicroTask) {
-    const isNativeDrainingEnabled = global[enableNativeMicrotaskDraining];
-    const shouldDrainWithNative =
-      isNativeDrainingEnabled && _microTaskQueue.length === 0 && !_isDrainingMicrotaskQueue;
-    const shouldDrainWithoutNative =
-      !isNativeDrainingEnabled && _numberOfNestedTaskFrames === 0 && _microTaskQueue.length === 0;
-
-    if (shouldDrainWithNative || shouldDrainWithoutNative) {
-      // Start draining the microtask queue if:
-      // - Native draining is enabled and not currently in progress, or
-      // - Native draining is disabled, and there are no nested tasks and no queued microtasks.
-      nativeScheduleMicroTask(drainMicroTaskQueueSynchronously);
+    // if we are not running in any task, and there has not been anything scheduled
+    // we must bootstrap the initial task creation by manually scheduling the drain
+    if (_numberOfNestedTaskFrames === 0 && _microTaskQueue.length === 0) {
+      // We are not running in Task, so we need to kickstart the microtask queue.
+      nativeScheduleMicroTask(drainMicroTaskQueue);
     }
-
-    if (task) {
-      _microTaskQueue.push(task);
-    }
+    task && _microTaskQueue.push(task);
   }
 
-  function drainMicroTaskQueueSynchronously() {
-    if (_isDrainingMicrotaskQueue) {
-      return;
-    }
-
-    _isDrainingMicrotaskQueue = true;
-
-    try {
+  function drainMicroTaskQueue() {
+    if (!_isDrainingMicrotaskQueue) {
+      _isDrainingMicrotaskQueue = true;
       while (_microTaskQueue.length) {
         const queue = _microTaskQueue;
         _microTaskQueue = [];
-
-        for (const task of queue) {
+        for (let i = 0; i < queue.length; i++) {
+          const task = queue[i];
           try {
             task.zone.runTask(task, null, null);
           } catch (error) {
@@ -1564,18 +1552,8 @@ export function initZone(): ZoneType {
           }
         }
       }
-    } finally {
-      // The order matters!
-      if (global[enableNativeMicrotaskDraining]) {
-        _isDrainingMicrotaskQueue = false;
-        _api.microtaskDrainDone();
-      } else {
-        try {
-          _api.microtaskDrainDone();
-        } finally {
-          _isDrainingMicrotaskQueue = false;
-        }
-      }
+      _api.microtaskDrainDone();
+      _isDrainingMicrotaskQueue = false;
     }
   }
 
@@ -1596,13 +1574,13 @@ export function initZone(): ZoneType {
     macroTask: 'macroTask' = 'macroTask',
     eventTask: 'eventTask' = 'eventTask';
 
-  const patches: {[key: string]: any} = Object.create(null);
+  const patches: {[key: string]: any} = {};
   const _api: ZonePrivate = {
     symbol: __symbol__,
     currentZoneFrame: () => _currentZoneFrame,
     onUnhandledError: noop,
     microtaskDrainDone: noop,
-    scheduleMicroTask,
+    scheduleMicroTask: scheduleMicroTask,
     showUncaughtError: () => !(ZoneImpl as any)[__symbol__('ignoreConsoleErrorUncaughtError')],
     patchEventTarget: () => [],
     patchOnProperties: noop,
@@ -1611,6 +1589,7 @@ export function initZone(): ZoneType {
     patchThen: () => noop,
     patchMacroTask: () => noop,
     patchEventPrototype: () => noop,
+    isIEOrEdge: () => false,
     getGlobalObjects: () => undefined,
     ObjectDefineProperty: () => noop,
     ObjectGetOwnPropertyDescriptor: () => undefined,
@@ -1622,7 +1601,7 @@ export function initZone(): ZoneType {
     attachOriginToPatched: () => noop,
     _redefineProperty: () => noop,
     patchCallbacks: () => noop,
-    nativeScheduleMicroTask,
+    nativeScheduleMicroTask: nativeScheduleMicroTask,
   };
   let _currentZoneFrame: ZoneFrame = {parent: null, zone: new ZoneImpl(null, null)};
   let _currentTask: Task | null = null;

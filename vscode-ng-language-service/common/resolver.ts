@@ -1,9 +1,9 @@
-/*!
+/**
  * @license
- * Copyright Google LLC All Rights Reserved.
+ * Copyright Google Inc. All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
- * found in the LICENSE file at https://angular.dev/license
+ * found in the LICENSE file at https://angular.io/license
  */
 
 import * as fs from 'fs';
@@ -70,8 +70,7 @@ export class Version {
   }
 
   isVersionZero() {
-    // Handle both `0.0.0`, `0.0.0-PLACEHOLDER` and similar
-    return this.major === 0 && this.minor === 0 && this.patch === 0;
+    return this.versionStr === '0.0.0';
   }
 
   toString(): string {

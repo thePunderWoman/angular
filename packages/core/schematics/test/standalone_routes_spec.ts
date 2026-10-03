@@ -10,8 +10,8 @@ import {getSystemPath, normalize, virtualFs} from '@angular-devkit/core';
 import {TempScopedNodeJsSyncHost} from '@angular-devkit/core/node/testing';
 import {HostTree} from '@angular-devkit/schematics';
 import {SchematicTestRunner, UnitTestTree} from '@angular-devkit/schematics/testing/index.js';
-import {rmSync} from 'node:fs';
 import {resolve} from 'path';
+import {rmSync} from 'node:fs';
 
 describe('route lazy loading migration', () => {
   let runner: SchematicTestRunner;
@@ -285,12 +285,55 @@ describe('route lazy loading migration', () => {
     );
   });
 
+  it('should support provideRoutes', async () => {
+    writeFile(
+      'app.module.ts',
+      `
+      import {NgModule} from '@angular/core';
+      import {provideRoutes} from '@angular/router';
+      import {TestComponent} from './test';
+
+      const routes = [{path: 'test', component: TestComponent}];
+
+      @NgModule({
+        providers: [provideRoutes(routes)],
+      })
+      export class AppModule {}
+    `,
+    );
+
+    writeFile(
+      'test.ts',
+      `
+      import {Component} from '@angular/core';
+      @Component({template: 'hello', standalone: true})
+      export class TestComponent {}
+    `,
+    );
+
+    await runMigration('route-lazy-loading');
+
+    expect(stripWhitespace(tree.readContent('app.module.ts'))).toContain(
+      stripWhitespace(`
+        import {NgModule} from '@angular/core';
+        import {provideRoutes} from '@angular/router';
+
+        const routes = [{path: 'test', loadComponent: () => import('./test').then(m => m.TestComponent)}];
+
+        @NgModule({
+          providers: [provideRoutes(routes)],
+        })
+        export class AppModule {}
+      `),
+    );
+  });
+
   it('should skip not standalone components', async () => {
     writeFile(
       'app.module.ts',
       `
       import {NgModule} from '@angular/core';
-      import {provideRouter} from '@angular/router';
+      import {provideRoutes} from '@angular/router';
       import {TestComponent} from './test';
       import {StandaloneByDefaultComponent} from './standalone-by-default';
       import {NotStandaloneComponent} from './not-standalone';
@@ -302,7 +345,7 @@ describe('route lazy loading migration', () => {
       ];
 
       @NgModule({
-        providers: [provideRouter(routes)],
+        providers: [provideRoutes(routes)],
       })
       export class AppModule {}
     `,
@@ -343,7 +386,7 @@ describe('route lazy loading migration', () => {
     expect(stripWhitespace(tree.readContent('app.module.ts'))).toContain(
       stripWhitespace(`
         import {NgModule} from '@angular/core';
-        import {provideRouter} from '@angular/router';
+        import {provideRoutes} from '@angular/router';
         import {NotStandaloneComponent} from './not-standalone';
 
         const routes = [
@@ -353,7 +396,7 @@ describe('route lazy loading migration', () => {
         ];
 
         @NgModule({
-          providers: [provideRouter(routes)],
+          providers: [provideRoutes(routes)],
         })
         export class AppModule {}
       `),
@@ -847,59 +890,6 @@ describe('route lazy loading migration', () => {
       stripWhitespace(`
         export const routes = [{path: 'test', loadComponent: () => import('./test').then(m => m.TestComponent)}];
       `),
-    );
-  });
-
-  it('should resolve the correct import when one component name is a suffix of another', async () => {
-    writeFile(
-      'app.module.ts',
-      `
-      import {NgModule} from '@angular/core';
-      import {RouterModule} from '@angular/router';
-      import {FooBarComponent} from './foo-bar';
-      import {BarComponent} from './bar';
-
-      @NgModule({
-        imports: [RouterModule.forRoot([
-          {path: 'foo-bar', component: FooBarComponent},
-          {path: 'bar', component: BarComponent},
-        ])],
-      })
-      export class AppModule {}
-    `,
-    );
-
-    writeFile(
-      'foo-bar.ts',
-      `
-      import {Component} from '@angular/core';
-      @Component({template: 'foo bar', standalone: true})
-      export class FooBarComponent {}
-    `,
-    );
-
-    writeFile(
-      'bar.ts',
-      `
-      import {Component} from '@angular/core';
-      @Component({template: 'bar', standalone: true})
-      export class BarComponent {}
-    `,
-    );
-
-    await runMigration('route-lazy-loading');
-
-    const result = stripWhitespace(tree.readContent('app.module.ts'));
-
-    expect(result).toContain(
-      stripWhitespace(
-        `{path: 'foo-bar', loadComponent: () => import('./foo-bar').then(m => m.FooBarComponent)}`,
-      ),
-    );
-    expect(result).toContain(
-      stripWhitespace(
-        `{path: 'bar', loadComponent: () => import('./bar').then(m => m.BarComponent)}`,
-      ),
     );
   });
 

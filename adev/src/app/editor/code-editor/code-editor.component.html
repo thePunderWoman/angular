@@ -11,14 +11,15 @@
         <mat-tab #tab>
           <ng-template mat-tab-label>
             @if (tab.isActive && isRenamingFile()) {
-              <form (submit)="renameFile($event, file.filename)">
+              <form
+                (submit)="renameFile($event, file.filename)"
+                (docsClickOutside)="closeRenameFile()"
+              >
                 <input
                   name="rename-file"
                   class="adev-rename-file-input"
-                  [value]="file.filename.replace('src/', '')"
                   #renameFileInput
                   (keydown)="$event.stopPropagation()"
-                  (blur)="isRenamingFile.set(false)"
                 />
               </form>
             } @else if (restrictedMode()) {
@@ -63,7 +64,6 @@
                 class="adev-new-file-input"
                 #createFileInput
                 (keydown)="$event.stopPropagation()"
-                (blur)="createFile()"
               />
             </form>
           </ng-template>
@@ -96,6 +96,14 @@
   <!-- launcher dropdown window -->
   <ng-template #launcherMenu>
     <div class="adev-editor-dropdown" cdkMenu>
+      <button cdkMenuItem (click)="openCurrentSolutionInFirebaseStudio()">
+        <span>Open in Firebase Studio </span>
+        <img
+          class="icon"
+          src="assets/images/tutorials/common/firebase-studio_logo.svg"
+          height="32"
+        />
+      </button>
       <button cdkMenuItem (click)="openCurrentCodeInStackBlitz()">Open in StackBlitz</button>
     </div>
   </ng-template>
@@ -120,16 +128,7 @@
     </button>
     <ul>
       @for (error of errors(); track error) {
-        <li>
-          <a
-            class="adev-error-location-link"
-            href="#"
-            (click)="$event.preventDefault(); openFileAtLocation(error)"
-          >
-            (line: {{ error.lineNumber }}:{{ error.characterPosition }})
-          </a>
-          {{ error.message }}
-        </li>
+        <li>(line: {{ error.lineNumber }}:{{ error.characterPosition }}) {{ error.message }}</li>
       }
     </ul>
   </div>

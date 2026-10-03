@@ -1,9 +1,9 @@
-import {ApplicationRef, inject, Service} from '@angular/core';
+import {ApplicationRef, inject, Injectable} from '@angular/core';
 import {SwUpdate} from '@angular/service-worker';
 import {concat, interval} from 'rxjs';
 import {first} from 'rxjs/operators';
 
-@Service()
+@Injectable({providedIn: 'root'})
 export class CheckForUpdateService {
   private appRef = inject(ApplicationRef);
   private updates = inject(SwUpdate);

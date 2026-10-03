@@ -14,7 +14,6 @@ esbuild(
     external = [
         "jsdom",
         "playwright-core",
-        "typescript",
     ],
     format = "esm",
     output = "guides.mjs",
@@ -39,7 +38,6 @@ esbuild(
     entry_point = ":index.mts",
     external = [
         "jsdom",
-        "typescript",
     ],
     output = "guides-no-mermaid.mjs",
     platform = "node",
@@ -62,7 +60,6 @@ ts_project(
         "//adev/shared-docs:__subpackages__",
     ],
     deps = [
-        "//adev:node_modules/jsdom",
         "//adev/shared-docs/pipeline/shared:shiki",
         "//adev/shared-docs/pipeline/shared/marked",
     ],

@@ -6,11 +6,10 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {ChangeDetectionStrategy} from '@angular/compiler';
+import {CommonModule, JsonPipe} from '../../index';
 import {Component} from '@angular/core';
-import {TestBed} from '@angular/core/testing';
+import {TestBed, waitForAsync} from '@angular/core/testing';
 import {expect} from '@angular/private/testing/matchers';
-import {JsonPipe} from '../../index';
 
 describe('JsonPipe', () => {
   const regNewLine = '\n';
@@ -58,28 +57,32 @@ describe('JsonPipe', () => {
     @Component({
       selector: 'test-comp',
       template: '{{data | json}}',
-      imports: [JsonPipe],
-      changeDetection: ChangeDetectionStrategy.Eager,
+      standalone: false,
     })
     class TestComp {
       data: any;
     }
 
-    it('should work with mutable objects', async () => {
+    beforeEach(() => {
+      TestBed.configureTestingModule({declarations: [TestComp], imports: [CommonModule]});
+    });
+
+    it('should work with mutable objects', waitForAsync(() => {
       const fixture = TestBed.createComponent(TestComp);
       const mutable: number[] = [1];
       fixture.componentInstance.data = mutable;
-      await fixture.whenStable();
+      fixture.changeDetectorRef.markForCheck();
+      fixture.detectChanges();
       expect(fixture.nativeElement).toHaveText('[\n  1\n]');
 
       mutable.push(2);
       fixture.changeDetectorRef.markForCheck();
-      await fixture.whenStable();
+      fixture.detectChanges();
       expect(fixture.nativeElement).toHaveText('[\n  1,\n  2\n]');
-    });
+    }));
   });
 
-  it('should be available as a standalone pipe', async () => {
+  it('should be available as a standalone pipe', () => {
     @Component({
       selector: 'test-component',
       imports: [JsonPipe],
@@ -90,7 +93,7 @@ describe('JsonPipe', () => {
     }
 
     const fixture = TestBed.createComponent(TestComponent);
-    await fixture.whenStable();
+    fixture.detectChanges();
 
     const content = fixture.nativeElement.textContent;
     expect(content.replace(/\s/g, '')).toBe('{"a":1}');

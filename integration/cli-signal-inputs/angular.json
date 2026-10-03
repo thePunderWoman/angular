@@ -24,8 +24,7 @@
             "styles": ["src/styles.css"],
             "scripts": [],
             "optimization": true,
-            "progress": false,
-            "preserveSymlinks": true
+            "progress": false
           },
           "configurations": {
             "development": {
@@ -84,7 +83,6 @@
             "styles": ["src/styles.css"],
             "scripts": [],
             "progress": false,
-            "preserveSymlinks": true,
             "watch": false
           }
         },
@@ -93,6 +91,25 @@
           "options": {
             "tsConfig": ["tsconfig.app.json", "tsconfig.spec.json", "e2e/tsconfig.json"],
             "exclude": ["**/node_modules/**"]
+          }
+        },
+        "e2e": {
+          "builder": "@angular-devkit/build-angular:private-protractor",
+          "options": {
+            "protractorConfig": "e2e/protractor.conf.js",
+            "devServerTarget": "cli-signal-inputs:serve",
+            "webdriverUpdate": false
+          },
+          "configurations": {
+            "production": {
+              "devServerTarget": "cli-signal-inputs:serve:production"
+            },
+            "ci": {
+              "devServerTarget": "cli-signal-inputs:serve:ci"
+            },
+            "ci-production": {
+              "devServerTarget": "cli-signal-inputs:serve:ci-production"
+            }
           }
         }
       }

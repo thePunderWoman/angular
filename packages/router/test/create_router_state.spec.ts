@@ -19,7 +19,6 @@ import {
   ActivatedRoute,
   advanceActivatedRoute,
   createEmptyState,
-  DEFAULT_PARAMS_INHERITANCE_STRATEGY,
   RouterState,
   RouterStateSnapshot,
 } from '../src/router_state';
@@ -33,10 +32,10 @@ describe('create router state', () => {
     reuseStrategy = new DefaultRouteReuseStrategy();
   });
 
-  const emptyState = () => createEmptyState(RootComponent, TestBed.inject(EnvironmentInjector));
+  const emptyState = () => createEmptyState(RootComponent);
 
   it('should create new state', async () => {
-    const {state, newlyCreatedRoutes} = createRouterState(
+    const state = createRouterState(
       reuseStrategy,
       await createState(
         [
@@ -55,12 +54,6 @@ describe('create router state', () => {
     checkActivatedRoute(c[0], ComponentA);
     checkActivatedRoute(c[1], ComponentB, 'left');
     checkActivatedRoute(c[2], ComponentC, 'right');
-
-    expect(newlyCreatedRoutes.has(state.root)).toBe(false);
-    expect(newlyCreatedRoutes.has(c[0])).toBe(true);
-    expect(newlyCreatedRoutes.has(c[1])).toBe(true);
-    expect(newlyCreatedRoutes.has(c[2])).toBe(true);
-    expect(newlyCreatedRoutes.size).toBe(3);
   });
 
   it('should reuse existing nodes when it can', async () => {
@@ -70,13 +63,13 @@ describe('create router state', () => {
       {path: 'c', component: ComponentC, outlet: 'left'},
     ];
 
-    const {state: prevState, newlyCreatedRoutes: prevCreated} = createRouterState(
+    const prevState = createRouterState(
       reuseStrategy,
       await createState(config, 'a(left:b)'),
       emptyState(),
     );
     advanceState(prevState);
-    const {state, newlyCreatedRoutes} = createRouterState(
+    const state = createRouterState(
       reuseStrategy,
       await createState(config, 'a(left:c)'),
       prevState,
@@ -89,16 +82,6 @@ describe('create router state', () => {
     expect(prevC[0]).toBe(currC[0]);
     expect(prevC[1]).not.toBe(currC[1]);
     checkActivatedRoute(currC[1], ComponentC, 'left');
-
-    expect(prevCreated.has(prevState.root)).toBe(false);
-    expect(prevCreated.has(prevC[0])).toBe(true);
-    expect(prevCreated.has(prevC[1])).toBe(true);
-    expect(prevCreated.size).toBe(2);
-
-    expect(newlyCreatedRoutes.has(state.root)).toBe(false);
-    expect(newlyCreatedRoutes.has(currC[0])).toBe(false);
-    expect(newlyCreatedRoutes.has(currC[1])).toBe(true);
-    expect(newlyCreatedRoutes.size).toBe(1);
   });
 
   it('should handle componentless routes', async () => {
@@ -112,13 +95,13 @@ describe('create router state', () => {
       },
     ];
 
-    const {state: prevState} = createRouterState(
+    const prevState = createRouterState(
       reuseStrategy,
       await createState(config, 'a/1;p=11/(b//right:c)'),
       emptyState(),
     );
     advanceState(prevState);
-    const {state} = createRouterState(
+    const state = createRouterState(
       reuseStrategy,
       await createState(config, 'a/2;p=22/(b//right:c)'),
       prevState,
@@ -146,7 +129,7 @@ describe('create router state', () => {
     ];
     spyOn(reuseStrategy, 'retrieve');
 
-    const {state: prevState} = createRouterState(
+    const prevState = createRouterState(
       reuseStrategy,
       await createState(config, 'a(left:b)'),
       emptyState(),
@@ -162,7 +145,7 @@ describe('create router state', () => {
       {path: 'product/:id', component: ComponentB},
     ];
     spyOn(reuseStrategy, 'shouldReuseRoute').and.callThrough();
-    const {state: previousState} = createRouterState(
+    const previousState = createRouterState(
       reuseStrategy,
       await createState(config, ''),
       emptyState(),
@@ -186,39 +169,6 @@ describe('create router state', () => {
     expect(current2._routerState.url).toEqual(tree('').toString());
     expect(future2._routerState.url).toEqual(tree('product/30').toString());
   });
-
-  it('should not include attached routes in newlyCreatedRoutes', async () => {
-    const config = [{path: 'a', component: ComponentA}];
-
-    // First transition creates the route
-    const {state: state1, newlyCreatedRoutes: created1} = createRouterState(
-      reuseStrategy,
-      await createState(config, 'a'),
-      emptyState(),
-    );
-    const routeA = (state1 as any).firstChild(state1.root);
-    expect(created1.has(routeA)).toBe(true);
-
-    // Simulate detaching routeA
-    const detachedHandle = {
-      route: new TreeNode<ActivatedRoute>(routeA, []),
-    } as any;
-
-    spyOn(reuseStrategy, 'shouldAttach').and.returnValue(true);
-    spyOn(reuseStrategy, 'retrieve').and.returnValue(detachedHandle);
-
-    // Second transition attaches the route
-    const {state: state2, newlyCreatedRoutes: created2} = createRouterState(
-      reuseStrategy,
-      await createState(config, 'a'),
-      emptyState(),
-    );
-
-    const child2 = (state2 as any).firstChild(state2.root);
-    expect(child2).toBe(routeA); // attached route
-    expect(created2.has(routeA)).toBe(false); // not in newlyCreatedRoutes of the second transition
-    expect(created2.size).toBe(0);
-  });
 });
 
 function advanceState(state: RouterState): void {
@@ -238,7 +188,7 @@ async function createState(config: Routes, url: string): Promise<RouterStateSnap
     config,
     tree(url),
     new DefaultUrlSerializer(),
-    DEFAULT_PARAMS_INHERITANCE_STRATEGY,
+    undefined,
     new AbortController().signal,
   );
   return result.state;

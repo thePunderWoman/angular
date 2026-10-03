@@ -17,11 +17,9 @@ interface ChromeMessage<T, K extends keyof T> {
 
 type AnyEventCallback<Ev> = <E extends keyof Ev>(topic: E, args: Parameters<Ev[E]>) => void;
 
-type ListenerFn = (msg: ChromeMessage<Events, keyof Events>) => void;
-
 export class ChromeMessageBus extends MessageBus<Events> {
   private _disconnected = false;
-  private _listeners: ListenerFn[] = [];
+  private _listeners: any[] = [];
 
   constructor(private _port: chrome.runtime.Port) {
     super();
@@ -82,7 +80,7 @@ export class ChromeMessageBus extends MessageBus<Events> {
   }
 
   override destroy(): void {
-    this._listeners.forEach((l) => this._port.onMessage.removeListener(l));
+    this._listeners.forEach((l) => window.removeEventListener('message', l));
     this._listeners = [];
   }
 }

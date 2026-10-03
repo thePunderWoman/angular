@@ -6,28 +6,26 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {CdkMenu, CdkMenuItem, CdkMenuTrigger} from '@angular/cdk/menu';
 import {isPlatformServer, NgComponentOutlet} from '@angular/common';
 import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   DestroyRef,
-  effect,
   EnvironmentInjector,
-  inject,
-  injectAsync,
-  input,
   PLATFORM_ID,
-  signal,
   Type,
+  inject,
 } from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
+import {CdkMenu, CdkMenuItem, CdkMenuTrigger} from '@angular/cdk/menu';
 import {IconComponent, PlaygroundTemplate} from '@angular/docs';
 import {forkJoin, switchMap, tap} from 'rxjs';
 
+import {injectAsync} from '../../core/services/inject-async';
 import {injectNodeRuntimeSandbox} from '../../editor/index';
 import type {NodeRuntimeSandbox} from '../../editor/node-runtime-sandbox.service';
 
-import {ActivatedRoute, Router} from '@angular/router';
 import PLAYGROUND_ROUTE_DATA_JSON from '../../../../src/assets/tutorials/playground/routes.json';
 
 @Component({
@@ -35,38 +33,26 @@ import PLAYGROUND_ROUTE_DATA_JSON from '../../../../src/assets/tutorials/playgro
   imports: [NgComponentOutlet, IconComponent, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './playground.component.html',
   styleUrls: ['./playground.component.scss', '../tutorial/tutorial-navigation.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export default class PlaygroundComponent {
-  readonly templateId = input<string | undefined>();
-
+  private readonly changeDetectorRef = inject(ChangeDetectorRef);
   private readonly environmentInjector = inject(EnvironmentInjector);
   private readonly destroyRef = inject(DestroyRef);
   private readonly isServer = isPlatformServer(inject(PLATFORM_ID));
-  private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
 
-  private editorTutorialManager = injectAsync(() =>
-    import('../../editor/index').then((c) => c.EmbeddedTutorialManager),
-  );
-
-  readonly templates: PlaygroundTemplate[] = PLAYGROUND_ROUTE_DATA_JSON.templates;
+  readonly templates = PLAYGROUND_ROUTE_DATA_JSON.templates;
   readonly defaultTemplate = PLAYGROUND_ROUTE_DATA_JSON.defaultTemplate;
   readonly starterTemplate = PLAYGROUND_ROUTE_DATA_JSON.starterTemplate;
 
   protected nodeRuntimeSandbox?: NodeRuntimeSandbox;
-  protected embeddedEditorComponent = signal<Type<unknown> | null>(null);
+  protected embeddedEditorComponent?: Type<unknown>;
   protected selectedTemplate: PlaygroundTemplate = this.defaultTemplate;
-  private readonly isSandboxReady = signal(false);
 
   constructor() {
     if (this.isServer) {
       return;
     }
-
-    effect(() => {
-      const foundTemplate = this.templates.find((t) => t.id === this.templateId());
-      this.changeTemplate(foundTemplate ?? this.defaultTemplate);
-    });
 
     // If using `async-await`, `this` will be captured until the function is executed
     // and completed, which can lead to a memory leak if the user navigates away from
@@ -78,14 +64,14 @@ export default class PlaygroundComponent {
       .pipe(
         tap(({nodeRuntimeSandbox, embeddedEditorComponent}) => {
           this.nodeRuntimeSandbox = nodeRuntimeSandbox;
-          this.embeddedEditorComponent.set(embeddedEditorComponent);
+          this.embeddedEditorComponent = embeddedEditorComponent;
         }),
-        switchMap(() => this.loadTemplate(this.selectedTemplate.path)),
+        switchMap(() => this.loadTemplate(this.defaultTemplate.path)),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe(() => {
-        this.nodeRuntimeSandbox?.init();
-        this.isSandboxReady.set(true);
+        this.changeDetectorRef.markForCheck();
+        this.nodeRuntimeSandbox!.init();
       });
   }
 
@@ -94,24 +80,16 @@ export default class PlaygroundComponent {
   }
 
   async changeTemplate(template: PlaygroundTemplate): Promise<void> {
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: {templateId: template.id},
-      replaceUrl: true,
-    });
     this.selectedTemplate = template;
     await this.loadTemplate(template.path);
-    if (this.isSandboxReady()) {
-      await this.nodeRuntimeSandbox?.reset();
-    }
+    await this.nodeRuntimeSandbox!.reset();
   }
 
   private async loadTemplate(tutorialPath: string) {
-    try {
-      const embeddedTutorialManager = await this.editorTutorialManager();
-      await embeddedTutorialManager.fetchAndSetTutorialFiles(tutorialPath);
-    } catch (err) {
-      console.error('Failed to load tutorial files', err);
-    }
+    const embeddedTutorialManager = await injectAsync(this.environmentInjector, () =>
+      import('../../editor/index').then((c) => c.EmbeddedTutorialManager),
+    );
+
+    await embeddedTutorialManager.fetchAndSetTutorialFiles(tutorialPath);
   }
 }

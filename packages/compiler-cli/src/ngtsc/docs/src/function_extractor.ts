@@ -42,18 +42,8 @@ export class FunctionExtractor {
     const overloads = ts.isConstructorDeclaration(this.exportDeclaration)
       ? constructorOverloads(this.exportDeclaration, this.typeChecker)
       : extractCallSignatures(this.name, this.typeChecker, type);
-    const implementationJsDocTags = extractJsDocTags(implementation);
-    const implementationDescription = extractJsDocDescription(implementation);
-    const implementationRawComment = extractRawJsDoc(implementation);
-    const docsForFunctionEntry = extractFunctionEntryDocs(overloads, {
-      description: implementationDescription,
-      jsdocTags: implementationJsDocTags,
-      rawComment: implementationRawComment,
-    }) ?? {
-      description: implementationDescription,
-      jsdocTags: implementationJsDocTags,
-      rawComment: implementationRawComment,
-    };
+    const jsdocsTags = extractJsDocTags(implementation);
+    const description = extractJsDocDescription(implementation);
 
     return {
       name: this.name,
@@ -62,39 +52,20 @@ export class FunctionExtractor {
         params: extractAllParams(implementation.parameters, this.typeChecker),
         isNewType: ts.isConstructSignatureDeclaration(implementation),
         returnType,
-        returnDescription: implementationJsDocTags.find((tag) => tag.name === 'returns')?.comment,
+        returnDescription: jsdocsTags.find((tag) => tag.name === 'returns')?.comment,
         generics: extractGenerics(implementation),
         name: this.name,
-        description: implementationDescription,
+        description,
         entryType: EntryType.Function,
-        jsdocTags: implementationJsDocTags,
-        rawComment: implementationRawComment,
+        jsdocTags: jsdocsTags,
+        rawComment: extractRawJsDoc(implementation),
       },
       entryType: EntryType.Function,
-      description: docsForFunctionEntry.description,
-      jsdocTags: docsForFunctionEntry.jsdocTags,
-      rawComment: docsForFunctionEntry.rawComment,
+      description,
+      jsdocTags: jsdocsTags,
+      rawComment: extractRawJsDoc(implementation),
     };
   }
-}
-
-function extractFunctionEntryDocs(
-  overloads: FunctionSignatureMetadata[],
-  implementationDocs: Pick<FunctionSignatureMetadata, 'description' | 'jsdocTags' | 'rawComment'>,
-): Pick<FunctionSignatureMetadata, 'description' | 'jsdocTags' | 'rawComment'> | null {
-  if (hasJSDocContent(implementationDocs)) {
-    return implementationDocs;
-  }
-
-  return overloads.find((overload) => hasJSDocContent(overload)) ?? null;
-}
-
-function hasJSDocContent(
-  docs: Pick<FunctionSignatureMetadata, 'description' | 'jsdocTags' | 'rawComment'>,
-): boolean {
-  return (
-    docs.description.trim() !== '' || docs.rawComment.trim() !== '' || docs.jsdocTags.length > 0
-  );
 }
 
 function constructorOverloads(
@@ -162,21 +133,17 @@ function filterSignatureDeclarations(signatures: readonly ts.Signature[]) {
 }
 
 export function extractCallSignatures(name: string, typeChecker: ts.TypeChecker, type: ts.Type) {
-  return filterSignatureDeclarations(type.getCallSignatures()).map(({decl, signature}) => {
-    const jsdocTags = extractJsDocTags(decl);
-    return {
-      name,
-      entryType: EntryType.Function,
-      description: extractJsDocDescription(decl),
-      generics: extractGenerics(decl),
-      isNewType: false,
-      jsdocTags,
-      params: extractAllParams(decl.parameters, typeChecker),
-      rawComment: extractRawJsDoc(decl),
-      returnType: extractReturnType(signature, typeChecker),
-      returnDescription: jsdocTags.find((tag) => tag.name === 'returns')?.comment,
-    };
-  });
+  return filterSignatureDeclarations(type.getCallSignatures()).map(({decl, signature}) => ({
+    name,
+    entryType: EntryType.Function,
+    description: extractJsDocDescription(decl),
+    generics: extractGenerics(decl),
+    isNewType: false,
+    jsdocTags: extractJsDocTags(decl),
+    params: extractAllParams(decl.parameters, typeChecker),
+    rawComment: extractRawJsDoc(decl),
+    returnType: extractReturnType(signature, typeChecker),
+  }));
 }
 
 function extractReturnType(signature: ts.Signature, typeChecker: ts.TypeChecker): string {
@@ -185,23 +152,12 @@ function extractReturnType(signature: ts.Signature, typeChecker: ts.TypeChecker)
     return signature.declaration.type.getText();
   }
 
-  const returnType = typeChecker.getReturnTypeOfSignature(signature);
-  const returnTypeString = typeChecker.typeToString(
-    returnType,
+  return typeChecker.typeToString(
+    typeChecker.getReturnTypeOfSignature(signature),
     undefined,
     // This ensures that e.g. `T | undefined` is not reduced to `T`.
     ts.TypeFormatFlags.NoTypeReduction | ts.TypeFormatFlags.NoTruncation,
   );
-
-  if (
-    returnTypeString === 'any' &&
-    signature.declaration?.type &&
-    signature.declaration.type.kind !== ts.SyntaxKind.AnyKeyword
-  ) {
-    return signature.declaration.type.getText();
-  }
-
-  return returnTypeString;
 }
 
 /** Finds the implementation of the given function declaration overload signature. */

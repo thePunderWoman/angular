@@ -15,7 +15,7 @@ import {HttpContext} from './context';
 /**
  * The structure of an `httpResource` request which will be sent to the backend.
  *
- * @publicApi 22.0
+ * @experimental 19.2
  */
 export interface HttpResourceRequest {
   /**
@@ -112,12 +112,6 @@ export interface HttpResourceRequest {
   referrer?: string;
 
   /**
-   * The referrer policy of the request, which can be used to specify the referrer information to be included with the request.
-   * This can affect the amount of referrer information sent with the request, and can be used to enhance privacy and security.
-   */
-  referrerPolicy?: ReferrerPolicy | (string & {});
-
-  /**
    * The integrity metadata of the request, which can be used to ensure the request is made with the expected content.
    * A cryptographic hash of the resource to be fetched by request
    */
@@ -139,7 +133,7 @@ export interface HttpResourceRequest {
 /**
  * Options for creating an `httpResource`.
  *
- * @publicApi 22.0
+ * @experimental 19.2
  */
 export interface HttpResourceOptions<TResult, TRaw> {
   /**
@@ -171,11 +165,6 @@ export interface HttpResourceOptions<TResult, TRaw> {
    * A comparison function which defines equality for the response value.
    */
   equal?: ValueEqualityFn<NoInfer<TResult>>;
-
-  /**
-   * A debug name for the reactive node. Used in Angular DevTools to identify the node.
-   */
-  debugName?: string;
 }
 
 /**
@@ -184,7 +173,7 @@ export interface HttpResourceOptions<TResult, TRaw> {
  * `HttpResource`s are backed by `HttpClient`, including support for interceptors, testing, and the
  * other features of the `HttpClient` API.
  *
- * @publicApi 22.0
+ * @experimental 19.2
  */
 export interface HttpResourceRef<T> extends WritableResource<T>, ResourceRef<T> {
   /**

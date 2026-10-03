@@ -7,7 +7,6 @@
  */
 
 import {
-  ChangeDetectionStrategy,
   Component,
   Directive,
   EventEmitter,
@@ -141,7 +140,6 @@ describe('model inputs', () => {
     @Component({
       template: '<div [value]="value" dir></div>',
       imports: [Dir],
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       @ViewChild(Dir) dir!: Dir;

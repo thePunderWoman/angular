@@ -37,7 +37,6 @@ import {
 
 import {DominoAdapter, parseDocument} from './domino_adapter';
 import {SERVER_HTTP_PROVIDERS} from './http';
-import {resolveUrl} from './url';
 import {ServerPlatformLocation} from './location';
 import {enableDomEmulation, PlatformState} from './platform_state';
 import {ServerEventManagerPlugin} from './server_events';
@@ -101,12 +100,7 @@ function _document() {
     document =
       typeof config.document === 'string'
         ? _enableDomEmulation
-          ? parseDocument(
-              config.document,
-              config.url !== undefined
-                ? resolveUrl(config.url, 'http://localhost').href
-                : undefined,
-            )
+          ? parseDocument(config.document, config.url)
           : window.document
         : config.document;
   } else {

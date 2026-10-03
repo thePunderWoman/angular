@@ -56,12 +56,11 @@ import {
   expectEvents,
   createRoot,
   advance,
-  simulateLocationChange,
 } from './integration_helpers';
 import {getLoadedComponent} from '../../src/utils/config';
 import {of, delay} from 'rxjs';
 
-export function lazyLoadingIntegrationSuite(browserAPI: 'navigation' | 'history') {
+export function lazyLoadingIntegrationSuite() {
   describe('lazy loading', () => {
     it('works', async () => {
       const router = TestBed.inject(Router);
@@ -980,7 +979,8 @@ export function lazyLoadingIntegrationSuite(browserAPI: 'navigation' | 'history'
         events.splice(0);
 
         // another unsupported URL
-        simulateLocationChange('/exclude/two', browserAPI);
+        location.go('/exclude/two');
+        location.historyGo(0);
         await advance(fixture);
 
         expect(location.path()).toEqual('/exclude/two');
@@ -988,7 +988,8 @@ export function lazyLoadingIntegrationSuite(browserAPI: 'navigation' | 'history'
         events.splice(0);
 
         // back to a supported URL
-        simulateLocationChange('/include/simple', browserAPI);
+        location.go('/include/simple');
+        location.historyGo(0);
         await advance(fixture);
 
         expect(location.path()).toEqual('/include/simple');
@@ -1025,7 +1026,8 @@ export function lazyLoadingIntegrationSuite(browserAPI: 'navigation' | 'history'
         const events: Event[] = [];
         router.events.subscribe((e) => e instanceof RouterEvent && events.push(e));
 
-        simulateLocationChange('/include/user/kate(aux:excluded)', browserAPI);
+        location.go('/include/user/kate(aux:excluded)');
+        location.historyGo(0);
         await advance(fixture);
 
         expect(location.path()).toEqual('/include/user/kate(aux:excluded)');
@@ -1040,7 +1042,8 @@ export function lazyLoadingIntegrationSuite(browserAPI: 'navigation' | 'history'
         ]);
         events.splice(0);
 
-        simulateLocationChange('/include/user/kate(aux:excluded2)', browserAPI);
+        location.go('/include/user/kate(aux:excluded2)');
+        location.historyGo(0);
         await advance(fixture);
         expectEvents(events, [[NavigationSkipped, '/include/user/kate(aux:excluded2)']]);
         events.splice(0);
@@ -1076,7 +1079,8 @@ export function lazyLoadingIntegrationSuite(browserAPI: 'navigation' | 'history'
           },
         ]);
 
-        simulateLocationChange('/include/user/kate(aux:excluded)', browserAPI);
+        location.go('/include/user/kate(aux:excluded)');
+        location.historyGo(0);
         await advance(fixture);
 
         expect(location.path()).toEqual('/include/user/kate(aux:excluded)');
@@ -1093,12 +1097,9 @@ export function lazyLoadingIntegrationSuite(browserAPI: 'navigation' | 'history'
 
       @Component({
         selector: 'link-cmp',
-        template: `<a [relativeTo]="route.parent" [routerLink]="[{outlets: {'secondary': null}}]"
-            >link</a
-          >
-          <button [relativeTo]="route.parent" [routerLink]="[{outlets: {'secondary': null}}]">
-            link
-          </button> `,
+        template: `<a [relativeTo]="route.parent" [routerLink]="[{outlets: {'secondary': null}}]">link</a>
+            <button [relativeTo]="route.parent" [routerLink]="[{outlets: {'secondary': null}}]">link</button>
+            `,
         standalone: false,
       })
       class RelativeLinkCmp {

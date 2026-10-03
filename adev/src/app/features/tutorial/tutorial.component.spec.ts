@@ -6,9 +6,9 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {DOCS_VIEWER_SELECTOR, DocViewer, TutorialConfig, TutorialType, WINDOW} from '@angular/docs';
+import {DOCS_VIEWER_SELECTOR, DocViewer, WINDOW, TutorialConfig, TutorialType} from '@angular/docs';
 
-import {Component, input, signal} from '@angular/core';
+import {Component, input, Input, signal} from '@angular/core';
 import {ComponentFixture, TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
 import {of} from 'rxjs';
@@ -16,6 +16,7 @@ import {of} from 'rxjs';
 import {EMBEDDED_EDITOR_SELECTOR, EmbeddedEditor, EmbeddedTutorialManager} from '../../editor';
 import {NodeRuntimeSandbox} from '../../editor/node-runtime-sandbox.service';
 
+import {mockAsyncProvider} from '../../core/services/inject-async';
 import Tutorial from './tutorial.component';
 
 @Component({
@@ -98,7 +99,7 @@ describe('Tutorial', () => {
           provide: EmbeddedTutorialManager,
           useValue: fakeEmbeddedTutorialManager,
         },
-        {provide: NodeRuntimeSandbox, useClass: FakeNodeRuntimeSandbox},
+        mockAsyncProvider(NodeRuntimeSandbox, FakeNodeRuntimeSandbox),
       ],
     });
     TestBed.overrideComponent(Tutorial, {
@@ -110,13 +111,15 @@ describe('Tutorial', () => {
       },
     });
 
+    await TestBed;
+
     fixture = TestBed.createComponent(Tutorial);
     component = fixture.componentInstance;
 
     // Replace EmbeddedEditor with FakeEmbeddedEditor
     spyOn(component as any, 'loadEmbeddedEditorComponent').and.resolveTo(FakeEmbeddedEditor);
 
-    await fixture.whenStable();
+    fixture.detectChanges();
   });
 
   it('should create', () => {
@@ -130,7 +133,7 @@ describe('Tutorial', () => {
 
   it('should reset the reveal answer', async () => {
     setupResetRevealAnswerValues();
-    await fixture.whenStable();
+    fixture.detectChanges();
 
     const revealAnswerButton = component.revealAnswerButton();
     if (!revealAnswerButton) throw new Error('revealAnswerButton is undefined');
@@ -146,7 +149,7 @@ describe('Tutorial', () => {
 
   it('should reveal the answer on button click', async () => {
     setupRevealAnswerValues();
-    await fixture.whenStable();
+    fixture.detectChanges();
 
     const revealAnswerButton = component.revealAnswerButton();
     if (!revealAnswerButton) throw new Error('revealAnswerButton is undefined');
@@ -162,13 +165,14 @@ describe('Tutorial', () => {
     expect(embeddedTutorialManagerRevealAnswerSpy).toHaveBeenCalled();
 
     await fixture.whenStable();
+    fixture.detectChanges();
 
     expect(revealAnswerButton.nativeElement.textContent?.trim()).toBe('Reset');
   });
 
   it('should not reveal the answer when button is disabled', async () => {
     setupDisabledRevealAnswerValues();
-    await fixture.whenStable();
+    fixture.detectChanges();
 
     const revealAnswerButton = component.revealAnswerButton();
     if (!revealAnswerButton) throw new Error('revealAnswerButton is undefined');
@@ -183,9 +187,9 @@ describe('Tutorial', () => {
     expect(handleRevealAnswerSpy).not.toHaveBeenCalled();
   });
 
-  it('should not render the reveal answer button when there are no answers', async () => {
+  it('should not render the reveal answer button when there are no answers', () => {
     setupNoRevealAnswerValues();
-    await fixture.whenStable();
+    fixture.detectChanges();
 
     expect(component.revealAnswerButton()).toBe(undefined);
   });

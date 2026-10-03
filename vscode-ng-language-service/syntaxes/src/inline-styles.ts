@@ -1,9 +1,9 @@
-/*!
+/**
  * @license
- * Copyright Google LLC All Rights Reserved.
+ * Copyright Google Inc. All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
- * found in the LICENSE file at https://angular.dev/license
+ * found in the LICENSE file at https://angular.io/license
  */
 
 import {GrammarDefinition} from './types';
@@ -44,18 +44,13 @@ export const InlineStyles: GrammarDefinition = {
     },
 
     style: {
-      begin: /\s*([`'"])/,
+      begin: /\s*([`|'|"])/,
       beginCaptures: {1: {name: 'string'}},
       // @ts-ignore
       end: /\1/,
       endCaptures: {0: {name: 'string'}},
       contentName: 'source.css.scss',
-      patterns: [
-        // Consume escape sequences first so that an escaped delimiter (e.g. \`)
-        // does not terminate the style string prematurely.
-        {match: /\\[\s\S]/, name: 'constant.character.escape.ts'},
-        {include: 'source.css.scss'},
-      ],
+      patterns: [{include: 'source.css.scss'}],
     },
   },
 };

@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {LEGACY_OPTIONAL_CHAINING_DEFAULT, TypeCheckingConfig} from '@angular/compiler';
+import {R3Identifiers} from '@angular/compiler';
 import ts from 'typescript';
 
 import {
@@ -21,9 +21,9 @@ import {
 import {InjectableClassRegistry, JitDeclarationRegistry} from '../../annotations/common';
 import {CycleAnalyzer, CycleHandlingStrategy, ImportGraph} from '../../cycles';
 import {
-  addDiagnosticDetails,
+  COMPILER_ERRORS_WITH_GUIDES,
+  ERROR_DETAILS_PAGE_BASE_URL,
   ErrorCode,
-  errorCodeWithGuideFromDiagnosticCode,
   isFatalDiagnosticError,
   ngErrorCode,
 } from '../../diagnostics';
@@ -64,12 +64,11 @@ import {
 } from '../../incremental';
 import {SemanticSymbol} from '../../incremental/semantic_graph';
 import {generateAnalysis, IndexedComponent, IndexingContext} from '../../indexer';
-import {NodeAdapter} from '../../indexer/src/api';
 import {
+  DirectiveResources,
   CompoundMetadataReader,
   CompoundMetadataRegistry,
   DirectiveMeta,
-  DirectiveResources,
   DtsMetadataReader,
   ExportedProviderStatusResolver,
   HostDirectivesResolver,
@@ -88,7 +87,7 @@ import {
   PerfEvent,
   PerfPhase,
 } from '../../perf';
-import {FileUpdate, InliningMode, ProgramDriver, UpdateMode} from '../../program_driver';
+import {FileUpdate, ProgramDriver, UpdateMode} from '../../program_driver';
 import {DeclarationNode, isNamedClassDeclaration, TypeScriptReflectionHost} from '../../reflection';
 import {AdapterResourceLoader} from '../../resource';
 import {
@@ -107,11 +106,11 @@ import {
   DecoratorHandler,
   DtsTransformRegistry,
   ivyTransformFactory,
-  signalMetadataTransform,
   TraitCompiler,
+  signalMetadataTransform,
 } from '../../transform';
 import {TemplateTypeCheckerImpl} from '../../typecheck';
-import {OptimizeFor, TemplateTypeChecker} from '../../typecheck/api';
+import {OptimizeFor, TemplateTypeChecker, TypeCheckingConfig} from '../../typecheck/api';
 import {
   ALL_DIAGNOSTIC_FACTORIES,
   ExtendedTemplateCheckerImpl,
@@ -125,10 +124,9 @@ import {SourceFileValidator} from '../../validation';
 import {Xi18nContext} from '../../xi18n';
 import {DiagnosticCategoryLabel, NgCompilerAdapter, NgCompilerOptions} from '../api';
 
-import {ServiceDecoratorHandler} from '../../annotations/src/service';
-import {untagAllTsFiles} from '../../shims';
-import {angularJitApplicationTransform} from '../../transform/jit';
 import {coreVersionSupportsFeature} from './feature_detection';
+import {angularJitApplicationTransform} from '../../transform/jit';
+import {untagAllTsFiles} from '../../shims';
 
 /**
  * State information about a compilation which is only generated once some data is requested from
@@ -397,7 +395,6 @@ export class NgCompiler {
   private readonly implicitStandaloneValue: boolean;
   private readonly enableSelectorless: boolean;
   private readonly emitDeclarationOnly: boolean;
-  private readonly enableTemplateSourceLocations: boolean;
 
   /**
    * `NgCompiler` can be reused for multiple compilations (for resource-only changes), and each
@@ -425,6 +422,7 @@ export class NgCompiler {
           ticket.programDriver,
           ticket.incrementalBuildStrategy,
           IncrementalCompilation.fresh(
+            ticket.tsProgram,
             versionMapFromProgram(ticket.tsProgram, ticket.programDriver),
           ),
           ticket.enableTemplateTypeChecker,
@@ -473,7 +471,6 @@ export class NgCompiler {
       this.angularCoreVersion === null ||
       coreVersionSupportsFeature(this.angularCoreVersion, '>= 18.1.0');
     this.enableSelectorless = options['_enableSelectorless'] ?? false;
-    this.enableTemplateSourceLocations = options['enableTemplateSourceLocations'] ?? false;
     this.emitDeclarationOnly =
       !!options.emitDeclarationOnly && !!options._experimentalAllowEmitDeclarationOnly;
     // Standalone by default is enabled since v19. We need to toggle it here,
@@ -661,7 +658,7 @@ export class NgCompiler {
       if (templateSemanticsChecker !== null) {
         diagnostics.push(...templateSemanticsChecker.getDiagnosticsForComponent(component));
       }
-      if (this.strictTemplates && extendedTemplateChecker !== null) {
+      if (this.options.strictTemplates && extendedTemplateChecker !== null) {
         diagnostics.push(...extendedTemplateChecker.getDiagnosticsForComponent(component));
       }
     } catch (err: unknown) {
@@ -674,22 +671,16 @@ export class NgCompiler {
   }
 
   /**
-   * Add https://angular.dev/errors error guide links to diagnostics for this compilation.
+   * Add Angular.io error guide links to diagnostics for this compilation.
    */
   private addMessageTextDetails(diagnostics: ts.Diagnostic[]): ts.Diagnostic[] {
     return diagnostics.map((diag) => {
-      const errorCode = errorCodeWithGuideFromDiagnosticCode(diag.code);
-      if (errorCode !== null) {
-        const messageText =
-          typeof diag.messageText === 'string'
-            ? addDiagnosticDetails(errorCode, diag.messageText)
-            : {
-                ...diag.messageText,
-                messageText: addDiagnosticDetails(errorCode, diag.messageText.messageText),
-              };
+      if (diag.code && COMPILER_ERRORS_WITH_GUIDES.has(ngErrorCode(diag.code))) {
         return {
           ...diag,
-          messageText,
+          messageText:
+            diag.messageText +
+            `. Find more at ${ERROR_DETAILS_PAGE_BASE_URL}/NG${ngErrorCode(diag.code)}`,
         };
       }
       return diag;
@@ -844,8 +835,6 @@ export class NgCompiler {
         compilation.isCore,
         this.closureCompilerEnabled,
         this.emitDeclarationOnly,
-        compilation.refEmitter,
-        !!this.options['_experimentalEmitIntermediateTs'],
       ),
       aliasTransformFactory(compilation.traitCompiler.exportStatements),
       defaultImportTracker.importPreservingTransformer(),
@@ -928,17 +917,7 @@ export class NgCompiler {
     const compilation = this.ensureAnalyzed();
     const context = new IndexingContext();
     compilation.traitCompiler.index(context);
-
-    const adapter: NodeAdapter<DeclarationNode> = {
-      getName(node: DeclarationNode): string {
-        return ts.isClassDeclaration(node) && node.name ? node.name.getText() : '';
-      },
-      getFileName(node: DeclarationNode): string {
-        return node.getSourceFile().fileName;
-      },
-    };
-
-    return generateAnalysis(context, adapter);
+    return generateAnalysis(context);
   }
 
   /**
@@ -1056,12 +1035,13 @@ export class NgCompiler {
     });
   }
 
-  /**
-   * strictTemplate is `true` by default.
-   * Explicit opt-out is required to disable strictness
-   */
-  private get strictTemplates(): boolean {
-    return this.options.strictTemplates !== false;
+  private get fullTemplateTypeCheck(): boolean {
+    // Determine the strictness level of type checking based on compiler options. As
+    // `strictTemplates` is a superset of `fullTemplateTypeCheck`, the former implies the latter.
+    // Also see `verifyCompatibleTypeCheckOptions` where it is verified that `fullTemplateTypeCheck`
+    // is not disabled when `strictTemplates` is enabled.
+    const strictTemplates = !!this.options.strictTemplates;
+    return strictTemplates || !!this.options.fullTemplateTypeCheck;
   }
 
   private getTypeCheckingConfig(): TypeCheckingConfig {
@@ -1069,9 +1049,10 @@ export class NgCompiler {
     // `strictTemplates` is a superset of `fullTemplateTypeCheck`, the former implies the latter.
     // Also see `verifyCompatibleTypeCheckOptions` where it is verified that `fullTemplateTypeCheck`
     // is not disabled when `strictTemplates` is enabled.
-    const strictTemplates = this.strictTemplates;
+    const strictTemplates = !!this.options.strictTemplates;
 
     const useInlineTypeConstructors = this.programDriver.supportsInlineOperations;
+    const checkTwoWayBoundEvents = this.options['_checkTwoWayBoundEvents'] ?? false;
 
     // Check whether the loaded version of `@angular/core` in the `ts.Program` supports unwrapping
     // writable signals for type-checking. Only Angular versions greater than 17.2 have the necessary
@@ -1087,7 +1068,7 @@ export class NgCompiler {
     // First select a type-checking configuration, based on whether full template type-checking is
     // requested.
     let typeCheckingConfig: TypeCheckingConfig;
-    if (strictTemplates) {
+    if (this.fullTemplateTypeCheck) {
       typeCheckingConfig = {
         applyTemplateContextGuards: strictTemplates,
         checkQueries: false,
@@ -1107,8 +1088,6 @@ export class NgCompiler {
         // - error TS2531: Object is possibly 'null'.
         // - error TS2339: Property 'value' does not exist on type 'EventTarget'.
         checkTypeOfDomEvents: strictTemplates,
-        checkUnclaimedEventNames: false, // 3p-only
-        // g3-only checkUnclaimedEventNames: strictTemplates,
         checkTypeOfDomReferences: strictTemplates,
         // Non-DOM references have the correct type in View Engine so there is no strictness flag.
         checkTypeOfNonDomReferences: true,
@@ -1119,11 +1098,16 @@ export class NgCompiler {
         strictLiteralTypes: true,
         enableTemplateTypeChecker: this.enableTemplateTypeChecker,
         useInlineTypeConstructors,
+        // Warnings for suboptimal type inference are only enabled if in Language Service mode
+        // (providing the full TemplateTypeChecker API) and if strict mode is not enabled. In strict
+        // mode, the user is in full control of type inference.
+        suggestionsForSuboptimalTypeInference: this.enableTemplateTypeChecker && !strictTemplates,
         controlFlowPreventingContentProjection:
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         unusedStandaloneImports:
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         allowSignalsInTwoWayBindings,
+        checkTwoWayBoundEvents,
         allowDomEventAssertion,
       };
     } else {
@@ -1143,7 +1127,6 @@ export class NgCompiler {
         checkTypeOfOutputEvents: false,
         checkTypeOfAnimationEvents: false,
         checkTypeOfDomEvents: false,
-        checkUnclaimedEventNames: false,
         checkTypeOfDomReferences: false,
         checkTypeOfNonDomReferences: false,
         checkTypeOfPipes: false,
@@ -1152,17 +1135,21 @@ export class NgCompiler {
         strictLiteralTypes: false,
         enableTemplateTypeChecker: this.enableTemplateTypeChecker,
         useInlineTypeConstructors,
+        // In "basic" template type-checking mode, no warnings are produced since most things are
+        // not checked anyways.
+        suggestionsForSuboptimalTypeInference: false,
         controlFlowPreventingContentProjection:
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         unusedStandaloneImports:
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         allowSignalsInTwoWayBindings,
+        checkTwoWayBoundEvents,
         allowDomEventAssertion,
       };
     }
 
     // Apply explicitly configured strictness flags on top of the default configuration
-    // based on "strictTemplates".
+    // based on "fullTemplateTypeCheck".
     if (this.options.strictInputTypes !== undefined) {
       typeCheckingConfig.checkTypeOfInputBindings = this.options.strictInputTypes;
       typeCheckingConfig.applyTemplateContextGuards = this.options.strictInputTypes;
@@ -1180,9 +1167,6 @@ export class NgCompiler {
     }
     if (this.options.strictDomEventTypes !== undefined) {
       typeCheckingConfig.checkTypeOfDomEvents = this.options.strictDomEventTypes;
-    }
-    if (this.options.strictUnclaimedEventNames !== undefined) {
-      typeCheckingConfig.checkUnclaimedEventNames = this.options.strictUnclaimedEventNames;
     }
     if (this.options.strictSafeNavigationTypes !== undefined) {
       typeCheckingConfig.strictSafeNavigationTypes = this.options.strictSafeNavigationTypes;
@@ -1292,7 +1276,7 @@ export class NgCompiler {
           }),
         );
       }
-      if (this.strictTemplates && extendedTemplateChecker !== null) {
+      if (this.options.strictTemplates && extendedTemplateChecker !== null) {
         diagnostics.push(
           ...compilation.traitCompiler.runAdditionalChecks(sf, (clazz, handler) => {
             return handler.extendedTemplateCheck?.(clazz, extendedTemplateChecker) || null;
@@ -1556,8 +1540,6 @@ export class NgCompiler {
         typeCheckHostBindings,
         this.enableSelectorless,
         this.emitDeclarationOnly,
-        this.options.legacyOptionalChaining ?? LEGACY_OPTIONAL_CHAINING_DEFAULT,
-        this.enableTemplateSourceLocations,
       ),
 
       // TODO(alxhub): understand why the cast here is necessary (something to do with `null`
@@ -1587,7 +1569,6 @@ export class NgCompiler {
         this.usePoisonedData,
         typeCheckHostBindings,
         this.emitDeclarationOnly,
-        this.options.legacyOptionalChaining ?? LEGACY_OPTIONAL_CHAINING_DEFAULT,
       ) as Readonly<DecoratorHandler<unknown, unknown, SemanticSymbol | null, unknown>>,
       // Pipe handler must be before injectable handler in list so pipe factories are printed
       // before injectable factories (so injectable factories can delegate to them)
@@ -1604,14 +1585,6 @@ export class NgCompiler {
         !!this.options.generateExtraImportsInLocalMode,
         !!this.options.strictStandalone,
         this.implicitStandaloneValue,
-      ),
-      new ServiceDecoratorHandler(
-        reflector,
-        evaluator,
-        isCore,
-        this.delegatingPerfRecorder,
-        supportTestBed,
-        compilationMode,
       ),
       new InjectableDecoratorHandler(
         reflector,
@@ -1658,7 +1631,6 @@ export class NgCompiler {
       semanticDepGraphUpdater,
       this.adapter,
       this.emitDeclarationOnly,
-      !!this.options['_experimentalEmitIntermediateTs'],
     );
 
     // Template type-checking may use the `ProgramDriver` to produce new `ts.Program`(s). If this
@@ -1783,11 +1755,33 @@ function getR3SymbolsFile(program: ts.Program): ts.SourceFile | null {
 }
 
 /**
- * Checks compiler options compatibility with strictTemplates
+ * Since "strictTemplates" is a true superset of type checking capabilities compared to
+ * "fullTemplateTypeCheck", it is required that the latter is not explicitly disabled if the
+ * former is enabled.
  */
 function* verifyCompatibleTypeCheckOptions(
   options: NgCompilerOptions,
 ): Generator<ts.Diagnostic, void, void> {
+  if (options.fullTemplateTypeCheck === false && options.strictTemplates === true) {
+    yield makeConfigDiagnostic({
+      category: ts.DiagnosticCategory.Error,
+      code: ErrorCode.CONFIG_STRICT_TEMPLATES_IMPLIES_FULL_TEMPLATE_TYPECHECK,
+      messageText: `
+Angular compiler option "strictTemplates" is enabled, however "fullTemplateTypeCheck" is disabled.
+
+Having the "strictTemplates" flag enabled implies that "fullTemplateTypeCheck" is also enabled, so
+the latter can not be explicitly disabled.
+
+One of the following actions is required:
+1. Remove the "fullTemplateTypeCheck" option.
+2. Remove "strictTemplates" or set it to 'false'.
+
+More information about the template type checking compiler options can be found in the documentation:
+https://angular.dev/tools/cli/template-typecheck
+      `.trim(),
+    });
+  }
+
   if (options.extendedDiagnostics && options.strictTemplates === false) {
     yield makeConfigDiagnostic({
       category: ts.DiagnosticCategory.Error,
@@ -1906,10 +1900,6 @@ class NotifyingProgramDriverWrapper implements ProgramDriver {
     private notifyNewProgram: (program: ts.Program) => void,
   ) {
     this.getSourceFileVersion = this.delegate.getSourceFileVersion?.bind(this);
-  }
-
-  get inliningMode(): InliningMode {
-    return this.delegate.inliningMode;
   }
 
   get supportsInlineOperations() {

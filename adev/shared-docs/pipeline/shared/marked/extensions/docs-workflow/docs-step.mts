@@ -7,12 +7,14 @@
  */
 
 import {Token, Tokens, RendererThis, TokenizerThis} from 'marked';
+import {formatHeading} from '../../transformations/heading.mjs';
+import {AdevDocsRenderer} from '../../renderer.mjs';
 
 interface DocsStepToken extends Tokens.Generic {
   type: 'docs-step';
+  title: string;
   body: string;
   tokens: Token[];
-  header: Tokens.Heading;
 }
 
 // Capture group 1: all attributes on the opening tag
@@ -33,20 +35,13 @@ export const docsStepExtension = {
       const attr = match[1].trim();
       const title = titleRule.exec(attr);
       const body = match[2].trim();
-      const header = title ? title[1] : '';
 
       const token: DocsStepToken = {
         type: 'docs-step',
         raw: match[0],
+        title: title ? title[1] : '',
         body: body,
         tokens: [],
-        header: {
-          text: header,
-          raw: header,
-          tokens: this.lexer.inlineTokens(header, []),
-          type: 'heading',
-          depth: 3,
-        },
       };
       this.lexer.blockTokens(token.body, token.tokens);
       return token;
@@ -57,7 +52,7 @@ export const docsStepExtension = {
     return `
     <li>
       <span class="docs-step-number" aria-hidden="true"></span>
-      ${this.parser.renderer.heading(token.header)}
+      ${formatHeading({text: token.title, depth: 3}, (this.parser.renderer as AdevDocsRenderer).context.markdownFilePath)}
       ${this.parser.parse(token.tokens)}
     </li>
     `;

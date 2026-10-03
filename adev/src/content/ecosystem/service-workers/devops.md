@@ -60,17 +60,17 @@ If necessary, the service worker enters a safe mode where requests fall back on 
 
 Hash mismatches can occur for a variety of reasons:
 
-- Caching layers between the origin server and the end user could serve stale content
-- A non-atomic deployment could result in the Angular service worker having visibility of partially updated content
-- Errors during the build process could result in updated resources without `ngsw.json` being updated.
-  The reverse could also happen resulting in an updated `ngsw.json` without updated resources.
+* Caching layers between the origin server and the end user could serve stale content
+* A non-atomic deployment could result in the Angular service worker having visibility of partially updated content
+* Errors during the build process could result in updated resources without `ngsw.json` being updated.
+    The reverse could also happen resulting in an updated `ngsw.json` without updated resources.
 
 #### Unhashed content
 
 The only resources that have hashes in the `ngsw.json` manifest are resources that were present in the `dist` directory at the time the manifest was built.
 Other resources, especially those loaded from CDNs, have content that is unknown at build time or are updated more frequently than the application is deployed.
 
-If the Angular service worker does not have a hash to verify a resource is valid, it still caches its contents. At the same time, it honors the HTTP caching headers by using a policy of _stale while revalidate_.
+If the Angular service worker does not have a hash to verify a resource is valid, it still caches its contents. At the same time, it honors the HTTP caching headers by using a policy of *stale while revalidate*.
 The Angular service worker continues to serve a resource even after its HTTP caching headers indicate
 that it is no longer valid. At the same time, it attempts to refresh the expired resource in the background.
 This way, broken unhashed resources do not remain in the cache beyond their configured lifetimes.
@@ -88,15 +88,15 @@ IMPORTANT: This guarantee is **stronger** than that provided by the normal web d
 
 The Angular service worker might change the version of a running application under error conditions such as:
 
-- The current version becomes non-valid due to a failed hash.
-- An unrelated error causes the service worker to enter safe mode and deactivates it temporarily.
+* The current version becomes non-valid due to a failed hash.
+* An unrelated error causes the service worker to enter safe mode and deactivates it temporarily.
 
 The Angular service worker cleans up application versions when no tab is using them.
 
 Other reasons the Angular service worker might change the version of a running application are normal events:
 
-- The page is reloaded/refreshed.
-- The page requests an update be immediately activated using the `SwUpdate` service.
+* The page is reloaded/refreshed.
+* The page requests an update be immediately activated using the `SwUpdate` service.
 
 ### Service worker updates
 
@@ -109,24 +109,6 @@ If the service worker changes, it's updated in the background.
 Most updates to the Angular service worker are transparent to the application. The old caches are still valid and content is still served normally.
 Occasionally, a bug fix or feature in the Angular service worker might require the invalidation of old caches.
 In this case, the service worker transparently refreshes the application from the network.
-
-#### Updating the service worker when only its response headers change
-
-Browsers only install a new service worker when the service worker script is byte-different from the installed one.
-Because `ngsw-worker.js` is usually identical across builds, changing only the response headers that the server sends with it, such as a `Content-Security-Policy`, does not update the installed service worker.
-The service worker keeps running with the headers it was installed with.
-
-To make browsers install the service worker again, register it with a versioned script URL, and change the version whenever those headers change:
-
-```ts
-provideServiceWorker('ngsw-worker.js?v=2', {
-  enabled: !isDevMode(),
-  registrationStrategy: 'registerWhenStable:30000',
-});
-```
-
-Registering a different script URL makes the browser fetch and install the service worker again, even if its content is unchanged.
-The Angular service worker resolves its caches and `ngsw.json` relative to its registration scope, not its script URL, so the query parameter doesn't affect cached content.
 
 ### Bypassing the service worker
 
@@ -156,7 +138,7 @@ The Angular service worker exposes debugging information under the `ngsw/` virtu
 Currently, the single exposed URL is `ngsw/state`.
 Here is an example of this debug page's contents:
 
-```shell {hideCopy}
+<docs-code hideCopy language="shell">
 
 NGSW Debug Info:
 
@@ -173,31 +155,30 @@ Clients: 7b79a015-69af-4d3d-9ae6-95ba90c79486, 5bc08295-aaf2-42f3-a4cc-9e4ef9100
 Last update tick: 1s496u
 Last update run: never
 Task queue:
-
-- init post-load (update, cleanup)
+ * init post-load (update, cleanup)
 
 Debug log:
 
-```
+</docs-code>
 
 #### Driver state
 
 The first line indicates the driver state:
 
-```shell {hideCopy}
+<docs-code hideCopy language="shell">
 
 Driver state: NORMAL ((nominal))
 
-```
+</docs-code>
 
 `NORMAL` indicates that the service worker is operating normally and is not in a degraded state.
 
 There are two possible degraded states:
 
-| Degraded states         | Details                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| :---------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Degraded states         | Details |
+|:---                     |:---     |
 | `EXISTING_CLIENTS_ONLY` | The service worker does not have a clean copy of the latest known version of the application. Older cached versions are safe to use, so existing tabs continue to run from cache, but new loads of the application will be served from the network. The service worker will try to recover from this state when a new version of the application is detected and installed. This happens when a new `ngsw.json` is available. |
-| `SAFE_MODE`             | The service worker cannot guarantee the safety of using cached data. Either an unexpected error occurred or all cached versions are invalid. All traffic will be served from the network, running as little service worker code as possible.                                                                                                                                                                                  |
+| `SAFE_MODE`             | The service worker cannot guarantee the safety of using cached data. Either an unexpected error occurred or all cached versions are invalid. All traffic will be served from the network, running as little service worker code as possible. |
 
 In both cases, the parenthetical annotation provides the
 error that caused the service worker to enter the degraded state.
@@ -208,21 +189,21 @@ The new instance starts in the `NORMAL` mode, regardless of the state of the pre
 
 #### Latest manifest hash
 
-```shell {hideCopy}
+<docs-code hideCopy language="shell">
 
 Latest manifest hash: eea7f5f464f90789b621170af5a569d6be077e5c
 
-```
+</docs-code>
 
 This is the SHA1 hash of the most up-to-date version of the application that the service worker knows about.
 
 #### Last update check
 
-```shell {hideCopy}
+<docs-code hideCopy language="shell">
 
 Last update check: never
 
-```
+</docs-code>
 
 This indicates the last time the service worker checked for a new version, or update, of the application.
 `never` indicates that the service worker has never checked for an update.
@@ -231,13 +212,13 @@ In this example debug file, the update check is currently scheduled, as explaine
 
 #### Version
 
-```shell {hideCopy}
+<docs-code hideCopy language="shell">
 
 === Version eea7f5f464f90789b621170af5a569d6be077e5c ===
 
 Clients: 7b79a015-69af-4d3d-9ae6-95ba90c79486, 5bc08295-aaf2-42f3-a4cc-9e4ef9100f65
 
-```
+</docs-code>
 
 In this example, the service worker has one version of the application cached and being used to serve two different tabs.
 
@@ -245,16 +226,15 @@ HELPFUL: This version hash is the "latest manifest hash" listed above. Both clie
 
 #### Idle task queue
 
-```shell {hideCopy}
+<docs-code hideCopy language="shell">
 
 === Idle Task Queue ===
 Last update tick: 1s496u
 Last update run: never
 Task queue:
+ * init post-load (update, cleanup)
 
-- init post-load (update, cleanup)
-
-```
+</docs-code>
 
 The Idle Task Queue is the queue of all pending tasks that happen in the background in the service worker.
 If there are any tasks in the queue, they are listed with a description.
@@ -266,11 +246,11 @@ The "Last update run" counter shows the last time idle tasks were actually execu
 
 #### Debug log
 
-```shell {hideCopy}
+<docs-code hideCopy language="shell">
 
 Debug log:
 
-```
+</docs-code>
 
 Errors that occur within the service worker are logged here.
 
@@ -279,13 +259,13 @@ Errors that occur within the service worker are logged here.
 Browsers such as Chrome provide developer tools for interacting with service workers.
 Such tools can be powerful when used properly, but there are a few things to keep in mind.
 
-- When using developer tools, the service worker is kept running in the background and never restarts.
-  This can cause behavior with Dev Tools open to differ from behavior a user might experience.
+* When using developer tools, the service worker is kept running in the background and never restarts.
+    This can cause behavior with Dev Tools open to differ from behavior a user might experience.
 
-- If you look in the Cache Storage viewer, the cache is frequently out of date.
-  Right-click the Cache Storage title and refresh the caches.
+* If you look in the Cache Storage viewer, the cache is frequently out of date.
+    Right-click the Cache Storage title and refresh the caches.
 
-- Stopping and starting the service worker in the Service Worker pane checks for updates
+* Stopping and starting the service worker in the Service Worker pane checks for updates
 
 ## Service worker safety
 
@@ -301,7 +281,7 @@ When the service worker's request for `ngsw.json` returns a `404`, then the serv
 
 <!-- vale Angular.Google_Acronyms = NO -->
 
-A small script, `safety-worker.js`, is also included in the `@angular/service-worker` npm package.
+A small script, `safety-worker.js`, is also included in the `@angular/service-worker` NPM package.
 When loaded, it un-registers itself from the browser and removes the service worker caches.
 This script can be used as a last resort to get rid of unwanted service workers already installed on client pages.
 

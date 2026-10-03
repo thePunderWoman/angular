@@ -4,6 +4,7 @@
     "strict": true
   },
   "angularCompilerOptions": {
+    "strictTemplates": true,
     "_enableSelectorless": true
   }
 }

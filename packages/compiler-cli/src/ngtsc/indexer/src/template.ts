@@ -8,14 +8,12 @@
 import {
   AST,
   ASTWithSource,
-  BindingPipe,
+  BoundTarget,
   CombinedRecursiveAstVisitor,
   ImplicitReceiver,
   ParseSourceSpan,
   PropertyRead,
-  ThisReceiver,
   TmplAstBoundAttribute,
-  TmplAstBoundEvent,
   TmplAstComponent,
   TmplAstDirective,
   TmplAstElement,
@@ -23,18 +21,15 @@ import {
   TmplAstNode,
   TmplAstReference,
   TmplAstTemplate,
-  TmplAstTextAttribute,
   TmplAstVariable,
   tmplAstVisitAll,
 } from '@angular/compiler';
 
-import {DeclarationNode} from '../../reflection';
+import {ClassDeclaration, DeclarationNode} from '../../reflection';
 
 import {
   AbsoluteSourceSpan,
-  AbstractBoundTemplate,
   AttributeIdentifier,
-  BoundAttributeIdentifier,
   ComponentNodeIdentifier,
   DirectiveHostIdentifier,
   DirectiveNodeIdentifier,
@@ -42,37 +37,36 @@ import {
   IdentifierKind,
   LetDeclarationIdentifier,
   MethodIdentifier,
-  PipeIdentifier,
   PropertyIdentifier,
   ReferenceIdentifier,
   TemplateNodeIdentifier,
   TopLevelIdentifier,
   VariableIdentifier,
 } from './api';
+import {ComponentMeta} from './context';
 
-type ExpressionIdentifier<T = DeclarationNode> = PropertyIdentifier<T> | MethodIdentifier<T>;
+type ExpressionIdentifier = PropertyIdentifier | MethodIdentifier;
 type TmplTarget = TmplAstReference | TmplAstVariable | TmplAstLetDeclaration;
-type TargetIdentifier<T = DeclarationNode> =
-  ReferenceIdentifier<T> | VariableIdentifier | LetDeclarationIdentifier;
-type TargetIdentifierMap<T = DeclarationNode> = Map<TmplTarget, TargetIdentifier<T>>;
+type TargetIdentifier = ReferenceIdentifier | VariableIdentifier | LetDeclarationIdentifier;
+type TargetIdentifierMap = Map<TmplTarget, TargetIdentifier>;
 
 /**
  * Visits the AST of a parsed Angular template. Discovers and stores
  * identifiers of interest, deferring to an `ExpressionVisitor` as needed.
  */
-class TemplateVisitor<T = DeclarationNode> extends CombinedRecursiveAstVisitor {
+class TemplateVisitor extends CombinedRecursiveAstVisitor {
   // Identifiers of interest found in the template.
-  readonly identifiers = new Set<TopLevelIdentifier<T>>();
+  readonly identifiers = new Set<TopLevelIdentifier>();
   readonly errors: Error[] = [];
   private currentAstWithSource: {source: string | null; absoluteOffset: number} | null = null;
 
   // Map of targets in a template to their identifiers.
-  private readonly targetIdentifierCache: TargetIdentifierMap<T> = new Map();
+  private readonly targetIdentifierCache: TargetIdentifierMap = new Map();
 
   // Map of elements and templates to their identifiers.
   private readonly directiveHostIdentifierCache = new Map<
     TmplAstElement | TmplAstTemplate | TmplAstComponent | TmplAstDirective,
-    DirectiveHostIdentifier<T>
+    DirectiveHostIdentifier
   >();
 
   /**
@@ -81,7 +75,7 @@ class TemplateVisitor<T = DeclarationNode> extends CombinedRecursiveAstVisitor {
    *
    * @param boundTemplate bound template target
    */
-  constructor(private boundTemplate: AbstractBoundTemplate<T>) {
+  constructor(private boundTemplate: BoundTarget<ComponentMeta>) {
     super();
   }
 
@@ -150,46 +144,7 @@ class TemplateVisitor<T = DeclarationNode> extends CombinedRecursiveAstVisitor {
     super.visitPropertyRead(ast, null);
   }
 
-  override visitPipe(ast: BindingPipe): void {
-    this.visitPipeIdentifier(ast);
-    super.visitPipe(ast, null);
-  }
-
-  private visitPipeIdentifier(ast: BindingPipe): void {
-    if (this.currentAstWithSource === null || this.currentAstWithSource.source === null) {
-      return;
-    }
-
-    const {absoluteOffset, source: expressionStr} = this.currentAstWithSource;
-    const identifierStart = ast.nameSpan.start - absoluteOffset;
-
-    if (!expressionStr.startsWith(ast.name, identifierStart)) {
-      this.errors.push(
-        new Error(
-          `Impossible state: "${ast.name}" not found in "${expressionStr}" at location ${identifierStart}`,
-        ),
-      );
-      return;
-    }
-
-    const absoluteStart = absoluteOffset + identifierStart;
-    const span = new AbsoluteSourceSpan(absoluteStart, absoluteStart + ast.name.length);
-    const target = this.boundTemplate.getPipe(ast.name);
-    const identifier: PipeIdentifier<T> = {
-      name: ast.name,
-      span,
-      kind: IdentifierKind.Pipe,
-      target: target ? {node: target.ref.node} : null,
-    };
-
-    this.identifiers.add(identifier);
-  }
-
   override visitBoundAttribute(attribute: TmplAstBoundAttribute): void {
-    const identifier = this.bindingToIdentifier(attribute, IdentifierKind.Input);
-    if (identifier !== null) {
-      this.identifiers.add(identifier);
-    }
     const previous = this.currentAstWithSource;
     this.currentAstWithSource = {
       source: attribute.valueSpan?.toString() || null,
@@ -199,57 +154,10 @@ class TemplateVisitor<T = DeclarationNode> extends CombinedRecursiveAstVisitor {
     this.currentAstWithSource = previous;
   }
 
-  override visitBoundEvent(event: TmplAstBoundEvent): void {
-    const identifier = this.bindingToIdentifier(event, IdentifierKind.Output);
-    if (identifier !== null) {
-      this.identifiers.add(identifier);
-    }
-    super.visitBoundEvent(event);
-  }
-
-  override visitTextAttribute(attribute: TmplAstTextAttribute): void {
-    const identifier = this.bindingToIdentifier(attribute, IdentifierKind.Input);
-    if (identifier !== null) {
-      this.identifiers.add(identifier);
-    }
-    super.visitTextAttribute(attribute);
-  }
-
-  private bindingToIdentifier(
-    node: TmplAstBoundAttribute | TmplAstBoundEvent | TmplAstTextAttribute,
-    kind: IdentifierKind.Input | IdentifierKind.Output,
-  ): BoundAttributeIdentifier<T> | null {
-    if (!this.boundTemplate.getConsumerOfBinding) {
-      return null;
-    }
-    const consumer = this.boundTemplate.getConsumerOfBinding(node);
-    if (!consumer || consumer instanceof TmplAstElement || consumer instanceof TmplAstTemplate) {
-      return null;
-    }
-
-    const keySpan = node.keySpan ?? (node instanceof TmplAstTextAttribute ? node.sourceSpan : null);
-    if (!keySpan) {
-      return null;
-    }
-
-    const span = new AbsoluteSourceSpan(
-      keySpan.start.offset,
-      keySpan.start.offset + node.name.length,
-    );
-    return {
-      name: node.name,
-      span,
-      kind,
-      target: {
-        node: consumer.ref.node,
-      },
-    };
-  }
-
   /** Creates an identifier for a template element or template node. */
   private directiveHostToIdentifier(
     node: TmplAstElement | TmplAstTemplate | TmplAstComponent | TmplAstDirective,
-  ): DirectiveHostIdentifier<T> | null {
+  ): DirectiveHostIdentifier | null {
     // If this node has already been seen, return the cached result.
     if (this.directiveHostIdentifierCache.has(node)) {
       return this.directiveHostIdentifierCache.get(node)!;
@@ -320,17 +228,17 @@ class TemplateVisitor<T = DeclarationNode> extends CombinedRecursiveAstVisitor {
       ),
       // cast b/c pre-TypeScript 3.5 unions aren't well discriminated
     } as
-      | ElementIdentifier<T>
-      | TemplateNodeIdentifier<T>
-      | ComponentNodeIdentifier<T>
-      | DirectiveNodeIdentifier<T>;
+      | ElementIdentifier
+      | TemplateNodeIdentifier
+      | ComponentNodeIdentifier
+      | DirectiveNodeIdentifier;
 
     this.directiveHostIdentifierCache.set(node, identifier);
     return identifier;
   }
 
   /** Creates an identifier for a template reference or template variable target. */
-  private targetToIdentifier(node: TmplTarget): TargetIdentifier<T> | null {
+  private targetToIdentifier(node: TmplTarget): TargetIdentifier | null {
     // If this node has already been seen, return the cached result.
     if (this.targetIdentifierCache.has(node)) {
       return this.targetIdentifierCache.get(node)!;
@@ -343,7 +251,7 @@ class TemplateVisitor<T = DeclarationNode> extends CombinedRecursiveAstVisitor {
     }
 
     const span = new AbsoluteSourceSpan(start, start + name.length);
-    let identifier: ReferenceIdentifier<T> | VariableIdentifier | LetDeclarationIdentifier;
+    let identifier: ReferenceIdentifier | VariableIdentifier | LetDeclarationIdentifier;
     if (node instanceof TmplAstReference) {
       // If the node is a reference, we care about its target. The target can be an element, a
       // template, a directive applied on a template or element (in which case the directive field
@@ -351,8 +259,8 @@ class TemplateVisitor<T = DeclarationNode> extends CombinedRecursiveAstVisitor {
       const refTarget = this.boundTemplate.getReferenceTarget(node);
       let target = null;
       if (refTarget) {
-        let node: DirectiveHostIdentifier<T> | null = null;
-        let directive: T | null = null;
+        let node: DirectiveHostIdentifier | null = null;
+        let directive: ClassDeclaration<DeclarationNode> | null = null;
         if (
           refTarget instanceof TmplAstElement ||
           refTarget instanceof TmplAstTemplate ||
@@ -433,7 +341,7 @@ class TemplateVisitor<T = DeclarationNode> extends CombinedRecursiveAstVisitor {
    */
   private visitIdentifier(
     ast: AST & {name: string; receiver: AST},
-    kind: ExpressionIdentifier<T>['kind'],
+    kind: ExpressionIdentifier['kind'],
   ) {
     // Only handle identifiers in expressions that have a source location.
     if (this.currentAstWithSource === null || this.currentAstWithSource.source === null) {
@@ -444,7 +352,7 @@ class TemplateVisitor<T = DeclarationNode> extends CombinedRecursiveAstVisitor {
     // impossible to determine by an indexer and unsupported by the indexing module.
     // The indexing module also does not currently support references to identifiers declared in the
     // template itself, which have a non-null expression target.
-    if (!(ast.receiver instanceof ImplicitReceiver) && !(ast.receiver instanceof ThisReceiver)) {
+    if (!(ast.receiver instanceof ImplicitReceiver)) {
       return;
     }
 
@@ -474,7 +382,7 @@ class TemplateVisitor<T = DeclarationNode> extends CombinedRecursiveAstVisitor {
     const span = new AbsoluteSourceSpan(absoluteStart, absoluteStart + ast.name.length);
     const targetAst = this.boundTemplate.getExpressionTarget(ast);
     const target = targetAst ? this.targetToIdentifier(targetAst) : null;
-    const identifier: ExpressionIdentifier<T> = {
+    const identifier: ExpressionIdentifier = {
       name: ast.name,
       span,
       kind,
@@ -491,16 +399,13 @@ class TemplateVisitor<T = DeclarationNode> extends CombinedRecursiveAstVisitor {
  * @param boundTemplate bound template target, which can be used for querying expression targets.
  * @return identifiers in template
  */
-export function getTemplateIdentifiers<T = DeclarationNode>(
-  boundTemplate: AbstractBoundTemplate<T>,
-): {
-  identifiers: Set<TopLevelIdentifier<T>>;
+export function getTemplateIdentifiers(boundTemplate: BoundTarget<ComponentMeta>): {
+  identifiers: Set<TopLevelIdentifier>;
   errors: Error[];
 } {
-  const visitor = new TemplateVisitor<T>(boundTemplate);
-  const template = boundTemplate.getTemplateAst();
-  if (template !== undefined) {
-    tmplAstVisitAll(visitor, template);
+  const visitor = new TemplateVisitor(boundTemplate);
+  if (boundTemplate.target.template !== undefined) {
+    tmplAstVisitAll(visitor, boundTemplate.target.template);
   }
   return {identifiers: visitor.identifiers, errors: visitor.errors};
 }

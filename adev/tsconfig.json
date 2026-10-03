@@ -3,6 +3,7 @@
   "compilerOptions": {
     "outDir": "./dist/out-tsc",
     "forceConsistentCasingInFileNames": true,
+    "strict": true,
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,
@@ -24,6 +25,7 @@
   },
   "angularCompilerOptions": {
     "strictInjectionParameters": true,
-    "strictInputAccessModifiers": true
+    "strictInputAccessModifiers": true,
+    "strictTemplates": true
   }
 }

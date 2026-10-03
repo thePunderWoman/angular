@@ -8,11 +8,7 @@
 
 import {Fragment, h} from 'preact';
 import {PipeEntry} from '../entities.mjs';
-import {
-  ClassEntryRenderable,
-  InterfaceEntryRenderable,
-  PipeEntryRenderable,
-} from '../entities/renderables.mjs';
+import {ClassEntryRenderable, PipeEntryRenderable} from '../entities/renderables.mjs';
 import {ClassMemberList} from './class-member-list';
 import {HeaderApi} from './header-api';
 import {
@@ -28,12 +24,9 @@ import {RawHtml} from './raw-html';
 import {DeprecationWarning} from './deprecation-warning';
 import {codeToHtml} from '../../../shared/shiki.mjs';
 import {getHighlighterInstance} from '../shiki/shiki.mjs';
-import {getSymbolsAsApiEntries} from '../symbol-context.mjs';
 
 /** Component to render a class API reference document. */
-export function ClassReference(
-  entry: ClassEntryRenderable | InterfaceEntryRenderable | PipeEntryRenderable,
-) {
+export function ClassReference(entry: ClassEntryRenderable | PipeEntryRenderable) {
   return (
     <div className={API_REFERENCE_CONTAINER}>
       <HeaderApi entry={entry} />
@@ -42,10 +35,11 @@ export function ClassReference(
           <div className={SECTION_CONTAINER + ' docs-reference-api-section'}>
             <SectionHeading name="Pipe usage" />
             <RawHtml
-              value={codeToHtml(getHighlighterInstance(), (entry as PipeEntry).usage, {
-                language: 'angular-html',
-                apiEntries: getSymbolsAsApiEntries(),
-              })}
+              value={codeToHtml(
+                getHighlighterInstance(),
+                (entry as PipeEntry).usage,
+                'angular-html',
+              )}
             />
           </div>
         </>

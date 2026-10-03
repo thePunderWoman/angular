@@ -6,19 +6,11 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {
-  computed,
-  EnvironmentInjector,
-  signal,
-  Signal,
-  Type,
-  WritableSignal,
-  ɵWritable as Writable,
-} from '@angular/core';
+import {Type} from '@angular/core';
 import {BehaviorSubject, Observable, of} from 'rxjs';
 import {map} from 'rxjs/operators';
 
-import {Data, ResourceResult, ResolveData, Route} from './models';
+import {Data, ResolveData, Route} from './models';
 import {convertToParamMap, ParamMap, Params, PRIMARY_OUTLET, RouteTitleKey} from './shared';
 import {equalSegments, UrlSegment} from './url_tree';
 import {shallowEqual, shallowEqualArrays} from './utils/collection';
@@ -71,11 +63,8 @@ export class RouterState extends Tree<ActivatedRoute> {
   }
 }
 
-export function createEmptyState(
-  rootComponent: Type<any> | null,
-  injector: EnvironmentInjector,
-): RouterState {
-  const snapshot = createEmptyStateSnapshot(rootComponent, injector);
+export function createEmptyState(rootComponent: Type<any> | null): RouterState {
+  const snapshot = createEmptyStateSnapshot(rootComponent);
   const emptyUrl = new BehaviorSubject([new UrlSegment('', {})]);
   const emptyParams = new BehaviorSubject({});
   const emptyData = new BehaviorSubject({});
@@ -95,10 +84,7 @@ export function createEmptyState(
   return new RouterState(new TreeNode<ActivatedRoute>(activated, []), snapshot);
 }
 
-export function createEmptyStateSnapshot(
-  rootComponent: Type<any> | null,
-  injector: EnvironmentInjector,
-): RouterStateSnapshot {
+export function createEmptyStateSnapshot(rootComponent: Type<any> | null): RouterStateSnapshot {
   const emptyParams = {};
   const emptyData = {};
   const emptyQueryParams = {};
@@ -113,7 +99,6 @@ export function createEmptyStateSnapshot(
     rootComponent,
     null,
     {},
-    injector,
   );
   return new RouterStateSnapshot('', new TreeNode<ActivatedRouteSnapshot>(activated, []));
 }
@@ -130,7 +115,7 @@ export function createEmptyStateSnapshot(
  * on shallow equality. For example, changing deeply nested properties in resolved `data` will not
  * cause the `ActivatedRoute.data` `Observable` to emit a new value.
  *
- * {@example router/activated-route/activated_route_component.ts region="activated-route"}
+ * {@example router/activated-route/module.ts region="activated-route"}
  *
  * @see [Getting route information](guide/routing/common-router-tasks#getting-route-information)
  *
@@ -161,45 +146,6 @@ export class ActivatedRoute {
   public fragment: Observable<string | null>;
   /** An observable of the static and resolved data of this route. */
   public data: Observable<Data>;
-
-  // =================================
-  // ===== Resource integration ======
-  // =================================
-
-  // Note for framework developers: Unlike `data` and `params`, the `resources` property
-  // is assigned once when the route is first initialized and its reference remains stable
-  // for the entire lifetime of the `ActivatedRoute` instance. Do NOT replace or swap this
-  // reference during pending navigations or route reuse, as doing so breaks reactivity
-  // for components subscribed to the underlying resource signals.
-  /**
-   * A map of resources for this route.
-   *
-   * @developerPreview 22.2
-   */
-  resources?: ResourceResult;
-  /** @internal */
-  _localInjector?: EnvironmentInjector;
-  /** @internal */
-  readonly pending?: WritableSignal<boolean>;
-  // Note for framework developers: `paramsSignal`, `queryParamsSignal`, and `dataSignal`
-  // do NOT use `{equal: shallowEqual}`. Even though navigations can re-emit structurally
-  // identical parameters, we rely on the default strict equality (`===`) so that any consumer
-  // depending on the entire object is correctly invalidated. This encourages developers to properly
-  // project nested scalar properties (e.g. `paramMap().get('id')`) instead of subscribing to the
-  // naked object. Furthermore, `shallowEqual` unsafely relies on mutations (`.sort()`) for generic
-  // arrays, making it unsuitable for signals that might carry complex `data` objects.
-  /** @internal */
-  readonly paramsSignal!: Signal<Params>;
-  /** @internal */
-  readonly queryParamsSignal!: Signal<Params>;
-  /** @internal */
-  readonly paramMapSignal!: Signal<ParamMap>;
-  /** @internal */
-  readonly queryParamMapSignal!: Signal<ParamMap>;
-  /** @internal */
-  readonly fragmentSignal!: Signal<string | null>;
-  /** @internal */
-  readonly dataSignal!: Signal<Data>;
 
   /** @internal */
   constructor(
@@ -283,18 +229,9 @@ export class ActivatedRoute {
   toString(): string {
     return this.snapshot ? this.snapshot.toString() : `Future(${this._futureSnapshot})`;
   }
-
-  /** @internal */
-  _setPending(snapshot: ActivatedRouteSnapshot): void {
-    this._futureSnapshot = snapshot;
-    this.pending?.set(true);
-  }
 }
 
 export type ParamsInheritanceStrategy = 'emptyOnly' | 'always';
-
-// g3-only export const DEFAULT_PARAMS_INHERITANCE_STRATEGY: ParamsInheritanceStrategy = 'emptyOnly';
-export const DEFAULT_PARAMS_INHERITANCE_STRATEGY: ParamsInheritanceStrategy = 'always'; // 3p-only
 
 /** @internal */
 export type Inherited = {
@@ -312,7 +249,7 @@ export type Inherited = {
 export function getInherited(
   route: ActivatedRouteSnapshot,
   parent: ActivatedRouteSnapshot | null,
-  paramsInheritanceStrategy: ParamsInheritanceStrategy,
+  paramsInheritanceStrategy: ParamsInheritanceStrategy = 'emptyOnly',
 ): Inherited {
   let inherited: Inherited;
   const {routeConfig} = route;
@@ -378,8 +315,6 @@ export function getInherited(
  * }
  * ```
  *
- * @see [Understanding route snapshots](guide/routing/read-route-state#understanding-route-snapshots)
- *
  * @publicApi
  */
 export class ActivatedRouteSnapshot {
@@ -395,13 +330,6 @@ export class ActivatedRouteSnapshot {
   _paramMap?: ParamMap;
   /** @internal */
   _queryParamMap?: ParamMap;
-  /** @internal */
-  readonly _environmentInjector: EnvironmentInjector;
-  /**
-   * The result of running the route's resources function.
-   * @developerPreview 22.2
-   */
-  resources?: ResourceResult;
 
   /** The resolved route title */
   get title(): string | undefined {
@@ -446,11 +374,9 @@ export class ActivatedRouteSnapshot {
     public component: Type<any> | null,
     routeConfig: Route | null,
     resolve: ResolveData,
-    environmentInjector: EnvironmentInjector,
   ) {
     this.routeConfig = routeConfig;
     this._resolve = resolve;
-    this._environmentInjector = environmentInjector;
   }
 
   /** The root of the router state */
@@ -579,41 +505,6 @@ export function advanceActivatedRoute(route: ActivatedRoute): void {
     // this is for resolved data
     route.dataSubject.next(route._futureSnapshot.data);
   }
-}
-
-export function initializeActivatedRoute(route: ActivatedRoute): void {
-  if (route.paramsSignal !== undefined) {
-    return;
-  }
-  const writableRoute = route as Writable<ActivatedRoute>;
-  const pendingSignal = signal(false);
-  writableRoute.pending = pendingSignal;
-
-  writableRoute.paramsSignal = computed(() =>
-    pendingSignal() || !route.snapshot ? route._futureSnapshot.params : route.snapshot.params,
-  );
-
-  writableRoute.queryParamsSignal = computed(() =>
-    pendingSignal() || !route.snapshot
-      ? route._futureSnapshot.queryParams
-      : route.snapshot.queryParams,
-  );
-
-  writableRoute.paramMapSignal = computed(() => convertToParamMap(route.paramsSignal()));
-  writableRoute.queryParamMapSignal = computed(() => convertToParamMap(route.queryParamsSignal()));
-
-  writableRoute.fragmentSignal = computed(() =>
-    pendingSignal() || !route.snapshot ? route._futureSnapshot.fragment : route.snapshot.fragment,
-  );
-
-  writableRoute.dataSignal = computed(() =>
-    pendingSignal() || !route.snapshot ? route._futureSnapshot.data : route.snapshot.data,
-  );
-
-  writableRoute._setPending = (snapshot: ActivatedRouteSnapshot) => {
-    route._futureSnapshot = snapshot;
-    pendingSignal.set(true);
-  };
 }
 
 export function equalParamsAndUrlSegments(

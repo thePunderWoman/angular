@@ -6,11 +6,9 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {
-  DtsMetadataReader,
-  TypeScriptReflectionHost,
-} from '@angular/compiler-cli/private/migrations';
-import {confirmAsSerializable} from '../helpers/serializable';
+import {DtsMetadataReader} from '@angular/compiler-cli/src/ngtsc/metadata';
+import {TypeScriptReflectionHost} from '@angular/compiler-cli/src/ngtsc/reflection';
+import {confirmAsSerializable, Serializable} from '../helpers/serializable';
 import {TsurgeComplexMigration} from '../migration';
 import {ProgramInfo} from '../program_info';
 import {Replacement, TextUpdate} from '../replacement';

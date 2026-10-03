@@ -17,42 +17,6 @@ import {RuntimeError, RuntimeErrorCode} from './errors';
 import {DestroyRef} from './linker/destroy_ref';
 import {NgZone} from './zone/ng_zone';
 
-import {Type} from './interface/type';
-
-/**
- * Error details caught by the error boundary
- *
- * @developerPreview 22.2
- */
-export interface ErrorDetails {
-  /**
-   * The class of the component or directive where the error occurred.
-   */
-  readonly declarationType: Type<unknown>;
-  /**
-   * The instance of the component or directive where the error occurred.
-   */
-  readonly declarationInstance: unknown;
-  /**
-   * Information about the error boundary that caught the error.
-   */
-  readonly boundary?: {
-    /**
-     * The component where the error boundary that caught the rendering error was located
-     */
-    readonly type: Type<unknown>;
-
-    /**
-     * Call this method to retry rendering the error boundary.
-     */
-    readonly reset: () => void;
-  };
-  /**
-   * The function that intercepted the error, if any.
-   */
-  readonly caughtBy?: Function;
-}
-
 /**
  * Provides a hook for centralized exception handling.
  *
@@ -83,9 +47,6 @@ export interface ErrorDetails {
  * ```
  *
  * @publicApi
- *
- * @see [Unhandled errors in Angular](best-practices/error-handling)
- *
  */
 export class ErrorHandler {
   /**
@@ -96,48 +57,6 @@ export class ErrorHandler {
   handleError(error: any): void {
     this._console.error('ERROR', error);
   }
-
-  /**
-   * Callback to handle errors happening during the rendering of a component/directive view.
-   *
-   * @param error The error that was thrown.
-   * @param details Additional information about the error.
-   */
-  onViewError?(error: Error, details: ErrorDetails): void;
-}
-
-export function encapsulateBoundaryError(error: unknown): Error {
-  if (isErrorLike(error)) {
-    return error;
-  }
-  return new ErrorBoundaryWrappedError(error);
-}
-
-export function isErrorLike(error: unknown): error is Error {
-  return (
-    error instanceof Error ||
-    (typeof error === 'object' &&
-      error !== null &&
-      typeof (error as Error).name === 'string' &&
-      typeof (error as Error).message === 'string')
-  );
-}
-
-/**
- * Error thrown when an error boundary catches an error that is not an `Error` instance.
- *
- * @publicApi 22.2
- */
-export class ErrorBoundaryWrappedError extends Error {
-  constructor(error: unknown) {
-    super(
-      typeof ngDevMode !== 'undefined' && ngDevMode
-        ? `Error boundary caught an error that's not an Error instance: ${String(error)}. Check this error's .cause for the actual error.`
-        : String(error),
-      {cause: error},
-    );
-    this.name = 'ErrorBoundaryWrappedError';
-  }
 }
 
 /**
@@ -146,6 +65,7 @@ export class ErrorBoundaryWrappedError extends Error {
 export const INTERNAL_APPLICATION_ERROR_HANDLER = new InjectionToken<(e: any) => void>(
   typeof ngDevMode === 'undefined' || ngDevMode ? 'internal error handler' : '',
   {
+    providedIn: 'root',
     factory: () => {
       // The user's error handler may depend on things that create a circular dependency
       // so we inject it lazily.
@@ -184,8 +104,9 @@ export const errorHandlerEnvironmentInitializer = {
 };
 
 const globalErrorListeners = new InjectionToken<void>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'GlobalErrorListeners' : '',
+  typeof ngDevMode !== undefined && ngDevMode ? 'GlobalErrorListeners' : '',
   {
+    providedIn: 'root',
     factory: () => {
       if (typeof ngServerMode !== 'undefined' && ngServerMode) {
         return;
@@ -241,8 +162,6 @@ const globalErrorListeners = new InjectionToken<void>(
  * Provides an environment initializer which forwards unhandled errors to the ErrorHandler.
  *
  * The listeners added are for the window's 'unhandledrejection' and 'error' events.
- *
- * @see [Global error listeners](best-practices/error-handling#global-error-listeners)
  *
  * @publicApi
  */

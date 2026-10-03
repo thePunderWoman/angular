@@ -129,8 +129,7 @@ export const isMix: boolean =
   !isWebWorker &&
   !!(isWindowExists && internalWindow['HTMLElement']);
 
-// tslint:disable-next-line:no-toplevel-property-access
-const zoneSymbolEventNames: {[eventName: string]: string} = Object.create(null);
+const zoneSymbolEventNames: {[eventName: string]: string} = {};
 
 const enableBeforeunloadSymbol = zoneSymbol('enable_beforeunload');
 
@@ -210,7 +209,7 @@ export function patchProperty(obj: any, prop: string, prototype?: any) {
   }
 
   const onPropPatchedSymbol = zoneSymbol('on' + prop + 'patched');
-  if (Object.hasOwn(obj, onPropPatchedSymbol) && obj[onPropPatchedSymbol]) {
+  if (obj.hasOwnProperty(onPropPatchedSymbol) && obj[onPropPatchedSymbol]) {
     return;
   }
 
@@ -385,7 +384,7 @@ export function patchClass(className: string) {
   }
 
   for (prop in OriginalClass) {
-    if (prop !== 'prototype' && Object.hasOwn(OriginalClass, prop)) {
+    if (prop !== 'prototype' && OriginalClass.hasOwnProperty(prop)) {
       _global[className][prop] = OriginalClass[prop];
     }
   }
@@ -431,7 +430,7 @@ export function patchMethod(
   ) => (self: any, args: any[]) => any,
 ): Function | null {
   let proto = target;
-  while (proto && !Object.hasOwn(proto, name)) {
+  while (proto && !proto.hasOwnProperty(name)) {
     proto = ObjectGetPrototypeOf(proto);
   }
   if (!proto && target[name]) {
@@ -441,7 +440,7 @@ export function patchMethod(
 
   const delegateName = zoneSymbol(name);
   let delegate: Function | null = null;
-  if (proto && (!(delegate = proto[delegateName]) || !Object.hasOwn(proto, delegateName))) {
+  if (proto && (!(delegate = proto[delegateName]) || !proto.hasOwnProperty(delegateName))) {
     delegate = proto[delegateName] = proto[name];
     // check whether proto[name] is writable
     // some property is readonly in safari, such as HtmlCanvasElement.prototype.toBlob
@@ -541,6 +540,25 @@ export function patchMicroTask(
 
 export function attachOriginToPatched(patched: Function, original: any) {
   (patched as any)[zoneSymbol('OriginalDelegate')] = original;
+}
+
+let isDetectedIEOrEdge = false;
+let ieOrEdge = false;
+
+export function isIEOrEdge() {
+  if (isDetectedIEOrEdge) {
+    return ieOrEdge;
+  }
+
+  isDetectedIEOrEdge = true;
+
+  try {
+    const ua = internalWindow.navigator.userAgent;
+    if (ua.indexOf('MSIE ') !== -1 || ua.indexOf('Trident/') !== -1 || ua.indexOf('Edge/') !== -1) {
+      ieOrEdge = true;
+    }
+  } catch (error) {}
+  return ieOrEdge;
 }
 
 export function isFunction(value: unknown): value is Function {

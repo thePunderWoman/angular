@@ -9,6 +9,7 @@
 import {Injectable} from '@angular/core';
 import {
   ComponentExplorerViewProperties,
+  Descriptor,
   DirectivePosition,
   DirectivesProperties,
   Events,
@@ -18,6 +19,18 @@ import {
 import {IndexedNode} from '../directive-forest/index-forest';
 
 import {DirectivePropertyResolver} from './directive-property-resolver';
+
+export interface FlatNode {
+  expandable: boolean;
+  prop: Property;
+  level: number;
+}
+
+export interface Property {
+  name: string;
+  descriptor: Descriptor;
+  parent: Property | null;
+}
 
 @Injectable()
 export class ElementPropertyResolver {
@@ -43,7 +56,7 @@ export class ElementPropertyResolver {
         directive: undefined,
       };
       if (!indexedNode.component || indexedNode.component.name !== key) {
-        position.directive = indexedNode.directives?.findIndex((d) => d.name === key) ?? -1;
+        position.directive = indexedNode.directives.findIndex((d) => d.name === key);
       }
       this._directivePropertiesController.set(
         key,

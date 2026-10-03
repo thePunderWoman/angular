@@ -7,22 +7,21 @@
  */
 
 import {DOCUMENT} from '@angular/common';
-import {BrowserModule} from '@angular/platform-browser';
-import {withBody} from '@angular/private/testing';
 import {
   ApplicationRef,
   Component,
   DoCheck,
   NgModule,
-  NgZone,
-  ɵNoopNgZone as NoopNgZone,
   OnInit,
   provideZoneChangeDetection,
   TestabilityRegistry,
+  NgZone,
+  ɵNoopNgZone as NoopNgZone,
 } from '../src/core';
 import {getTestBed} from '../testing';
+import {BrowserModule} from '@angular/platform-browser';
+import {withBody} from '@angular/private/testing';
 
-import {ChangeDetectionStrategy} from '@angular/compiler';
 import {NgModuleFactory} from '../src/render3/ng_module_ref';
 
 describe('ApplicationRef bootstrap', () => {
@@ -30,7 +29,6 @@ describe('ApplicationRef bootstrap', () => {
     selector: 'hello-world',
     template: '<div>Hello {{ name }}</div>',
     standalone: false,
-    changeDetection: ChangeDetectionStrategy.Eager,
   })
   class HelloWorldComponent implements OnInit, DoCheck {
     log: string[] = [];

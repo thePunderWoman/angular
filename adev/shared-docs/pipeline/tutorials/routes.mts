@@ -16,13 +16,10 @@ import {
 export async function generatePlaygroundRoutes(
   configs: Record<string, TutorialConfig>,
 ): Promise<PlaygroundRouteData> {
-  const templates = Object.entries(configs)
-    .map(([path, config]) => ({
-      path: `playground/${path}`,
-      label: config.title,
-      id: path,
-    }))
-    .sort((a, b) => a.id.localeCompare(b.id));
+  const templates = Object.entries(configs).map(([path, config]) => ({
+    path: `playground/${path}`,
+    label: config.title,
+  }));
 
   return {
     templates,

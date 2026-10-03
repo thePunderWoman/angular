@@ -120,7 +120,7 @@ const testClosureFunction = () => {
         'cancelTask',
       ];
       zonePrototypeKeys.forEach((key) => {
-        if (Object.hasOwn((Zone as any).prototype, key)) {
+        if ((Zone as any).prototype.hasOwnProperty(key)) {
           logs.push(key);
         }
       });
@@ -138,7 +138,7 @@ const testClosureFunction = () => {
         'onHasTask',
       ];
       zoneSpecKeys.forEach((key) => {
-        if (Object.hasOwn(testZoneSpec, key)) {
+        if (testZoneSpec.hasOwnProperty(key)) {
           logs.push(key);
         }
       });
@@ -162,7 +162,7 @@ const testClosureFunction = () => {
         () => {},
       );
       zoneTaskKeys.forEach((key) => {
-        if (Object.hasOwn(task, key)) {
+        if (task.hasOwnProperty(key)) {
           logs.push(key);
         }
       });

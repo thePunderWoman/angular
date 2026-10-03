@@ -6,9 +6,9 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {AbsoluteFsPath, getFileSystem} from '@angular/compiler-cli';
-import {groupReplacementsByFile} from '../../../utils/tsurge/helpers/group_replacements';
 import {applyTextUpdates, Replacement} from '../../../utils/tsurge/replacement';
+import {groupReplacementsByFile} from '../../../utils/tsurge/helpers/group_replacements';
+import {AbsoluteFsPath, getFileSystem} from '@angular/compiler-cli/src/ngtsc/file_system';
 
 /** Applies the migration result and applies it to the file system. */
 export function writeMigrationReplacements(

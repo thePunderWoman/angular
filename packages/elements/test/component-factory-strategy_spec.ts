@@ -8,10 +8,10 @@
 
 import {
   ApplicationRef,
-  ChangeDetectionStrategy,
   Component,
   ComponentRef,
   Directive,
+  EnvironmentInjector,
   Injector,
   Input,
   NgZone,
@@ -42,7 +42,7 @@ describe('ComponentFactoryNgElementStrategy', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({providers: [provideZoneChangeDetection()]});
     injector = TestBed.inject(Injector);
-    const strategyFactory = new ComponentNgElementStrategyFactory(TestComponent);
+    const strategyFactory = new ComponentNgElementStrategyFactory(TestComponent, injector);
     strategy = strategyFactory.create(injector);
   });
 
@@ -53,7 +53,7 @@ describe('ComponentFactoryNgElementStrategy', () => {
   }
 
   it('should create a new strategy from the factory', () => {
-    const strategyFactory = new ComponentNgElementStrategyFactory(TestComponent);
+    const strategyFactory = new ComponentNgElementStrategyFactory(TestComponent, injector);
     expect(strategyFactory.create(injector)).toBeTruthy();
   });
 
@@ -378,7 +378,6 @@ export class CdTrackerDir {
     <ng-content select="content-1"></ng-content>
     <ng-content select="content-2"></ng-content>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class TestComponent {
   @Output('templateOutput1') output1 = new Subject();

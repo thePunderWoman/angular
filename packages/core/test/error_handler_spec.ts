@@ -6,9 +6,9 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {TestBed} from '../testing';
+import {fakeAsync, TestBed} from '../testing';
 import {ErrorHandler, provideBrowserGlobalErrorListeners} from '../src/error_handler';
-import {isNode, timeout, withBody} from '@angular/private/testing';
+import {isNode, withBody} from '@angular/private/testing';
 import {ApplicationRef, Component, destroyPlatform, inject} from '../src/core';
 import {bootstrapApplication} from '@angular/platform-browser';
 
@@ -137,7 +137,7 @@ describe('ErrorHandler', () => {
         expect(dispatched).toEqual(true);
 
         // Wait until the error is re-thrown, so we can reset the original error handler.
-        await timeout(1);
+        await new Promise((resolve) => setTimeout(resolve, 1));
       });
 
       window.onerror = originalWindowOnError;

@@ -806,7 +806,7 @@ runInEachFileSystem((os) => {
           standalone: false,
         })
         export class PercentPipe {
-          transform(arg1: unknown, arg2?: unknown) {}
+          transform(v: any) {}
         }
 
         @Component({

@@ -22,18 +22,14 @@ export interface ParsedTranslation extends MessageMetadata {
 export type ParsedTranslations = Record<MessageId, ParsedTranslation>;
 
 export class MissingTranslationError extends Error {
-  readonly type = 'MissingTranslationError';
+  private readonly type = 'MissingTranslationError';
   constructor(readonly parsedMessage: ParsedMessage) {
     super(`No translation found for ${describeMessage(parsedMessage)}.`);
   }
 }
 
-export function isMissingTranslationError(e: unknown): e is MissingTranslationError {
-  return (
-    typeof e === 'object' &&
-    e !== null &&
-    (e as MissingTranslationError).type === 'MissingTranslationError'
-  );
+export function isMissingTranslationError(e: any): e is MissingTranslationError {
+  return e.type === 'MissingTranslationError';
 }
 
 /**
@@ -55,8 +51,8 @@ export function isMissingTranslationError(e: unknown): e is MissingTranslationEr
 export function translate(
   translations: Record<string, ParsedTranslation>,
   messageParts: TemplateStringsArray,
-  substitutions: readonly unknown[],
-): [TemplateStringsArray, readonly unknown[]] {
+  substitutions: readonly any[],
+): [TemplateStringsArray, readonly any[]] {
   const message = parseMessage(messageParts, substitutions);
   // Look up the translation using the messageId, and then the legacyId if available.
   let translation = translations[message.id];
@@ -72,7 +68,7 @@ export function translate(
   return [
     translation.messageParts,
     translation.placeholderNames.map((placeholder) => {
-      if (Object.hasOwn(message.substitutions, placeholder)) {
+      if (message.substitutions.hasOwnProperty(placeholder)) {
         return message.substitutions[placeholder];
       } else {
         throw new Error(
@@ -141,7 +137,7 @@ export function makeParsedTranslation(
  */
 export function makeTemplateObject(cooked: string[], raw: string[]): TemplateStringsArray {
   Object.defineProperty(cooked, 'raw', {value: raw});
-  return cooked as unknown as TemplateStringsArray;
+  return cooked as any;
 }
 
 function describeMessage(message: ParsedMessage): string {

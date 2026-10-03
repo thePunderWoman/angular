@@ -6,20 +6,13 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import fs from 'fs';
-import path from 'path';
 import {setOutput} from '@actions/core';
 import {GitClient, Log, bold, green, yellow} from '@angular/ng-dev';
 import {select} from '@inquirer/prompts';
 import yargs from 'yargs';
-import {collectBenchmarkResults} from './results.mts';
-import {
-  type ResolvedTarget,
-  findBenchmarkTargets,
-  getTestlogPath,
-  resolveTarget,
-} from './targets.mts';
-import {exec, projectDir} from './utils.mts';
+import {collectBenchmarkResults} from './results.mjs';
+import {ResolvedTarget, findBenchmarkTargets, getTestlogPath, resolveTarget} from './targets.mjs';
+import {exec} from './utils.mjs';
 
 const benchmarkTestFlags = [
   '--cache_test_results=no',
@@ -29,9 +22,6 @@ const benchmarkTestFlags = [
   // reduce fluctuation. Output streamed ensures that deps can build with RBE, but
   // tests run locally while also providing useful output for debugging.
   '--test_output=streamed',
-  // In the comparison run, we create a hybrid workspace (main files + PR scripts/lockfiles).
-  // This causes a lockfile mismatch, so we must allow Bazel to update the lockfile in memory.
-  '--lockfile_mode=update',
 ];
 
 await yargs(process.argv.slice(2))
@@ -103,11 +93,11 @@ async function prepareForGitHubAction(commentBody: string): Promise<void> {
   // Attempt to find the compare SHA. The commit may be either part of the
   // pull request, or might be a commit unrelated to the PR- but part of the
   // upstream repository. We attempt to fetch/resolve the SHA in both remotes.
-  const compareRefResolve = git.runGraceful(['rev-parse', '--', compareRefRaw]);
+  const compareRefResolve = git.runGraceful(['rev-parse', compareRefRaw]);
   let compareRefSha = compareRefResolve.stdout.trim();
   if (compareRefSha === '' || compareRefResolve.status !== 0) {
     git.run(['fetch', '--depth=1', git.getRepoGitUrl(), compareRefRaw]);
-    compareRefSha = git.run(['rev-parse', '--', 'FETCH_HEAD']).stdout.trim();
+    compareRefSha = git.run(['rev-parse', 'FETCH_HEAD']).stdout.trim();
   }
 
   setOutput('compareSha', compareRefSha);
@@ -131,8 +121,8 @@ async function runBenchmarkCmd(bazelTargetRaw: string | undefined): Promise<void
 }
 
 /** Runs a benchmark Bazel target. */
-async function runBenchmarkTarget(bazelTarget: ResolvedTarget, cwd?: string): Promise<void> {
-  await exec('pnpm', ['bazel', 'test', bazelTarget, ...benchmarkTestFlags], cwd);
+async function runBenchmarkTarget(bazelTarget: ResolvedTarget): Promise<void> {
+  await exec('bazel', ['test', bazelTarget, ...benchmarkTestFlags]);
 }
 
 /**
@@ -143,6 +133,13 @@ async function runCompare(bazelTargetRaw: string | undefined, compareRef: string
   const git = await GitClient.get();
   const currentRef = git.getCurrentBranchOrRevision();
 
+  if (git.hasUncommittedChanges()) {
+    Log.warn(bold('You have uncommitted changes.'));
+    Log.warn('The script will stash your changes and re-apply them so that');
+    Log.warn('the comparison ref can be checked out.');
+    Log.warn('');
+  }
+
   if (bazelTargetRaw === undefined) {
     bazelTargetRaw = await promptForBenchmarkTarget();
   }
@@ -150,98 +147,35 @@ async function runCompare(bazelTargetRaw: string | undefined, compareRef: string
   const bazelTarget = await resolveTarget(bazelTargetRaw);
   const testlogPath = await getTestlogPath(bazelTarget);
 
-  Log.log(green(`Test log path: ${testlogPath}`));
+  Log.log(green('Test log path:', testlogPath));
 
   // Run benchmark with the current working stage.
   await runBenchmarkTarget(bazelTarget);
 
   const workingDirResults = await collectBenchmarkResults(testlogPath);
 
-  // Define isolated temporary workspace inside `dist/` so it is ignored by git.
-  const tempDir = path.join(projectDir, 'dist/benchmark-compare-temp');
-  let comparisonResults: any = null;
+  // Stash working directory as we might be in the middle of developing
+  // and we wouldn't want to discard changes when checking out the compare SHA.
+  git.run(['stash']);
 
   try {
-    Log.log(green(`Creating isolated workspace in ${tempDir}`));
-    try {
-      git.run(['worktree', 'remove', '--force', tempDir]);
-    } catch (e) {
-      if (fs.existsSync(tempDir)) {
-        fs.rmSync(tempDir, {recursive: true, force: true});
-      }
-      try {
-        git.run(['worktree', 'prune']);
-      } catch (pruneError) {
-        // Ignore prune errors
-      }
-    }
+    Log.log(green('Fetching comparison revision.'));
+    // Note: Not using a shallow fetch here as that would convert the local
+    // user repository into an incomplete repository.
+    git.run(['fetch', git.getRepoGitUrl(), compareRef]);
+    Log.log(green('Checking out comparison revision.'));
+    git.run(['checkout', 'FETCH_HEAD']);
 
-    // Ensure the comparison ref is fetched on the main repository if not already present.
-    const hasCommit = git.runGraceful(['cat-file', '-e', `${compareRef}^{commit}`]).status === 0;
-    if (!hasCommit) {
-      Log.log(green(`Fetching comparison revision ${compareRef}...`));
-      git.run(['fetch', git.getRepoGitUrl(), compareRef]);
-    } else {
-      Log.log(
-        green(`Comparison revision ${compareRef} is already available locally. Skipping fetch.`),
-      );
-    }
-
-    // Create isolated workspace instantly using native git worktree.
-    Log.log(green(`Creating isolated worktree for ${compareRef} in ${tempDir}`));
-    git.run(['worktree', 'add', '--detach', tempDir, compareRef]);
-
-    // Copy the current PR's benchmark scripts and packages into the isolated workspace.
-    // Explicitly exclude node_modules to avoid copying broken relative symlinks.
-    Log.log(green('Copying PR benchmark scripts and packages into isolated workspace...'));
-    const dirsToCopy = ['scripts/benchmarks', 'packages/benchpress'];
-    for (const relDir of dirsToCopy) {
-      const src = path.join(projectDir, relDir);
-      const dest = path.join(tempDir, relDir);
-      fs.rmSync(dest, {recursive: true, force: true});
-      fs.cpSync(src, dest, {
-        recursive: true,
-        filter: (srcPath) => !srcPath.split(path.sep).includes('node_modules'),
-      });
-    }
-
-    // Copy `.bazelrc.user` if it exists, otherwise create it.
-    const bazelrcUser = path.join(projectDir, '.bazelrc.user');
-    const tempBazelrcUser = path.join(tempDir, '.bazelrc.user');
-    if (fs.existsSync(bazelrcUser)) {
-      fs.copyFileSync(bazelrcUser, tempBazelrcUser);
-    } else {
-      fs.writeFileSync(tempBazelrcUser, '');
-    }
-
-    // Run pnpm install inside the isolated workspace.
-    Log.log(green('Installing dependencies in isolated workspace...'));
-    await exec('pnpm', ['install', '--no-frozen-lockfile', '--prefer-offline'], tempDir);
-
-    // Run the benchmark on the comparison workspace.
-    Log.log(green('Running benchmark in isolated workspace...'));
-    await runBenchmarkTarget(bazelTarget, tempDir);
-
-    // Resolve testlog path and collect results from the isolated workspace.
-    Log.log(green('Collecting comparison results...'));
-    const tempTestlogPath = await getTestlogPath(bazelTarget, tempDir);
-    comparisonResults = await collectBenchmarkResults(tempTestlogPath);
+    await exec('yarn');
+    await runBenchmarkTarget(bazelTarget);
   } finally {
-    Log.log(green('Cleaning up isolated workspace...'));
-    try {
-      git.run(['worktree', 'remove', '--force', tempDir]);
-    } catch (e) {
-      Log.warn(`Failed to clean up isolated worktree: ${e}`);
-      if (fs.existsSync(tempDir)) {
-        fs.rmSync(tempDir, {recursive: true, force: true});
-      }
-      try {
-        git.run(['worktree', 'prune']);
-      } catch (pruneError) {
-        // Ignore prune errors
-      }
-    }
+    restoreWorkingStage(git, currentRef);
   }
+
+  // Re-install dependencies for `HEAD`.
+  await exec('yarn');
+
+  const comparisonResults = await collectBenchmarkResults(testlogPath);
 
   // If we are running in a GitHub action, expose the benchmark text
   // results as outputs. Useful if those are exposed as a GitHub comment then.
@@ -258,4 +192,12 @@ async function runCompare(bazelTargetRaw: string | undefined, compareRef: string
 
   Log.info(bold(yellow(`Working stage (${currentRef}) results:`)), '\n');
   Log.info(workingDirResults.summaryConsoleText);
+}
+
+function restoreWorkingStage(git: GitClient, initialRef: string) {
+  Log.log(green('Restoring working stage'));
+  git.run(['checkout', '-f', initialRef]);
+
+  // Stash apply could fail if there were not changes in the working stage.
+  git.runGraceful(['stash', 'apply']);
 }

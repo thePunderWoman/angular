@@ -8,7 +8,6 @@
 import * as o from '../../output/output_ast';
 import {
   compileComponentMetadataAsyncResolver,
-  compileCtorParameters,
   R3ClassMetadata,
 } from '../r3_class_metadata_compiler';
 import {Identifiers as R3} from '../r3_identifiers';
@@ -38,14 +37,7 @@ export function compileDeclareClassMetadata(metadata: R3ClassMetadata): o.Expres
   definitionMap.set('ngImport', o.importExpr(R3.core));
   definitionMap.set('type', metadata.type);
   definitionMap.set('decorators', metadata.decorators);
-  // Keep the `null` case distinct so that the key is omitted rather than emitted as an explicit
-  // `null`, which is what the declaration format has always done.
-  definitionMap.set(
-    'ctorParameters',
-    metadata.ctorParameters === null
-      ? null
-      : compileCtorParameters(metadata.ctorParameters, /* allowSuppressions */ false),
-  );
+  definitionMap.set('ctorParameters', metadata.ctorParameters);
   definitionMap.set('propDecorators', metadata.propDecorators);
 
   return o.importExpr(R3.declareClassMetadata).callFn([definitionMap.toLiteralMap()]);
@@ -62,10 +54,7 @@ export function compileComponentDeclareClassMetadata(
   const definitionMap = new DefinitionMap<R3DeclareClassMetadataAsync>();
   const callbackReturnDefinitionMap = new DefinitionMap<R3ClassMetadata>();
   callbackReturnDefinitionMap.set('decorators', metadata.decorators);
-  callbackReturnDefinitionMap.set(
-    'ctorParameters',
-    compileCtorParameters(metadata.ctorParameters, /* allowSuppressions */ false),
-  );
+  callbackReturnDefinitionMap.set('ctorParameters', metadata.ctorParameters ?? o.literal(null));
   callbackReturnDefinitionMap.set('propDecorators', metadata.propDecorators ?? o.literal(null));
 
   definitionMap.set('minVersion', o.literal(MINIMUM_PARTIAL_LINKER_DEFER_SUPPORT_VERSION));

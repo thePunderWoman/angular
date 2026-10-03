@@ -8,7 +8,7 @@
 
 import {Pipe, PipeTransform} from '@angular/core';
 
-import {invalidPipeArgumentError} from './utils';
+import {invalidPipeArgumentError} from './invalid_pipe_argument_error';
 
 /**
  * @ngModule CommonModule
@@ -24,8 +24,6 @@ import {invalidPipeArgumentError} from './utils';
  * ### Example
  *
  * {@example common/pipes/ts/i18n_pipe.ts region='I18nSelectPipeComponent'}
- *
- * @see [Built-in Pipes](guide/templates/pipes#built-in-pipes)
  *
  * @publicApi
  */
@@ -45,11 +43,11 @@ export class I18nSelectPipe implements PipeTransform {
       throw invalidPipeArgumentError(I18nSelectPipe, mapping);
     }
 
-    if (Object.hasOwn(mapping, value)) {
+    if (mapping.hasOwnProperty(value)) {
       return mapping[value];
     }
 
-    if (Object.hasOwn(mapping, 'other')) {
+    if (mapping.hasOwnProperty('other')) {
       return mapping['other'];
     }
 

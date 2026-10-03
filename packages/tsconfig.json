@@ -9,11 +9,13 @@
     "emitDecoratorMetadata": true,
     "module": "esnext",
     "target": "es2020",
+    "strict": true,
     "moduleResolution": "node",
     "esModuleInterop": true,
-    "stableTypeOrdering": true,
+    "strictNullChecks": true,
     "noImplicitReturns": true,
     "noPropertyAccessFromIndexSignature": true,
+    "strictPropertyInitialization": true,
     "outDir": "../dist/all/@angular",
     "noImplicitAny": true,
     "noImplicitOverride": true,
@@ -34,7 +36,9 @@
   "bazelOptions": {
     "suppressTsconfigOverrideWarnings": true
   },
-  "angularCompilerOptions": {},
+  "angularCompilerOptions": {
+    "strictTemplates": true
+  },
   "exclude": [
     "common/locales",
     "compiler-cli/integrationtest",

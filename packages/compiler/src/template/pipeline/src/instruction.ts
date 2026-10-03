@@ -49,29 +49,6 @@ export function elementStart(
   );
 }
 
-export function foreignComponent(
-  slot: number,
-  foreignComponentRef: o.Expression,
-  props: o.Expression | null,
-  sourceSpan: ParseSourceSpan | null,
-): ir.CreateOp {
-  const args = [o.literal(slot), foreignComponentRef];
-  if (props !== null) {
-    args.push(props);
-  }
-  return call(Identifiers.foreignComponent, args, sourceSpan);
-}
-
-export function foreignContent(
-  slot: number,
-  foreignComponentIndex: number,
-  parameterized: boolean,
-): o.Expression {
-  return o
-    .importExpr(parameterized ? Identifiers.foreignContentFn : Identifiers.foreignContent)
-    .callFn([o.literal(slot), o.literal(foreignComponentIndex)]);
-}
-
 function elementOrContainerBase(
   instruction: o.ExternalReference,
   slot: number,
@@ -337,10 +314,6 @@ export function defer(
   return call(Identifiers.defer, args, sourceSpan);
 }
 
-export function enableIncrementalHydrationRuntime(sourceSpan: ParseSourceSpan | null): ir.CreateOp {
-  return call(Identifiers.enableIncrementalHydrationRuntime, [], sourceSpan);
-}
-
 const deferTriggerToR3TriggerInstructionsMap = new Map([
   [
     ir.DeferTriggerKind.Idle,
@@ -402,7 +375,7 @@ const deferTriggerToR3TriggerInstructionsMap = new Map([
 
 export function deferOn(
   trigger: ir.DeferTriggerKind,
-  args: o.Expression[],
+  args: (number | null)[],
   modifier: ir.DeferOpModifierKind,
   sourceSpan: ParseSourceSpan | null,
 ): ir.CreateOp {
@@ -410,7 +383,11 @@ export function deferOn(
   if (instructionToCall === undefined) {
     throw new Error(`Unable to determine instruction for trigger ${trigger}`);
   }
-  return call(instructionToCall, args, sourceSpan);
+  return call(
+    instructionToCall,
+    args.map((a) => o.literal(a)),
+    sourceSpan,
+  );
 }
 
 export function projectionDef(def: o.Expression | null): ir.CreateOp {
@@ -420,7 +397,7 @@ export function projectionDef(def: o.Expression | null): ir.CreateOp {
 export function projection(
   slot: number,
   projectionSlotIndex: number,
-  attributes: o.Expression | null,
+  attributes: o.LiteralArrayExpr | null,
   fallbackFnName: string | null,
   fallbackDecls: number | null,
   fallbackVars: number | null,
@@ -511,23 +488,6 @@ export function conditionalBranchCreate(
   return call(Identifiers.conditionalBranchCreate, args, sourceSpan);
 }
 
-export function boundaryCreate(slot: number, sourceSpan: ParseSourceSpan): ir.CreateOp {
-  return call(Identifiers.boundaryCreate, [o.literal(slot)], sourceSpan);
-}
-
-export function getBoundary(slot: o.Expression): o.Expression {
-  return o.importExpr(Identifiers.getBoundary).callFn([slot]);
-}
-
-export function boundary(
-  slot: o.Expression,
-  processedExpr: o.Expression,
-  primarySlot: o.Expression,
-  sourceSpan: ParseSourceSpan | null,
-): ir.UpdateOp {
-  const args = [slot, processedExpr, primarySlot];
-  return call(Identifiers.boundaryUpdate, args, sourceSpan);
-}
 export function repeaterCreate(
   slot: number,
   viewFnName: string,
@@ -637,14 +597,6 @@ export function property(
   sourceSpan: ParseSourceSpan,
 ): ir.UpdateOp {
   return propertyBase(Identifiers.property, name, expression, sanitizer, sourceSpan);
-}
-
-export function control(sourceSpan: ParseSourceSpan | null): ir.UpdateOp {
-  return call(Identifiers.control, [], sourceSpan);
-}
-
-export function controlCreate(sourceSpan: ParseSourceSpan | null): ir.CreateOp {
-  return call(Identifiers.controlCreate, [], sourceSpan);
 }
 
 export function twoWayProperty(
@@ -870,7 +822,7 @@ export function textInterpolate(
 ): ir.UpdateOp {
   const interpolationArgs = collateInterpolationArgs(strings, expressions);
 
-  return callVariadicInstruction(TEXT_INTERPOLATE_CONFIG, [], interpolationArgs, sourceSpan);
+  return callVariadicInstruction(TEXT_INTERPOLATE_CONFIG, [], interpolationArgs, [], sourceSpan);
 }
 
 export function i18nExp(expr: o.Expression, sourceSpan: ParseSourceSpan | null): ir.UpdateOp {
@@ -959,7 +911,13 @@ export function pureFunction(
   fn: o.Expression,
   args: o.Expression[],
 ): o.Expression {
-  return callVariadicInstructionExpr(PURE_FUNCTION_CONFIG, [o.literal(varOffset), fn], args, null);
+  return callVariadicInstructionExpr(
+    PURE_FUNCTION_CONFIG,
+    [o.literal(varOffset), fn],
+    args,
+    [],
+    null,
+  );
 }
 
 export function attachSourceLocation(
@@ -967,16 +925,6 @@ export function attachSourceLocation(
   locations: o.LiteralArrayExpr,
 ): ir.CreateOp {
   return call(Identifiers.attachSourceLocations, [o.literal(templatePath), locations], null);
-}
-
-export function arrowFunction(
-  slotOffset: number,
-  factory: o.Expression,
-  contextRef: o.Expression,
-): o.Expression {
-  return o
-    .importExpr(Identifiers.arrowFunction)
-    .callFn([o.literal(slotOffset), factory, contextRef]);
 }
 
 /**
@@ -1013,7 +961,13 @@ function interpolationToExpression(
     interpolation.strings,
     interpolation.expressions,
   );
-  return callVariadicInstructionExpr(VALUE_INTERPOLATE_CONFIG, [], interpolationArgs, sourceSpan);
+  return callVariadicInstructionExpr(
+    VALUE_INTERPOLATE_CONFIG,
+    [],
+    interpolationArgs,
+    [],
+    sourceSpan,
+  );
 }
 
 function call<OpT extends ir.CreateOp | ir.UpdateOp>(
@@ -1112,6 +1066,7 @@ function callVariadicInstructionExpr(
   config: VariadicInstructionConfig,
   baseArgs: o.Expression[],
   interpolationArgs: o.Expression[],
+  extraArgs: o.Expression[],
   sourceSpan: ParseSourceSpan | null,
 ): o.Expression {
   // mapping need to be done before potentially dropping the last interpolation argument
@@ -1121,6 +1076,7 @@ function callVariadicInstructionExpr(
   // And the runtime will take care of it.
   const lastInterpolationArg = interpolationArgs.at(-1);
   if (
+    extraArgs.length === 0 &&
     interpolationArgs.length > 1 &&
     lastInterpolationArg instanceof o.LiteralExpr &&
     lastInterpolationArg.value === ''
@@ -1130,12 +1086,14 @@ function callVariadicInstructionExpr(
 
   if (n < config.constant.length) {
     // Constant calling pattern.
-    return o.importExpr(config.constant[n]).callFn([...baseArgs, ...interpolationArgs], sourceSpan);
+    return o
+      .importExpr(config.constant[n])
+      .callFn([...baseArgs, ...interpolationArgs, ...extraArgs], sourceSpan);
   } else if (config.variable !== null) {
     // Variable calling pattern.
     return o
       .importExpr(config.variable)
-      .callFn([...baseArgs, o.literalArr(interpolationArgs)], sourceSpan);
+      .callFn([...baseArgs, o.literalArr(interpolationArgs), ...extraArgs], sourceSpan);
   } else {
     throw new Error(`AssertionError: unable to call variadic function`);
   }
@@ -1145,9 +1103,16 @@ function callVariadicInstruction(
   config: VariadicInstructionConfig,
   baseArgs: o.Expression[],
   interpolationArgs: o.Expression[],
+  extraArgs: o.Expression[],
   sourceSpan: ParseSourceSpan | null,
 ): ir.UpdateOp {
   return ir.createStatementOp(
-    callVariadicInstructionExpr(config, baseArgs, interpolationArgs, sourceSpan).toStmt(),
+    callVariadicInstructionExpr(
+      config,
+      baseArgs,
+      interpolationArgs,
+      extraArgs,
+      sourceSpan,
+    ).toStmt(),
   );
 }

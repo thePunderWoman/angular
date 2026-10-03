@@ -3,7 +3,6 @@
 Angular DevTools injects scripts in the user application page that interact with the framework debugging APIs. The injected scripts interact with the extension via message passing using a statically typed protocol.
 
 This subdirectory contains:
-
 - Declaration of a statically typed message bus
 - Implementation of priority aware message bus
 - Interfaces that declare the messages exchanged between the extension and the page
@@ -11,7 +10,6 @@ This subdirectory contains:
 We use the `PriorityAwareMessageBus` to ensure that certain messages have higher priority than others. Because of the asynchronous nature of the property exchange there's a risk that a message response may overwrite the result from a more recent response.
 
 An example is:
-
 1. We request the state of the component tree
 1. We update the state
 1. We request the state of the properties of a particular component

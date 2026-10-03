@@ -13,7 +13,6 @@ import {
   TmplAstElement,
 } from '@angular/compiler';
 
-const ANIMATE_ENTER = 'animate.enter';
 const ANIMATE_LEAVE = `animate.leave`;
 
 /**
@@ -26,24 +25,26 @@ export function analyzeTemplateForAnimations(template: TmplAstNode[]): {
   const analyzer = new AnimationsAnalyzer();
   tmplAstVisitAll(analyzer, template);
 
+  // The template is considered selectorless only if there
+  // are direct references to directives or pipes.
   return {hasAnimations: analyzer.hasAnimations};
 }
 
 /**
  * Visitor that traverses all the template nodes and
- * expressions to look for animation references.
+ * expressions to look for selectorless references.
  */
 class AnimationsAnalyzer extends CombinedRecursiveAstVisitor {
   hasAnimations: boolean = false;
 
   override visitElement(element: TmplAstElement): void {
     for (const attr of element.attributes) {
-      if (attr.name === ANIMATE_LEAVE || attr.name === ANIMATE_ENTER) {
+      if (attr.name === ANIMATE_LEAVE) {
         this.hasAnimations = true;
       }
     }
     for (const input of element.inputs) {
-      if (input.name === ANIMATE_LEAVE || input.name === ANIMATE_ENTER) {
+      if (input.name === ANIMATE_LEAVE) {
         this.hasAnimations = true;
       }
     }

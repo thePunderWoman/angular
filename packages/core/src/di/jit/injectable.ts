@@ -14,6 +14,7 @@ import {
 import {Type} from '../../interface/type';
 import {NG_FACTORY_DEF} from '../../render3/fields';
 import {getClosureSafeProperty} from '../../util/property';
+import {resolveForwardRef} from '../forward_ref';
 import type {Injectable} from '../injectable';
 import {NG_PROV_DEF} from '../interface/defs';
 import {
@@ -36,7 +37,7 @@ export function compileInjectable(type: Type<any>, meta?: Injectable): void {
   let ngFactoryDef: any = null;
 
   // if NG_PROV_DEF is already defined on this class then don't overwrite it
-  if (!Object.hasOwn(type, NG_PROV_DEF)) {
+  if (!type.hasOwnProperty(NG_PROV_DEF)) {
     Object.defineProperty(type, NG_PROV_DEF, {
       get: () => {
         if (ngInjectableDef === null) {
@@ -57,7 +58,7 @@ export function compileInjectable(type: Type<any>, meta?: Injectable): void {
   }
 
   // if NG_FACTORY_DEF is already defined on this class then don't overwrite it
-  if (!Object.hasOwn(type, NG_FACTORY_DEF)) {
+  if (!type.hasOwnProperty(NG_FACTORY_DEF)) {
     Object.defineProperty(type, NG_FACTORY_DEF, {
       get: () => {
         if (ngFactoryDef === null) {

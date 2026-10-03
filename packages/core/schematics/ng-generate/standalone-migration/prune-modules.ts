@@ -80,16 +80,18 @@ export function pruneNgModules(
   const testArrays = new UniqueItemTracker<ts.ArrayLiteralExpression, ts.Node>();
   const nodesToRemove = new Set<ts.Node>();
 
-  // Collect all NgModules and identify which ones can potentially be removed
-  const allNgModules = new Set<ts.ClassDeclaration>();
-  const candidateModules = new Set<ts.ClassDeclaration>();
-
   sourceFiles.forEach(function walk(node: ts.Node) {
-    if (ts.isClassDeclaration(node) && findNgModuleDecorator(node, typeChecker)) {
-      allNgModules.add(node);
-      if (canRemoveClass(node, typeChecker)) {
-        candidateModules.add(node);
-      }
+    if (ts.isClassDeclaration(node) && canRemoveClass(node, typeChecker)) {
+      collectChangeLocations(
+        node,
+        removalLocations,
+        componentImportArrays,
+        testArrays,
+        templateTypeChecker,
+        referenceResolver,
+        program,
+      );
+      classesToRemove.add(node);
     } else if (
       ts.isExportDeclaration(node) &&
       !node.exportClause &&
@@ -108,43 +110,12 @@ export function pruneNgModules(
     node.forEachChild(walk);
   });
 
-  // Filter out modules that are exported by non-removable modules
-  for (const candidate of candidateModules) {
-    if (
-      isExportedByRetainedModule(
-        candidate,
-        allNgModules,
-        candidateModules,
-        templateTypeChecker,
-        typeChecker,
-      )
-    ) {
-      candidateModules.delete(candidate);
-    }
-  }
-
-  // Collect change locations for modules that can be safely removed
-  for (const module of candidateModules) {
-    collectChangeLocations(
-      module,
-      removalLocations,
-      componentImportArrays,
-      testArrays,
-      templateTypeChecker,
-      referenceResolver,
-      program,
-    );
-    classesToRemove.add(module);
-  }
-
   replaceInComponentImportsArray(
     componentImportArrays,
     classesToRemove,
-    removalLocations,
     tracker,
     typeChecker,
     templateTypeChecker,
-    tsProgram,
     declarationImportRemapper,
   );
 
@@ -286,7 +257,6 @@ function collectChangeLocations(
  * Replaces all the leftover modules in component `imports` arrays with their exports.
  * @param componentImportArrays All the imports arrays and their nodes that represent NgModules.
  * @param classesToRemove Set of classes that were marked for removal.
- * @param removalLocations Tracks the different places from which imports should be removed.
  * @param tracker
  * @param typeChecker
  * @param templateTypeChecker
@@ -295,11 +265,9 @@ function collectChangeLocations(
 function replaceInComponentImportsArray(
   componentImportArrays: UniqueItemTracker<ts.ArrayLiteralExpression, ts.Node>,
   classesToRemove: Set<ts.ClassDeclaration>,
-  removalLocations: RemovalLocations,
   tracker: ChangeTracker,
   typeChecker: ts.TypeChecker,
   templateTypeChecker: TemplateTypeChecker,
-  program: ts.Program,
   importRemapper?: DeclarationImportsRemapper,
 ) {
   for (const [array, toReplace] of componentImportArrays.getEntries()) {
@@ -311,9 +279,8 @@ function replaceInComponentImportsArray(
 
     const replacements = new UniqueItemTracker<ts.Node, Reference<NamedClassDeclaration>>();
     const usedImports = new Set(
-      findTemplateDependencies(closestClass, templateTypeChecker, program).map((ref) => ref.node),
+      findTemplateDependencies(closestClass, templateTypeChecker).map((ref) => ref.node),
     );
-    const nodesToRemove = new Set<ts.Node>();
 
     for (const node of toReplace) {
       const moduleDecl = findClassDeclaration(node, typeChecker);
@@ -322,29 +289,11 @@ function replaceInComponentImportsArray(
         const moduleMeta = templateTypeChecker.getNgModuleMetadata(moduleDecl);
 
         if (moduleMeta) {
-          let hasUsedExports = false;
           moduleMeta.exports.forEach((exp) => {
             if (usedImports.has(exp.node as NamedClassDeclaration)) {
               replacements.track(node, exp as Reference<NamedClassDeclaration>);
-              hasUsedExports = true;
             }
           });
-
-          // If none of the module's exports are used, track the node for removal
-          if (!hasUsedExports) {
-            nodesToRemove.add(node);
-          } else if (ts.isIdentifier(node)) {
-            // Track the import statement for removal when replacing with exports
-            const symbol = typeChecker.getSymbolAtLocation(node);
-            const declarations = symbol?.declarations;
-            if (declarations) {
-              for (const declaration of declarations) {
-                if (ts.isImportSpecifier(declaration)) {
-                  removalLocations.imports.track(declaration.parent, declaration);
-                }
-              }
-            }
-          }
         } else {
           // It's unlikely not to have module metadata at this point, but just in
           // case unmark the class for removal to reduce the chance of breakages.
@@ -353,21 +302,13 @@ function replaceInComponentImportsArray(
       }
     }
 
-    replaceModulesInImportsArray(
-      array,
-      replacements,
-      nodesToRemove,
-      tracker,
-      templateTypeChecker,
-      importRemapper,
-    );
+    replaceModulesInImportsArray(array, replacements, tracker, templateTypeChecker, importRemapper);
   }
 }
 
 /**
  * Replaces all the leftover modules in testing `imports` arrays with their exports.
  * @param testImportArrays All test `imports` arrays and their nodes that represent modules.
- * @param removalLocations Tracks the different places from which imports should be removed.
  * @param classesToRemove Classes marked for removal by the migration.
  * @param tracker
  * @param typeChecker
@@ -385,7 +326,6 @@ function replaceInTestImportsArray(
 ) {
   for (const [array, toReplace] of testImportArrays.getEntries()) {
     const replacements = new UniqueItemTracker<ts.Node, Reference<NamedClassDeclaration>>();
-    const nodesToRemove = new Set<ts.Node>();
 
     for (const node of toReplace) {
       const moduleDecl = findClassDeclaration(node, typeChecker);
@@ -404,19 +344,6 @@ function replaceInTestImportsArray(
             exports.forEach((exp) =>
               replacements.track(node, exp as Reference<NamedClassDeclaration>),
             );
-
-            // Track the import statement for removal when replacing with exports
-            if (ts.isIdentifier(node)) {
-              const symbol = typeChecker.getSymbolAtLocation(node);
-              const declarations = symbol?.declarations;
-              if (declarations) {
-                for (const declaration of declarations) {
-                  if (ts.isImportSpecifier(declaration)) {
-                    removalLocations.imports.track(declaration.parent, declaration);
-                  }
-                }
-              }
-            }
           } else {
             removalLocations.arrays.track(array, node);
           }
@@ -428,14 +355,7 @@ function replaceInTestImportsArray(
       }
     }
 
-    replaceModulesInImportsArray(
-      array,
-      replacements,
-      nodesToRemove,
-      tracker,
-      templateTypeChecker,
-      importRemapper,
-    );
+    replaceModulesInImportsArray(array, replacements, tracker, templateTypeChecker, importRemapper);
   }
 }
 
@@ -443,21 +363,18 @@ function replaceInTestImportsArray(
  * Replaces any leftover modules in an `imports` arrays with a set of specified exports
  * @param array Imports array which is being migrated.
  * @param replacements Map of NgModule references to their exports.
- * @param nodesToRemove Set of nodes that should be removed without replacement (unused modules).
  * @param tracker
- * @param typeChecker
  * @param templateTypeChecker
  * @param importRemapper
  */
 function replaceModulesInImportsArray(
   array: ts.ArrayLiteralExpression,
   replacements: UniqueItemTracker<ts.Node, Reference<NamedClassDeclaration>>,
-  nodesToRemove: Set<ts.Node>,
   tracker: ChangeTracker,
   templateTypeChecker: TemplateTypeChecker,
   importRemapper?: DeclarationImportsRemapper,
 ): void {
-  if (replacements.isEmpty() && nodesToRemove.size === 0) {
+  if (replacements.isEmpty()) {
     return;
   }
 
@@ -471,11 +388,6 @@ function replaceModulesInImportsArray(
   }
 
   for (const element of array.elements) {
-    // Check if this element should be removed entirely (unused module)
-    if (nodesToRemove.has(element)) {
-      continue;
-    }
-
     const replacementRefs = replacements.get(element);
 
     if (!replacementRefs) {
@@ -798,97 +710,6 @@ function findNgModuleDecorator(
 ): NgDecorator | null {
   const decorators = getAngularDecorators(typeChecker, ts.getDecorators(node) || []);
   return decorators.find((decorator) => decorator.name === 'NgModule') || null;
-}
-
-/**
- * Checks if a module is exported by another module that is being retained for intrinsic reasons.
- * This prevents removal of modules that are transitively required.
- * A module is considered "intrinsically retained" if it has:
- * - Non-identifier imports (ModuleWithProviders pattern)
- * - Class members other than empty constructors
- */
-function isExportedByRetainedModule(
-  targetModule: ts.ClassDeclaration,
-  allNgModules: Set<ts.ClassDeclaration>,
-  removableModules: Set<ts.ClassDeclaration>,
-  templateTypeChecker: TemplateTypeChecker,
-  typeChecker: ts.TypeChecker,
-): boolean {
-  // Check all NgModules to see if any intrinsically non-removable module exports our target module
-  for (const ngModule of allNgModules) {
-    // Skip the target module itself
-    if (ngModule === targetModule) {
-      continue;
-    }
-
-    // Skip modules that are also candidates for removal - we only care about retained modules
-    if (removableModules.has(ngModule)) {
-      continue;
-    }
-
-    const moduleMeta = templateTypeChecker.getNgModuleMetadata(ngModule);
-    if (!moduleMeta) {
-      continue;
-    }
-
-    // Check if this retained module exports our target module
-    const exportsTargetModule = moduleMeta.exports.some((exp) => exp.node === targetModule);
-
-    if (exportsTargetModule) {
-      // This non-removable module exports our target module
-      // But we should only retain the target if the exporting module is "intrinsically" non-removable
-      // (i.e., has ModuleWithProviders or class members)
-      // not just non-removable because it has declarations/providers/bootstrap.
-      return isIntrinsicallyNonRemovable(ngModule, typeChecker);
-    }
-  }
-
-  return false;
-}
-
-/**
- * Checks if a module is intrinsically non-removable due to ModuleWithProviders or class members.
- * This specifically checks for patterns that create transitive export dependencies:
- * - Non-identifier imports (ModuleWithProviders) - these create provider dependencies
- * - Class members (methods, properties) - these indicate the module has logic/state
- */
-function isIntrinsicallyNonRemovable(
-  ngModule: ts.ClassDeclaration,
-  typeChecker: ts.TypeChecker,
-): boolean {
-  // Check if module has class members
-  if (
-    ngModule.members.length > 0 &&
-    ngModule.members.some((member) => !isEmptyConstructor(member))
-  ) {
-    return true;
-  }
-
-  const decorator = findNgModuleDecorator(ngModule, typeChecker);
-  if (!decorator || !ts.isCallExpression(decorator.node.expression)) {
-    return false;
-  }
-
-  if (
-    decorator.node.expression.arguments.length === 0 ||
-    !ts.isObjectLiteralExpression(decorator.node.expression.arguments[0])
-  ) {
-    return false;
-  }
-
-  const literal = decorator.node.expression.arguments[0];
-
-  // Check for non-identifier imports (ModuleWithProviders)
-  const imports = findLiteralProperty(literal, 'imports');
-  if (imports && isNonEmptyNgModuleProperty(imports)) {
-    for (const dep of imports.initializer.elements) {
-      if (!ts.isIdentifier(dep)) {
-        return true; // Has ModuleWithProviders
-      }
-    }
-  }
-
-  return false;
 }
 
 /**

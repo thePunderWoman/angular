@@ -12,15 +12,8 @@ import {ApplicationOperations} from '../application-operations';
 import {AppOperationsMock} from './test-utils/app_operations_mock';
 import {ApplicationRef} from '@angular/core';
 
-interface MockSettingsData {
-  'item@test': string;
-  'first@test': string;
-  'second@test': string;
-  'third@test': string;
-}
-
 describe('SettingsStore', () => {
-  let settingsStore: SettingsStore<MockSettingsData>;
+  let settingsStore: SettingsStore;
   let getStoredSettings: () => {[key: string]: unknown};
 
   beforeEach(() => {
@@ -31,15 +24,12 @@ describe('SettingsStore', () => {
         {provide: ApplicationOperations, useValue: appOperationsMock},
         {
           provide: SettingsStore,
-          useFactory: () =>
-            new SettingsStore({
-              'third@test': undefined,
-            }),
+          useFactory: () => new SettingsStore({}),
         },
       ],
     });
 
-    settingsStore = TestBed.inject<SettingsStore<MockSettingsData>>(SettingsStore);
+    settingsStore = TestBed.inject(SettingsStore);
     getStoredSettings = () => appOperationsMock.getStoredSettings();
   });
 
@@ -50,15 +40,6 @@ describe('SettingsStore', () => {
       initialValue: 'foo',
     });
     expect(item()).toEqual('foo');
-  });
-
-  it('should return a settings item with an initial value even though the data prop exists, but undefined', () => {
-    const item = settingsStore.create({
-      key: 'third',
-      category: 'test',
-      initialValue: 'bar',
-    });
-    expect(item()).toEqual('bar');
   });
 
   it('should set a settings item value', async () => {

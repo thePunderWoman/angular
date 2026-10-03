@@ -1,15 +1,15 @@
 import {Component, input} from '@angular/core';
 import {HousingLocationInfo} from '../housinglocation';
-import {RouterLink} from '@angular/router';
+import {RouterModule} from '@angular/router';
 
 @Component({
   selector: 'app-housing-location',
-  imports: [RouterLink],
+  imports: [RouterModule],
   template: `
     <section class="listing">
       <img
         class="listing-photo"
-        [src]="housingLocation().photo"
+        [src]="housingLocation.photo"
         alt="Exterior photo of {{ housingLocation().name }}"
         crossorigin
       />

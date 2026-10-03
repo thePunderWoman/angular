@@ -41,7 +41,8 @@ describe('markdown to html', () => {
     direction BT
     rootInjector --> elementInjector
     elementInjector --> nullInjector
-\`\`\``;
+\`\`\`;
+    `;
 
     const markedInstance = marked.use({
       async: true,
@@ -66,17 +67,11 @@ describe('markdown to html', () => {
       expect(marker?.tagName).toBe('marker');
     });
 
-    it('should have a structure .statediagram-state > rect', () => {
+    it('should have a structure .statediagram-state > g > path', () => {
       const stateDiagram = markdownDocument.querySelectorAll('svg')[2];
-      const rect = stateDiagram.querySelector('.statediagram-state > rect.label-container');
-      expect(rect).not.toBeNull();
-      expect(rect?.tagName).toBe('rect');
-
-      const nodeLabel = stateDiagram.querySelector(
-        '.statediagram-state > g > foreignObject .nodeLabel',
-      );
-      expect(nodeLabel).not.toBeNull();
-      expect(nodeLabel?.tagName).toBe('SPAN');
+      const path = stateDiagram.querySelector('.statediagram-state > g > path');
+      expect(path).not.toBeNull();
+      expect(path?.tagName).toBe('path');
     });
   });
 });

@@ -12,11 +12,11 @@ import {afterNextRender, InjectionToken, Injector, runInInjectionContext} from '
 import {ActivatedRouteSnapshot} from '../router_state';
 
 export const CREATE_VIEW_TRANSITION = new InjectionToken<typeof createViewTransition>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'view transition helper' : '',
+  typeof ngDevMode !== undefined && ngDevMode ? 'view transition helper' : '',
 );
 export const VIEW_TRANSITION_OPTIONS = new InjectionToken<
   ViewTransitionsFeatureOptions & {skipNextTransition: boolean}
->(typeof ngDevMode !== 'undefined' && ngDevMode ? 'view transition options' : '');
+>(typeof ngDevMode !== undefined && ngDevMode ? 'view transition options' : '');
 
 /**
  * Options to configure the View Transitions integration in the Router.
@@ -63,27 +63,17 @@ export interface ViewTransitionInfo {
 
 /**
  * A helper function for using browser view transitions. This function skips the call to
- * `startViewTransition` if the browser does not support it or has already provided a transition.
+ * `startViewTransition` if the browser does not support it.
  *
- * @returns A Promise that resolves when the view transition callback begins, or `undefined` when
- * the user agent has already provided a transition and the navigation should continue immediately.
+ * @returns A Promise that resolves when the view transition callback begins.
  */
 export function createViewTransition(
   injector: Injector,
   from: ActivatedRouteSnapshot,
   to: ActivatedRouteSnapshot,
-  hasUAVisualTransition?: boolean,
-): Promise<void> | undefined {
+): Promise<void> {
   const transitionOptions = injector.get(VIEW_TRANSITION_OPTIONS);
   const document = injector.get(DOCUMENT);
-
-  if (hasUAVisualTransition) {
-    transitionOptions.skipNextTransition = false;
-    // The browser has already started presenting the navigation. Continuing synchronously gives it
-    // the earliest opportunity to display the post-navigation DOM.
-    return;
-  }
-
   if (!document.startViewTransition || transitionOptions.skipNextTransition) {
     transitionOptions.skipNextTransition = false;
     // The timing of `startViewTransition` is closer to a macrotask. It won't be called
@@ -104,17 +94,7 @@ export function createViewTransition(
     // complete (below), which includes the update phase of the routed components.
     return createRenderPromise(injector);
   });
-  transition.updateCallbackDone.catch((error) => {
-    if (typeof ngDevMode === 'undefined' || ngDevMode) {
-      console.error(error);
-    }
-  });
   transition.ready.catch((error) => {
-    if (typeof ngDevMode === 'undefined' || ngDevMode) {
-      console.error(error);
-    }
-  });
-  transition.finished.catch((error) => {
     if (typeof ngDevMode === 'undefined' || ngDevMode) {
       console.error(error);
     }

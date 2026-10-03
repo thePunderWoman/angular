@@ -51,7 +51,7 @@ export abstract class AnimationBuilder {
     // (undocumented)
     static ɵfac: i0.ɵɵFactoryDeclaration<AnimationBuilder, never>;
     // (undocumented)
-    static ɵprov: i0.ɵɵInjectableDeclaration<any>;
+    static ɵprov: i0.ɵɵInjectableDeclaration<AnimationBuilder>;
 }
 
 // @public @deprecated

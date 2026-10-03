@@ -6,13 +6,10 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
+import {getAngularDecorators} from '@angular/compiler-cli/src/ngtsc/annotations';
+import {unwrapExpression} from '@angular/compiler-cli/src/ngtsc/annotations/common';
+import {ReflectionHost, reflectObjectLiteral} from '@angular/compiler-cli/src/ngtsc/reflection';
 import ts from 'typescript';
-import {
-  getAngularDecorators,
-  unwrapExpression,
-  ReflectionHost,
-  reflectObjectLiteral,
-} from '@angular/compiler-cli/private/migrations';
 import {
   AST,
   ParseLocation,

@@ -73,7 +73,7 @@ export class MessageBundle {
     // Deduplicate messages based on their ID
     this._messages.forEach((message) => {
       const id = serializer.digest(message);
-      if (!Object.hasOwn(messages, id)) {
+      if (!messages.hasOwnProperty(id)) {
         messages[id] = message;
       } else {
         messages[id].sources.push(...message.sources);

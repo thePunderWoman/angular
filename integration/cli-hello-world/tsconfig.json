@@ -1,6 +1,7 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
+    "baseUrl": "./",
     "outDir": "./dist/out-tsc",
     "sourceMap": true,
     "esModuleInterop": true,
@@ -13,5 +14,7 @@
     "typeRoots": ["node_modules/@types"],
     "lib": ["es2018", "dom"]
   },
-  "angularCompilerOptions": {}
+  "angularCompilerOptions": {
+    "strictTemplates": true
+  }
 }

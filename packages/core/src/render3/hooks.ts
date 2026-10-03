@@ -17,12 +17,11 @@ import {
   OnChanges,
   OnDestroy,
   OnInit,
-} from '../change_detection/lifecycle_hooks';
+} from '../interface/lifecycle_hooks';
 import {assertDefined, assertEqual, assertNotEqual} from '../util/assert';
 
-import {ProfilerEvent} from '../../primitives/devtools';
 import {assertFirstCreatePass} from './assert';
-import {getNgOnChangesFeatureImpl} from './features/ng_onchanges_feature';
+import {NgOnChangesFeatureImpl} from './features/ng_onchanges_feature';
 import {DirectiveDef} from './interfaces/definition';
 import {TNode} from './interfaces/node';
 import {
@@ -36,6 +35,7 @@ import {
   TView,
 } from './interfaces/view';
 import {profiler} from './profiler';
+import {ProfilerEvent} from './profiler_types';
 import {isInCheckNoChangesMode} from './state';
 
 /**
@@ -61,7 +61,7 @@ export function registerPreOrderHooks(
     DoCheck;
 
   if (ngOnChanges as Function | undefined) {
-    const wrappedOnChanges = getNgOnChangesFeatureImpl()(directiveDef);
+    const wrappedOnChanges = NgOnChangesFeatureImpl(directiveDef);
     (tView.preOrderHooks ??= []).push(directiveIndex, wrappedOnChanges);
     (tView.preOrderCheckHooks ??= []).push(directiveIndex, wrappedOnChanges);
   }

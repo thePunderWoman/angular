@@ -6,47 +6,32 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import * as webdriver from 'selenium-webdriver';
-import {createWebDriver, verifyNoBrowserErrors, waitForAngular} from '../../../../test-utils';
+import {browser, by, element, ElementArrayFinder, ElementFinder} from 'protractor';
+
+import {verifyNoBrowserErrors} from '../../../../test-utils';
 
 describe('reactiveSelectControl example', () => {
-  let driver: webdriver.WebDriver;
-  let baseUrl: string;
+  afterEach(verifyNoBrowserErrors);
+  let select: ElementFinder;
+  let options: ElementArrayFinder;
+  let p: ElementFinder;
 
-  beforeAll(async () => {
-    ({driver, baseUrl} = await createWebDriver());
+  beforeEach(() => {
+    browser.get('/reactiveSelectControl');
+    select = element(by.css('select'));
+    options = element.all(by.css('option'));
+    p = element(by.css('p'));
   });
 
-  afterAll(async () => {
-    await driver.quit();
+  it('should populate the initial selection', () => {
+    expect(select.getAttribute('value')).toEqual('3: Object');
+    expect(options.get(3).getAttribute('selected')).toBe('true');
   });
 
-  afterEach(async () => {
-    await verifyNoBrowserErrors(driver);
-  });
+  it('should update the model when the value changes in the UI', () => {
+    select.click();
+    options.get(0).click();
 
-  beforeEach(async () => {
-    await driver.get(`${baseUrl}/reactiveSelectControl`);
-    await waitForAngular(driver);
-  });
-
-  it('should populate the initial selection', async () => {
-    const select = await driver.findElement(webdriver.By.css('select'));
-    const options = await driver.findElements(webdriver.By.css('option'));
-    expect(await select.getAttribute('value')).toEqual('3: Object');
-    expect(await options[3].isSelected()).toBe(true);
-  });
-
-  it('should update the model when the value changes in the UI', async () => {
-    const select = await driver.findElement(webdriver.By.css('select'));
-    const options = await driver.findElements(webdriver.By.css('option'));
-    await select.click();
-    await options[0].click();
-    await waitForAngular(driver);
-
-    const p = await driver.findElement(webdriver.By.css('p'));
-    expect(await p.getText()).toEqual(
-      'Form value: { "state": { "name": "Arizona", "abbrev": "AZ" } }',
-    );
+    expect(p.getText()).toEqual('Form value: { "state": { "name": "Arizona", "abbrev": "AZ" } }');
   });
 });

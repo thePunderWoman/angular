@@ -11,31 +11,27 @@
     "@angular/platform-browser": "link:./in-existing-linked-by-bazel",
     "rxjs": "^7.0.0",
     "tslib": "^2.3.0",
-    "typescript": "6.0.3",
-    "zone.js": "0.16.3"
+    "typescript": "5.9.2",
+    "zone.js": "0.15.1"
   },
   "devDependencies": {
-    "@babel/core": "8.0.6",
-    "@rollup/plugin-babel": "^7.0.0",
+    "@babel/core": "7.28.4",
+    "@rollup/plugin-babel": "^6.0.0",
     "@rollup/plugin-node-resolve": "^16.0.0",
-    "@types/jasmine": "^6.0.0",
-    "@types/node": "^20.14.8",
-    "@types/selenium-webdriver": "3.0.7",
-    "concurrently": "10.0.5",
-    "jasmine": "6.3.0",
-    "jasmine-core": "6.3.0",
-    "jasmine-spec-reporter": "~7.0.0",
+    "@types/jasmine": "^5.0.0",
+    "@types/jasminewd2": "^2.0.8",
+    "concurrently": "9.2.1",
     "lite-server": "2.6.1",
-    "rollup": "4.63.4",
-    "selenium-webdriver": "3.5.0",
-    "ts-node": "^10.9.1"
+    "protractor": "^7.0.0",
+    "rollup": "4.52.3"
   },
   "scripts": {
     "build": "pnpm ngc && pnpm rollup -c rollup.config.mjs",
-    "test": "pnpm build && concurrently \"pnpm run serve\" \"pnpm run e2e\" --kill-others --success first",
+    "test": "pnpm build && concurrently \"pnpm run serve\" \"pnpm run protractor\" --kill-others --success first",
     "serve": "lite-server -c e2e/browser.config.json",
-    "e2e": "jasmine --config=e2e/jasmine.json 'e2e/**/*.e2e-spec.ts'"
+    "preprotractor": "tsc -p e2e",
+    "protractor": "protractor e2e/protractor.config.js"
   },
   "private": true,
-  "packageManager": "pnpm@11.27.1"
+  "packageManager": "pnpm@10.17.1"
 }

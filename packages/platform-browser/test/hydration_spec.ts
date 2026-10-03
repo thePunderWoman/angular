@@ -20,12 +20,7 @@ import {TestBed} from '@angular/core/testing';
 import {withBody} from '@angular/private/testing';
 import {BehaviorSubject} from 'rxjs';
 
-import {
-  provideClientHydration,
-  withNoHttpTransferCache,
-  withIncrementalHydration,
-  withNoIncrementalHydration,
-} from '../public_api';
+import {provideClientHydration, withNoHttpTransferCache} from '../public_api';
 import {withHttpTransferCacheOptions} from '../src/hydration';
 
 describe('provideClientHydration', () => {
@@ -167,14 +162,6 @@ describe('provideClientHydration', () => {
 
       TestBed.inject(HttpClient).post(url, body).subscribe();
       TestBed.inject(HttpTestingController).expectNone(url);
-    });
-  });
-
-  describe('incremental hydration conflicts', () => {
-    it('should throw when both withIncrementalHydration and withNoIncrementalHydration are provided', () => {
-      expect(() => {
-        provideClientHydration(withIncrementalHydration(), withNoIncrementalHydration());
-      }).toThrowError(/Configuration error: found both withIncrementalHydration/);
     });
   });
 });

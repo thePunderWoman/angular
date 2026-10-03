@@ -43,7 +43,7 @@ const __forward_ref__ = getClosureSafeProperty({__forward_ref__: getClosureSafeP
  * @Component({
  *   imports: [ChildComponent],
  *   selector: 'app-parent',
- *   template: `<app-child [hideParent]="hideParent()"/>`,
+ *   template: `<app-child [hideParent]="hideParent()"></app-child>`,
  * })
  * export class ParentComponent {
  *    hideParent = input.required<boolean>();
@@ -54,7 +54,7 @@ const __forward_ref__ = getClosureSafeProperty({__forward_ref__: getClosureSafeP
  *   imports: [forwardRef(() => ParentComponent)],
  *   selector: 'app-child',
  *   template: `
- *    @if(!hideParent()) {
+ *    @if(!hideParent() {
  *       <app-parent/>
  *    }
  *  `,
@@ -63,17 +63,14 @@ const __forward_ref__ = getClosureSafeProperty({__forward_ref__: getClosureSafeP
  *    hideParent = input.required<boolean>();
  * }
  * ```
- * @see [Resolve circular dependencies with a forward reference](guide/di/di-in-action#resolve-circular-dependencies-with-a-forward-reference)
+ *
  * @publicApi
  */
 export function forwardRef(forwardRefFn: ForwardRefFn): Type<any> {
   (<any>forwardRefFn).__forward_ref__ = forwardRef;
-  if (ngDevMode) {
-    (<any>forwardRefFn).toString = function () {
-      return stringify(this());
-    };
-  }
-
+  (<any>forwardRefFn).toString = function () {
+    return stringify(this());
+  };
   return <Type<any>>(<any>forwardRefFn);
 }
 
@@ -98,7 +95,7 @@ export function resolveForwardRef<T>(type: T): T {
 export function isForwardRef(fn: any): fn is () => any {
   return (
     typeof fn === 'function' &&
-    Object.hasOwn(fn, __forward_ref__) &&
+    fn.hasOwnProperty(__forward_ref__) &&
     fn.__forward_ref__ === forwardRef
   );
 }

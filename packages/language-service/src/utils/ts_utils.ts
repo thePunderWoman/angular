@@ -5,23 +5,21 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.dev/license
  */
-import {guessIndentationInSingleLine} from './format';
-import * as path from 'path';
+import {NgCompiler} from '@angular/compiler-cli/src/ngtsc/core';
 import {
-  ClassDeclaration,
   DirectiveModuleExportDetails,
-  NgCompiler,
   PotentialDirective,
   PotentialDirectiveModuleSpecifierResolver,
   PotentialImportMode,
   PotentialPipe,
-  Reference,
-  SymbolReference,
   TemplateTypeChecker,
   TsCompletionEntryInfo,
-} from '@angular/compiler-cli';
-
+} from '@angular/compiler-cli/src/ngtsc/typecheck/api';
 import ts from 'typescript';
+import {guessIndentationInSingleLine} from './format';
+import * as path from 'path';
+import {ClassDeclaration} from '@angular/compiler-cli/src/ngtsc/reflection';
+import {Reference} from '@angular/compiler-cli/src/ngtsc/imports';
 
 /**
  * Return the node that most tightly encompasses the specified `position`.
@@ -37,7 +35,6 @@ export function findTightestNode(node: ts.Node, position: number): ts.Node | und
 
 export interface FindOptions<T extends ts.Node> {
   filter: (node: ts.Node) => node is T;
-  position?: number;
 }
 
 /**
@@ -67,11 +64,6 @@ export function findFirstMatchingNode<T extends ts.Node>(
     if (match !== null) {
       return;
     }
-    if (opts.position !== undefined) {
-      if (currNode.getStart() > opts.position || opts.position >= currNode.getEnd()) {
-        return;
-      }
-    }
     if (opts.filter(currNode)) {
       match = currNode;
       return;
@@ -80,28 +72,6 @@ export function findFirstMatchingNode<T extends ts.Node>(
   };
   explore(root);
   return match;
-}
-
-/**
- * Resolves a ClassDeclaration from a SymbolReference.
- */
-export function getClassDeclarationFromSymbolReference(
-  ls: ts.LanguageService,
-  ref: SymbolReference,
-): ts.ClassDeclaration | null {
-  const program = ls.getProgram();
-  if (!program) {
-    return null;
-  }
-  const sf = program.getSourceFile(ref.filePath);
-  if (!sf) {
-    return null;
-  }
-  return findFirstMatchingNode(sf, {
-    position: ref.position,
-    filter: (node): node is ts.ClassDeclaration =>
-      ts.isClassDeclaration(node) && node.name?.getStart() === ref.position,
-  });
 }
 
 export function getParentClassDeclaration(startNode: ts.Node): ts.ClassDeclaration | undefined {
@@ -375,7 +345,6 @@ export function updateImportsForTypescriptFile(
   symbolName: string,
   declarationName: string,
   moduleSpecifier: string,
-  preferences?: ts.UserPreferences,
 ): [ts.TextChange[], string] {
   // The trait might already be imported, possibly under a different name. If so, determine the
   // local name of the imported trait.
@@ -422,38 +391,9 @@ export function updateImportsForTypescriptFile(
     // TODO: Why does the compiler insist this is null?
     span.start = lastImport!.getStart() + lastImport!.getWidth();
   }
-  const newImportDeclaration = generateImport(
-    symbolName,
-    importName,
-    moduleSpecifier,
-    shouldUseSingleQuotes(file, preferences),
-  );
+  const newImportDeclaration = generateImport(symbolName, importName, moduleSpecifier);
   const importString = '\n' + printNode(newImportDeclaration, file);
   return [[{span, newText: importString}], importName];
-}
-
-/**
- * Whether new string literals in the given file should use single quotes, based on the
- * user's `quotePreference`. When the preference is `auto` (or absent), the style is inferred
- * from the first existing import in the file, mirroring TypeScript's own behavior. Defaults
- * to double quotes when there is nothing to infer from.
- */
-export function shouldUseSingleQuotes(
-  file: ts.SourceFile,
-  preferences: ts.UserPreferences | undefined,
-): boolean {
-  if (preferences?.quotePreference === 'single') {
-    return true;
-  }
-  if (preferences?.quotePreference === 'double') {
-    return false;
-  }
-  for (const statement of file.statements) {
-    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
-      return file.text[statement.moduleSpecifier.getStart(file)] === `'`;
-    }
-  }
-  return false;
 }
 
 /**
@@ -620,14 +560,13 @@ export function generateImport(
   localName: string,
   exportedSpecifierName: string | null,
   rawModuleSpecifier: string,
-  useSingleQuotes = false,
 ): ts.ImportDeclaration {
   let propName: ts.Identifier | undefined;
   if (exportedSpecifierName !== null && exportedSpecifierName !== localName) {
     propName = ts.factory.createIdentifier(exportedSpecifierName);
   }
   const name = ts.factory.createIdentifier(localName);
-  const moduleSpec = ts.factory.createStringLiteral(rawModuleSpecifier, useSingleQuotes);
+  const moduleSpec = ts.factory.createStringLiteral(rawModuleSpecifier);
   let importClauseName: ts.Identifier | undefined;
   let importBindings: ts.NamedImportBindings | undefined;
 
@@ -640,7 +579,7 @@ export function generateImport(
   }
   return ts.factory.createImportDeclaration(
     undefined,
-    ts.factory.createImportClause(undefined, importClauseName, importBindings),
+    ts.factory.createImportClause(false, importClauseName, importBindings),
     moduleSpec,
     undefined,
   );
@@ -723,7 +662,6 @@ export function getCodeActionToImportTheDirectiveDeclaration(
   directive: PotentialDirective | PotentialPipe,
   tsLs: ts.LanguageService,
   includeCompletionsForModuleExports?: boolean,
-  preferences?: ts.UserPreferences,
 ): ts.CodeAction[] | undefined {
   const codeActions: ts.CodeAction[] = [];
 
@@ -736,31 +674,15 @@ export function getCodeActionToImportTheDirectiveDeclaration(
       tsLs,
       includeCompletionsForModuleExports,
     );
-  let ref: Reference<ClassDeclaration> | null = null;
-  const node = getClassDeclarationFromSymbolReference(tsLs, directive.ref);
-  if (node && node.name) {
-    const owningModule = directive.ref.moduleSpecifier
-      ? {
-          specifier: directive.ref.moduleSpecifier,
-          resolutionContext: directive.ref.filePath,
-        }
-      : null;
-    ref = new Reference(node as unknown as ClassDeclaration, owningModule);
-  }
-
-  if (ref === null) {
-    return undefined;
-  }
-
   const potentialImports = compiler
     .getTemplateTypeChecker()
     .getPotentialImportsFor(
-      ref,
+      directive.ref,
       importOn,
       PotentialImportMode.Normal,
       potentialDirectiveModuleSpecifierResolver,
     );
-  const declarationName = directive.ref.name;
+  const declarationName = directive.ref.node.name.getText();
 
   for (const potentialImport of potentialImports) {
     const fileImportChanges: ts.TextChange[] = [];
@@ -773,7 +695,6 @@ export function getCodeActionToImportTheDirectiveDeclaration(
         potentialImport.symbolName,
         declarationName,
         potentialImport.moduleSpecifier,
-        preferences,
       );
       importName = generatedImportName;
       fileImportChanges.push(...importChanges);
@@ -786,7 +707,6 @@ export function getCodeActionToImportTheDirectiveDeclaration(
           'forwardRef',
           declarationName,
           '@angular/core',
-          preferences,
         );
         fileImportChanges.push(...forwardRefImports);
         forwardRefName = generatedForwardRefName;
@@ -890,7 +810,9 @@ function getStringLiteralText(moduleSpecifier: ts.Expression): string | undefine
  * The developer should export the `FooComponent` in the `AppModule`.
  *
  */
-class PotentialDirectiveModuleSpecifierResolverImpl implements PotentialDirectiveModuleSpecifierResolver {
+class PotentialDirectiveModuleSpecifierResolverImpl
+  implements PotentialDirectiveModuleSpecifierResolver
+{
   constructor(
     private readonly compiler: NgCompiler,
     private readonly directive: PotentialDirective | PotentialPipe,

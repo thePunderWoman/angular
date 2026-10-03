@@ -1,44 +1,45 @@
 # Migration to the `inject` function
 
-Angular's [`inject`](/api/core/inject) function offers more accurate types and better compatibility with standard decorators, compared to constructor-based injection.
+Angular's `inject` function offers more accurate types and better compatibility with standard decorators, compared to constructor-based injection.
 
-This schematic converts constructor-based injection in your classes to use the [`inject`](/api/core/inject) function instead.
+This schematic converts constructor-based injection in your classes to use the `inject` function instead.
 
 Run the schematic using the following command:
 
-```shell
+<docs-code language="shell">
+
 ng generate @angular/core:inject
-```
+
+</docs-code>
 
 #### Before
 
-```typescript
-import {Component, Inject, Optional} from '@angular/core';
-import {MyService} from './service';
-import {DI_TOKEN} from './token';
+<docs-code language="typescript">
+import { Component, Inject, Optional } from '@angular/core';
+import { MyService } from './service';
+import { DI_TOKEN } from './token';
 
 @Component()
 export class MyComp {
   constructor(
     private service: MyService,
-    @Inject(DI_TOKEN) @Optional() readonly token: string,
-  ) {}
+    @Inject(DI_TOKEN) @Optional() readonly token: string) {}
 }
-```
+</docs-code>
 
 #### After
 
-```typescript
-import {Component, inject} from '@angular/core';
-import {MyService} from './service';
-import {DI_TOKEN} from './token';
+<docs-code language="typescript">
+import { Component, inject } from '@angular/core';
+import { MyService } from './service';
+import { DI_TOKEN } from './token';
 
 @Component()
 export class MyComp {
   private service = inject(MyService);
-  readonly token = inject(DI_TOKEN, {optional: true});
+  readonly token = inject(DI_TOKEN, { optional: true });
 }
-```
+</docs-code>
 
 ## Migration options
 
@@ -52,7 +53,7 @@ migrate the entire directory.
 ### `migrateAbstractClasses`
 
 Angular doesn't validate that parameters of abstract classes are injectable. This means that the
-migration can't reliably migrate them to [`inject`](/api/core/inject) without risking breakages which is why they're
+migration can't reliably migrate them to `inject` without risking breakages which is why they're
 disabled by default. Enable this option if you want abstract classes to be migrated, but note
 that you may have to **fix some breakages manually**.
 
@@ -64,34 +65,34 @@ In some cases this can lead to compilation errors when classes with Angular deco
 other classes with Angular decorators. If you enable this option, the migration will generate an
 additional constructor signature to keep it backwards compatible, at the expense of more code.
 
-#### Before {#backwards-compatible-constructors-before}
+#### Before
 
-```typescript
-import {Component} from '@angular/core';
-import {MyService} from './service';
-
-@Component()
-export class MyComp {
-  constructor(private service: MyService) {}
-}
-```
-
-#### After {#backwards-compatible-constructors-after}
-
-```ts
+<docs-code language="typescript">
 import { Component } from '@angular/core';
 import { MyService } from './service';
 
 @Component()
 export class MyComp {
-private service = inject(MyService);
+  constructor(private service: MyService) {}
+}
+</docs-code>
 
-  /\*_ Inserted by Angular inject() migration for backwards compatibility _/
+#### After
+
+<docs-code language="typescript">
+import { Component } from '@angular/core';
+import { MyService } from './service';
+
+@Component()
+export class MyComp {
+  private service = inject(MyService);
+
+  /** Inserted by Angular inject() migration for backwards compatibility */
   constructor(...args: unknown[]);
 
   constructor() {}
 }
-```
+</docs-code>
 
 ### `nonNullableOptional`
 
@@ -105,33 +106,32 @@ at the expense of potentially hiding type errors.
 **NOTE:** non-null assertions won't be added to parameters that are already typed to be nullable,
 because the code that depends on them likely already accounts for their nullability.
 
-#### Before {#non-nullable-optional-before}
+#### Before
 
-```typescript
-import {Component, Inject, Optional} from '@angular/core';
-import {TOKEN_ONE, TOKEN_TWO} from './token';
+<docs-code language="typescript">
+import { Component, Inject, Optional } from '@angular/core';
+import { TOKEN_ONE, TOKEN_TWO } from './token';
 
 @Component()
 export class MyComp {
   constructor(
     @Inject(TOKEN_ONE) @Optional() private tokenOne: number,
-    @Inject(TOKEN_TWO) @Optional() private tokenTwo: string | null,
-  ) {}
+    @Inject(TOKEN_TWO) @Optional() private tokenTwo: string | null) {}
 }
-```
+</docs-code>
 
-#### After {#non-nullable-optional-after}
+#### After
 
-```typescript
-import {Component, inject} from '@angular/core';
-import {TOKEN_ONE, TOKEN_TWO} from './token';
+<docs-code language="typescript">
+import { Component, inject } from '@angular/core';
+import { TOKEN_ONE, TOKEN_TWO } from './token';
 
 @Component()
 export class MyComp {
   // Note the `!` at the end.
-  private tokenOne = inject(TOKEN_ONE, {optional: true})!;
+  private tokenOne = inject(TOKEN_ONE, { optional: true })!;
 
   // Does not have `!` at the end, because the type was already nullable.
-  private tokenTwo = inject(TOKEN_TWO, {optional: true});
+  private tokenTwo = inject(TOKEN_TWO, { optional: true });
 }
-```
+</docs-code>

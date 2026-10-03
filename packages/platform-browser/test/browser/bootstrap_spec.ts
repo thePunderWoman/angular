@@ -7,26 +7,19 @@
  */
 
 import {animate, style, transition, trigger} from '@angular/animations';
-import {DOCUMENT, ɵgetDOM as getDOM, isPlatformBrowser} from '@angular/common';
+import {DOCUMENT, isPlatformBrowser, ɵgetDOM as getDOM} from '@angular/common';
 import {
-  inject as _inject,
   ANIMATION_MODULE_TYPE,
-  APP_ID,
   APP_INITIALIZER,
-  ApplicationRef,
-  ChangeDetectionStrategy,
   Compiler,
   Component,
-  ComponentRef,
-  ɵConsole as Console,
-  ɵcreateOrReusePlatformInjector as createOrReusePlatformInjector,
   createPlatformFactory,
   CUSTOM_ELEMENTS_SCHEMA,
-  destroyPlatform,
   Directive,
   ErrorHandler,
   importProvidersFrom,
   Inject,
+  inject as _inject,
   InjectionToken,
   Injector,
   LOCALE_ID,
@@ -36,7 +29,6 @@ import {
   OnDestroy,
   PLATFORM_ID,
   PLATFORM_INITIALIZER,
-  providePlatformInitializer,
   Provider,
   provideZoneChangeDetection,
   Sanitizer,
@@ -46,12 +38,20 @@ import {
   TransferState,
   Type,
   VERSION,
+  EnvironmentProviders,
+  ApplicationRef,
+  ɵConsole as Console,
+  ComponentRef,
+  destroyPlatform,
+  providePlatformInitializer,
+  ɵcreateOrReusePlatformInjector as createOrReusePlatformInjector,
+  APP_ID,
 } from '@angular/core';
-import {inject, ɵLog as Log, TestBed} from '@angular/core/testing';
-import {isNode, withBody} from '@angular/private/testing';
-import {expect} from '@angular/private/testing/matchers';
-import {provideAnimations, provideNoopAnimations} from '../../animations';
+import {ɵLog as Log, inject, TestBed} from '@angular/core/testing';
 import {BrowserModule} from '../../index';
+import {provideAnimations, provideNoopAnimations} from '../../animations';
+import {expect} from '@angular/private/testing/matchers';
+import {isNode} from '@angular/private/testing';
 
 import {bootstrapApplication, platformBrowser} from '../../src/browser';
 
@@ -224,7 +224,6 @@ describe('bootstrap factory method', () => {
     @Component({
       selector: 'hello-app',
       template: 'Hello from {{ name }}!',
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class SimpleComp {
       name = 'SimpleComp';
@@ -233,7 +232,6 @@ describe('bootstrap factory method', () => {
     @Component({
       selector: 'hello-app-2',
       template: 'Hello from {{ name }}!',
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class SimpleComp2 {
       name = 'SimpleComp2';
@@ -242,7 +240,6 @@ describe('bootstrap factory method', () => {
     @Component({
       selector: 'hello-app',
       template: 'Hello from {{ name }}!',
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class ComponentWithDeps {
       constructor(@Inject(NAME) public name: string) {}
@@ -252,7 +249,6 @@ describe('bootstrap factory method', () => {
       selector: 'hello-app-2',
       template: 'Hello from {{ name }}!',
       standalone: false,
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class NonStandaloneComp {
       name = 'NonStandaloneComp';
@@ -817,23 +813,6 @@ describe('bootstrap factory method', () => {
     );
   });
 
-  it('should register AI tools', async () => {
-    const evt = new Event('devtoolstooldiscovery') as any;
-    evt.respondWith = jasmine.createSpy<() => void>('respondWith');
-    window.dispatchEvent(evt);
-    expect(evt.respondWith).not.toHaveBeenCalled();
-
-    await bootstrap(HelloRootCmp);
-    window.dispatchEvent(evt);
-
-    // Should only be called once, but asserting that is flaky, likely because platforms
-    // aren't consistently destroyed across all tests, so we just check for any response.
-    expect(evt.respondWith).toHaveBeenCalledWith({
-      name: 'Angular',
-      tools: jasmine.any(Array),
-    });
-  });
-
   describe('change detection', () => {
     const log: string[] = [];
 
@@ -841,7 +820,6 @@ describe('bootstrap factory method', () => {
       selector: 'hello-app',
       template: '<div id="button-a" (click)="onClick()">{{title}}</div>',
       standalone: false,
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class CompA {
       title: string = '';
@@ -860,7 +838,6 @@ describe('bootstrap factory method', () => {
       selector: 'hello-app-2',
       template: '<div id="button-b" (click)="onClick()">{{title}}</div>',
       standalone: false,
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class CompB {
       title: string = '';
@@ -943,37 +920,28 @@ describe('providePlatformInitializer', () => {
 
     createPlatformInjector([
       {provide: TEST_TOKEN, useValue: 'test'},
-      providePlatformInitializer(() => (injectedValue = _inject(TEST_TOKEN))),
+      providePlatformInitializer(() => {
+        injectedValue = _inject(TEST_TOKEN);
+      }),
     ]);
 
     expect(injectedValue).toBe('test');
   });
 
-  function createPlatformInjector(providers: Array<StaticProvider>) {
-    return createOrReusePlatformInjector(providers);
+  function createPlatformInjector(providers: Array<EnvironmentProviders | Provider>) {
+    /* TODO: should we change `createOrReusePlatformInjector` type to allow `EnvironmentProviders`?
+     */
+    return createOrReusePlatformInjector(providers as any);
   }
-
-  it('should bootstrap with platform initializers', async () => {
-    return withBody('<app></app>', async () => {
-      @Component({
-        selector: 'app',
-        template: '',
-      })
-      class App {}
-
-      let platformInitializerCalls = 0;
-
-      const platformRef = platformBrowser([
-        providePlatformInitializer(() => {
-          platformInitializerCalls++;
-        }),
-      ]);
-
-      expect(platformInitializerCalls).toBe(0);
-      await bootstrapApplication(App, undefined, {platformRef});
-      expect(platformInitializerCalls).toBe(1);
-      await bootstrapApplication(App, undefined, {platformRef});
-      expect(platformInitializerCalls).toBe(1);
-    });
-  });
 });
+
+/**
+ * Typing tests.
+ */
+@Component({
+  template: '',
+  // @ts-expect-error: `providePlatformInitializer()` should not work with Component.providers, as
+  // it wouldn't be executed anyway.
+  providers: [providePlatformInitializer(() => {})],
+})
+class Test {}

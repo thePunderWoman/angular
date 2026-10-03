@@ -11,7 +11,7 @@ import { MessageId } from '../../../../../index';
 import { NodePath } from '@babel/core';
 import { ParseError } from '@angular/compiler';
 import { PathManipulation } from '@angular/compiler-cli/private/localize';
-import { PluginObject } from '@babel/core';
+import { PluginObj } from '@babel/core';
 import { ReadonlyFileSystem } from '@angular/compiler-cli/private/localize';
 import { types } from '@babel/core';
 import { ɵParsedMessage } from '../../../index';
@@ -78,17 +78,17 @@ export class LegacyMessageIdMigrationSerializer implements TranslationSerializer
 }
 
 // @public
-export function makeEs2015TranslatePlugin(diagnostics: Diagnostics, translations: Record<string, ɵParsedTranslation_2>, input?: TranslatePluginOptions, fs?: PathManipulation): PluginObject;
+export function makeEs2015TranslatePlugin(diagnostics: Diagnostics, translations: Record<string, ɵParsedTranslation_2>, { missingTranslation, localizeName }?: TranslatePluginOptions, fs?: PathManipulation): PluginObj;
 
 // @public
-export function makeEs5TranslatePlugin(diagnostics: Diagnostics, translations: Record<string, ɵParsedTranslation_2>, input?: TranslatePluginOptions, fs?: PathManipulation): PluginObject;
+export function makeEs5TranslatePlugin(diagnostics: Diagnostics, translations: Record<string, ɵParsedTranslation_2>, { missingTranslation, localizeName }?: TranslatePluginOptions, fs?: PathManipulation): PluginObj;
 
 // @public
-export function makeLocalePlugin(locale: string, input?: TranslatePluginOptions): PluginObject;
+export function makeLocalePlugin(locale: string, { localizeName }?: TranslatePluginOptions): PluginObj;
 
 // @public
 export class MessageExtractor {
-    constructor(fs: ReadonlyFileSystem, logger: Logger, input: ExtractionOptions);
+    constructor(fs: ReadonlyFileSystem, logger: Logger, { basePath, useSourceMaps, localizeName }: ExtractionOptions);
     // (undocumented)
     extractMessages(filename: string): ɵParsedMessage[];
 }

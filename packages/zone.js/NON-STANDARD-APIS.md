@@ -27,7 +27,7 @@ Usage:
 
 ## Currently Supported Non-Standard Common APIs
 
-- [Bluebird](https://github.com/petkaantonov/bluebird) Promise
+- [Bluebird](http://bluebirdjs.com/docs/getting-started.html) Promise
 
 Browser Usage:
 
@@ -247,7 +247,7 @@ Zone['__zone_symbol__jsonp']({
   jsonp: getJSONP,
   sendFuncName: 'send',
   successFuncName: 'jsonpSuccessCallback',
-  failedFuncName: 'jsonpFailedCallback',
+  failedFuncName: 'jsonpFailedCallback'
 });
 ```
 

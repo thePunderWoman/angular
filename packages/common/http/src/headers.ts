@@ -17,8 +17,6 @@ interface Update {
  * Instances are immutable. Modifying methods return a cloned
  * instance with the change. The original object is never changed.
  *
- * @see [Setting request headers](guide/http/making-requests#setting-request-headers)
- *
  * @publicApi
  */
 export class HttpHeaders {
@@ -192,10 +190,10 @@ export class HttpHeaders {
 
   private copyFrom(other: HttpHeaders) {
     other.init();
-    for (const [key, values] of other.headers.entries()) {
-      this.headers.set(key, values);
+    Array.from(other.headers.keys()).forEach((key) => {
+      this.headers.set(key, other.headers.get(key)!);
       this.normalizedNames.set(key, other.normalizedNames.get(key)!);
-    }
+    });
   }
 
   private clone(update: Update): HttpHeaders {
@@ -218,22 +216,21 @@ export class HttpHeaders {
           return;
         }
         this.maybeSetNormalizedName(update.name, key);
-        const base = update.op === 'a' ? (this.headers.get(key) || []).slice() : [];
+        const base = (update.op === 'a' ? this.headers.get(key) : undefined) || [];
         base.push(...value);
         this.headers.set(key, base);
         break;
       case 'd':
-        const toDelete = update.value;
-        if (toDelete === undefined) {
+        const toDelete = update.value as string | undefined;
+        if (!toDelete) {
           this.headers.delete(key);
           this.normalizedNames.delete(key);
         } else {
-          const valuesToDelete = Array.isArray(toDelete) ? toDelete : [toDelete];
           let existing = this.headers.get(key);
           if (!existing) {
             return;
           }
-          existing = existing.filter((value) => valuesToDelete.indexOf(value) === -1);
+          existing = existing.filter((value) => toDelete.indexOf(value) === -1);
           if (existing.length === 0) {
             this.headers.delete(key);
             this.normalizedNames.delete(key);

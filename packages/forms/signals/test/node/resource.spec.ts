@@ -7,23 +7,15 @@
  */
 import {provideHttpClient} from '@angular/common/http';
 import {HttpTestingController, provideHttpClientTesting} from '@angular/common/http/testing';
-import {
-  ApplicationRef,
-  assertNotInReactiveContext,
-  Injector,
-  resource,
-  signal,
-  type Signal,
-} from '@angular/core';
+import {ApplicationRef, Injector, resource, signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {isNode, timeout, useAutoTick} from '@angular/private/testing';
+import {isNode} from '@angular/private/testing';
 
 import {
   applyEach,
-  applyWhen,
-  createManagedMetadataKey,
+  customError,
   form,
-  metadata,
+  property,
   required,
   schema,
   SchemaOrSchemaFn,
@@ -43,8 +35,6 @@ interface Address {
 }
 
 describe('resources', () => {
-  useAutoTick();
-
   let appRef: ApplicationRef;
   let backend: HttpTestingController;
   let injector: Injector;
@@ -66,18 +56,17 @@ describe('resources', () => {
 
   it('Takes a simple resource which reacts to data changes', async () => {
     const s: SchemaOrSchemaFn<Cat> = function (p) {
-      const RES = createManagedMetadataKey((_state, params: Signal<{x: string} | undefined>) =>
-        resource({
-          params,
+      const RES = property(p.name, ({value}) => {
+        return resource({
+          params: () => ({x: value()}),
           loader: async ({params}) => `got: ${params.x}`,
-        }),
-      );
-      metadata(p.name, RES, ({value}) => ({x: value()}));
+        });
+      });
 
       validate(p.name, ({state}) => {
-        const remote = state.metadata(RES)!;
+        const remote = state.property(RES)!;
         if (remote.hasValue()) {
-          return {message: remote.value(), kind: 'custom'};
+          return customError({message: remote.value()});
         } else {
           return undefined;
         }
@@ -90,39 +79,36 @@ describe('resources', () => {
 
     await appRef.whenStable();
     expect(f.name().errors()).toEqual([
-      {
+      customError({
         message: 'got: cat',
-        fieldTree: f.name,
-        kind: 'custom',
-      },
+        field: f.name,
+      }),
     ]);
 
     f.name().value.set('dog');
     await appRef.whenStable();
     expect(f.name().errors()).toEqual([
-      {
+      customError({
         message: 'got: dog',
-        fieldTree: f.name,
-        kind: 'custom',
-      },
+        field: f.name,
+      }),
     ]);
   });
 
   it('should create a resource per entry in an array', async () => {
     const s: SchemaOrSchemaFn<Cat[]> = function (p) {
       applyEach(p, (p) => {
-        const RES = createManagedMetadataKey((_state, params: Signal<{x: string} | undefined>) =>
-          resource({
-            params,
+        const RES = property(p.name, ({value}) => {
+          return resource({
+            params: () => ({x: value()}),
             loader: async ({params}) => `got: ${params.x}`,
-          }),
-        );
-        metadata(p.name, RES, ({value}) => ({x: value()}));
+          });
+        });
 
         validate(p.name, ({state}) => {
-          const remote = state.metadata(RES)!;
+          const remote = state.property(RES)!;
           if (remote.hasValue()) {
-            return {message: remote.value(), kind: 'custom'};
+            return customError({message: remote.value()});
           } else {
             return undefined;
           }
@@ -136,73 +122,31 @@ describe('resources', () => {
 
     await appRef.whenStable();
     expect(f[0].name().errors()).toEqual([
-      {
+      customError({
         message: 'got: cat',
-        fieldTree: f[0].name,
-        kind: 'custom',
-      },
+        field: f[0].name,
+      }),
     ]);
     expect(f[1].name().errors()).toEqual([
-      {
+      customError({
         message: 'got: dog',
-        fieldTree: f[1].name,
-        kind: 'custom',
-      },
+        field: f[1].name,
+      }),
     ]);
 
     f[0].name().value.set('bunny');
     await appRef.whenStable();
     expect(f[0].name().errors()).toEqual([
-      {
+      customError({
         message: 'got: bunny',
-        fieldTree: f[0].name,
-        kind: 'custom',
-      },
-    ]);
-    expect(f[1].name().errors()).toEqual([
-      {
-        message: 'got: dog',
-        fieldTree: f[1].name,
-        kind: 'custom',
-      },
-    ]);
-  });
-
-  it('should support tree validation for resources (multiple errors)', async () => {
-    const s: SchemaOrSchemaFn<Cat[]> = function (p) {
-      validateAsync(p, {
-        params: ({value}) => value(),
-        factory: (params) =>
-          resource({
-            params,
-            loader: async ({params}) => {
-              return params as Cat[];
-            },
-          }),
-        onSuccess: (cats, {fieldTreeOf}) => {
-          return cats.map((cat, index) => ({
-            kind: 'meows_too_much',
-            name: cat.name,
-            fieldTree: fieldTreeOf(p)[index],
-          }));
-        },
-        onError: () => null,
-      });
-    };
-
-    const cats = signal([{name: 'Fluffy'}, {name: 'Ziggy'}]);
-    const f = form(cats, s, {injector});
-
-    await appRef.whenStable();
-    expect(f[0]().errors()).toEqual([
-      jasmine.objectContaining({
-        kind: 'meows_too_much',
-        name: 'Fluffy',
-        fieldTree: f[0],
+        field: f[0].name,
       }),
     ]);
-    expect(f[1]().errors()).toEqual([
-      jasmine.objectContaining({kind: 'meows_too_much', name: 'Ziggy', fieldTree: f[1]}),
+    expect(f[1].name().errors()).toEqual([
+      customError({
+        message: 'got: dog',
+        field: f[1].name,
+      }),
     ]);
   });
 
@@ -217,14 +161,15 @@ describe('resources', () => {
               return params as Cat[];
             },
           }),
-        onSuccess: (cats, {fieldTreeOf}) => {
-          return {
-            kind: 'meows_too_much',
-            name: cats[0].name,
-            fieldTree: fieldTreeOf(p)[0],
-          };
+        errors: (cats, {fieldOf}) => {
+          return cats.map((cat, index) =>
+            customError({
+              kind: 'meows_too_much',
+              name: cat.name,
+              field: fieldOf(p)[index],
+            }),
+          );
         },
-        onError: () => null,
       });
     };
 
@@ -233,7 +178,40 @@ describe('resources', () => {
 
     await appRef.whenStable();
     expect(f[0]().errors()).toEqual([
-      {kind: 'meows_too_much', name: 'Fluffy', fieldTree: f[0]} as any,
+      customError({kind: 'meows_too_much', name: 'Fluffy', field: f[0]}),
+    ]);
+    expect(f[1]().errors()).toEqual([
+      customError({kind: 'meows_too_much', name: 'Ziggy', field: f[1]}),
+    ]);
+  });
+
+  it('should support tree validation for resources', async () => {
+    const s: SchemaOrSchemaFn<Cat[]> = function (p) {
+      validateAsync(p, {
+        params: ({value}) => value(),
+        factory: (params) =>
+          resource({
+            params,
+            loader: async ({params}) => {
+              return params as Cat[];
+            },
+          }),
+        errors: (cats, {fieldOf}) => {
+          return customError({
+            kind: 'meows_too_much',
+            name: cats[0].name,
+            field: fieldOf(p)[0],
+          });
+        },
+      });
+    };
+
+    const cats = signal([{name: 'Fluffy'}, {name: 'Ziggy'}]);
+    const f = form(cats, s, {injector});
+
+    await appRef.whenStable();
+    expect(f[0]().errors()).toEqual([
+      customError({kind: 'meows_too_much', name: 'Fluffy', field: f[0]}),
     ]);
     expect(f[1]().errors()).toEqual([]);
   });
@@ -244,8 +222,8 @@ describe('resources', () => {
       (p) => {
         validateHttp(p, {
           request: ({value}) => `/api/check?username=${value()}`,
-          onSuccess: (available: boolean) => (available ? undefined : {kind: 'username-taken'}),
-          onError: () => null,
+          errors: (available: boolean) =>
+            available ? undefined : customError({kind: 'username-taken'}),
         });
       },
       {injector},
@@ -288,12 +266,8 @@ describe('resources', () => {
       required(address.street);
       validateHttp(address, {
         request: ({value}) => ({url: '/checkaddress', params: {...value()}}),
-        onSuccess: (message: string, {fieldTreeOf}) => ({
-          message,
-          fieldTree: fieldTreeOf(address.street),
-          kind: '',
-        }),
-        onError: () => null,
+        errors: (message: string, {fieldOf}) =>
+          customError({message, field: fieldOf(address.street)}),
       });
     });
     const addressForm = form(addressModel, addressSchema, {injector});
@@ -309,230 +283,7 @@ describe('resources', () => {
     await appRef.whenStable();
 
     expect(addressForm.street().errors()).toEqual([
-      {message: 'Invalid!', fieldTree: addressForm.street, kind: ''},
+      customError({message: 'Invalid!', field: addressForm.street}),
     ]);
-  });
-
-  it('should call onError handler when http validation fails', async () => {
-    const addressModel = signal<Address>({street: '123 Main St', city: '', zip: ''});
-    const addressSchema = schema<Address>((address) => {
-      required(address.street);
-      validateHttp(address, {
-        request: ({value}) => ({url: '/checkaddress', params: {...value()}}),
-        onSuccess: () => undefined,
-        onError: () => [
-          {kind: 'address-api-failed', message: 'API is down', fieldTree: addressForm},
-        ],
-      });
-    });
-
-    const addressForm = form(addressModel, addressSchema, {injector});
-    TestBed.tick();
-
-    const req = backend.expectOne('/checkaddress?street=123%20Main%20St&city=&zip=');
-    req.flush(null, {status: 500, statusText: 'Server Error'});
-
-    await appRef.whenStable();
-
-    expect(addressForm().pending()).toBe(false);
-    expect(addressForm().invalid()).toBe(true);
-    expect(addressForm().errors()).toEqual([
-      {
-        kind: 'address-api-failed',
-        message: 'API is down',
-        fieldTree: addressForm,
-      },
-    ]);
-  });
-
-  it('should allow double application of async validation schema with mutually exclusive predicate', async () => {
-    const toggle = signal(true);
-    const s = schema((p) => {
-      validateHttp(p, {
-        request: ({value}) => `/api/check?username=${value()}`,
-        onSuccess: (available: boolean) => (available ? undefined : {kind: 'username-taken'}),
-        onError: () => null,
-      });
-    });
-    const usernameForm = form(
-      signal('unique-user'),
-      (p) => {
-        applyWhen(p, () => toggle(), s);
-        applyWhen(p, () => !toggle(), s);
-      },
-      {injector},
-    );
-
-    TestBed.tick();
-    const req1 = backend.expectOne('/api/check?username=unique-user');
-
-    expect(usernameForm().valid()).toBe(false);
-    expect(usernameForm().invalid()).toBe(false);
-    expect(usernameForm().pending()).toBe(true);
-
-    req1.flush(true);
-    await appRef.whenStable();
-
-    expect(usernameForm().valid()).toBe(true);
-    expect(usernameForm().invalid()).toBe(false);
-    expect(usernameForm().pending()).toBe(false);
-
-    toggle.update((v) => !v);
-
-    // Toggling doesn't actually change the parameters, so we don't got back to pending.
-    expect(usernameForm().pending()).toBe(false);
-
-    TestBed.tick();
-    backend.expectNone('/api/check?username=unique-user');
-
-    usernameForm().value.set('new-user');
-
-    // Now that we've changed the parameters, go back to pending.
-    expect(usernameForm().pending()).toBe(true);
-
-    TestBed.tick();
-    const req3 = backend.expectOne('/api/check?username=new-user');
-    req3.flush(true);
-    await appRef.whenStable();
-  });
-
-  it('should not allow accessing resource metadata on a field that does not define its params', () => {
-    const RES = createManagedMetadataKey((_state, params: Signal<string | undefined>) =>
-      resource({params, loader: async () => 'hi'}),
-    );
-
-    const f = form(signal(''), {injector: TestBed.inject(Injector)});
-
-    expect(f().metadata(RES)).toBe(undefined);
-  });
-
-  it('should support debounce in validateHttp', async () => {
-    const usernameForm = form(
-      signal('unique-user'),
-      (p) => {
-        validateHttp(p, {
-          request: ({value}) => `/api/check?username=${value()}`,
-          debounce: 50, // Short debounce
-          onSuccess: (available: boolean) => (available ? undefined : {kind: 'username-taken'}),
-          onError: () => null,
-        });
-      },
-      {injector},
-    );
-
-    TestBed.tick();
-    const req1 = backend.expectOne('/api/check?username=unique-user');
-    req1.flush(true);
-    await appRef.whenStable();
-    expect(usernameForm().valid()).toBe(true);
-    usernameForm().value.set('taken-user');
-    TestBed.tick();
-
-    // Should not have triggered a new request yet
-    backend.expectNone('/api/check?username=taken-user');
-
-    // Wait for debounce
-    await timeout(80);
-    TestBed.tick();
-    const req2 = backend.expectOne('/api/check?username=taken-user');
-    req2.flush(false);
-    await appRef.whenStable();
-
-    expect(usernameForm().valid()).toBe(false);
-  });
-
-  describe('reloadValidation', () => {
-    it('should trigger a reload of async http validation', async () => {
-      const usernameForm = form(
-        signal('unique-user'),
-        (p) => {
-          validateHttp(p, {
-            request: ({value}) => `/api/check?username=${value()}`,
-            onSuccess: (available: boolean) => (available ? undefined : {kind: 'username-taken'}),
-            onError: () => null,
-          });
-        },
-        {injector},
-      );
-
-      TestBed.tick();
-      const req1 = backend.expectOne('/api/check?username=unique-user');
-
-      expect(usernameForm().pending()).toBe(true);
-
-      req1.flush(true);
-      await appRef.whenStable();
-
-      expect(usernameForm().valid()).toBe(true);
-      expect(usernameForm().pending()).toBe(false);
-
-      // Trigger reload
-      usernameForm().reloadValidation();
-
-      // Expect a new request to be made even though the value hasn't changed
-      TestBed.tick();
-      const req2 = backend.expectOne('/api/check?username=unique-user');
-
-      expect(usernameForm().pending()).toBe(true);
-      expect(usernameForm().valid()).toBe(false);
-
-      req2.flush(false);
-      await appRef.whenStable();
-
-      expect(usernameForm().invalid()).toBe(true);
-      expect(usernameForm().pending()).toBe(false);
-    });
-  });
-
-  it('should allow accessing basic field state properties during creation without reading them', () => {
-    let success = false;
-
-    const RES = createManagedMetadataKey((state, _params: Signal<string | undefined>) => {
-      // We shouldn't be captured in the reactive context of node creation here.
-      assertNotInReactiveContext(createManagedMetadataKey);
-
-      state.value();
-      state.disabled();
-
-      success = true;
-    });
-
-    form(
-      signal(''),
-      (p) => {
-        metadata(p, RES, () => 'trigger');
-      },
-      {injector: TestBed.inject(Injector)},
-    );
-
-    expect(success).toBeTrue();
-  });
-
-  it('should not throw NG0992 when using validateAsync on parent and lazily-created child', () => {
-    const model = signal({child: ''});
-    const injector = TestBed.inject(Injector);
-    function createForm() {
-      form(
-        model,
-        (p) => {
-          validateAsync(p, {
-            params: () => 1,
-            factory: () => resource({loader: async () => []}),
-            onSuccess: () => null,
-            onError: () => null,
-          });
-
-          validateAsync(p.child, {
-            params: () => 1,
-            factory: () => resource({loader: async () => []}),
-            onSuccess: () => null,
-            onError: () => null,
-          });
-        },
-        {injector},
-      );
-    }
-
-    expect(() => createForm()).not.toThrow();
   });
 });

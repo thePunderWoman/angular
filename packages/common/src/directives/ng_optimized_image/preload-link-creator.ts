@@ -7,11 +7,11 @@
  */
 
 import {
-  DOCUMENT,
-  ɵformatRuntimeError as formatRuntimeError,
   inject,
+  Injectable,
   Renderer2,
-  Service,
+  ɵformatRuntimeError as formatRuntimeError,
+  DOCUMENT,
 } from '@angular/core';
 
 import {RuntimeErrorCode} from '../../errors';
@@ -26,7 +26,7 @@ import {DEFAULT_PRELOADED_IMAGES_LIMIT, PRELOADED_IMAGES} from './tokens';
  * In dev mode this service will validate that the number of preloaded images does not exceed the
  * configured default preloaded images limit: {@link DEFAULT_PRELOADED_IMAGES_LIMIT}.
  */
-@Service()
+@Injectable({providedIn: 'root'})
 export class PreloadLinkCreator {
   private readonly preloadedImages = inject(PRELOADED_IMAGES);
   private readonly document = inject(DOCUMENT);
@@ -47,17 +47,8 @@ export class PreloadLinkCreator {
    * @param src The original src of the image that is set on the `ngSrc` input.
    * @param srcset The parsed and formatted srcset created from the `ngSrcset` input
    * @param sizes The value of the `sizes` attribute passed in to the `<img>` tag
-   * @param crossOrigin The value of the `crossorigin` attribute passed in to the `<img>` tag
    */
-  createPreloadLinkTag(
-    renderer: Renderer2,
-    src: string,
-    srcset?: string,
-    sizes?: string,
-    crossOrigin?: string | null,
-  ): void {
-    const preloadKey = `${src}:${getCrossOriginMode(crossOrigin)}`;
-
+  createPreloadLinkTag(renderer: Renderer2, src: string, srcset?: string, sizes?: string): void {
     if (
       ngDevMode &&
       !this.errorShown &&
@@ -75,21 +66,17 @@ export class PreloadLinkCreator {
       );
     }
 
-    if (this.preloadedImages.has(preloadKey)) {
+    if (this.preloadedImages.has(src)) {
       return;
     }
 
-    this.preloadedImages.add(preloadKey);
+    this.preloadedImages.add(src);
 
     const preload = renderer.createElement('link');
     renderer.setAttribute(preload, 'as', 'image');
     renderer.setAttribute(preload, 'href', src);
     renderer.setAttribute(preload, 'rel', 'preload');
     renderer.setAttribute(preload, 'fetchpriority', 'high');
-
-    if (crossOrigin != null) {
-      renderer.setAttribute(preload, 'crossorigin', crossOrigin);
-    }
 
     if (sizes) {
       renderer.setAttribute(preload, 'imageSizes', sizes);
@@ -101,12 +88,4 @@ export class PreloadLinkCreator {
 
     renderer.appendChild(this.document.head, preload);
   }
-}
-
-function getCrossOriginMode(crossOrigin?: string | null): string | null {
-  if (crossOrigin == null) {
-    return null;
-  }
-
-  return crossOrigin.toLowerCase() === 'use-credentials' ? 'use-credentials' : 'anonymous';
 }

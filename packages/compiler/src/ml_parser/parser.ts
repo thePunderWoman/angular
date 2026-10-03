@@ -31,7 +31,6 @@ import {
   IncompleteComponentOpenToken,
   IncompleteLetToken,
   IncompleteTagOpenToken,
-  InElementCommentToken,
   InterpolatedAttributeToken,
   InterpolatedTextToken,
   LetEndToken,
@@ -393,8 +392,7 @@ class _TreeBuilder {
   private _consumeElementStartTag(startTagToken: TagOpenStartToken | IncompleteTagOpenToken) {
     const attrs: html.Attribute[] = [];
     const directives: html.Directive[] = [];
-    const comments: html.StartTagComment[] = [];
-    this._consumeAttributesAndDirectives(attrs, directives, comments);
+    this._consumeAttributesAndDirectives(attrs, directives);
 
     const fullName = this._getElementFullName(startTagToken, this._getClosestElementLikeParent());
     const tagDef = this._getTagDefinition(fullName);
@@ -439,8 +437,6 @@ class _TreeBuilder {
       startSpan,
       undefined,
       tagDef?.isVoid ?? false,
-      undefined,
-      comments,
     );
     const parent = this._getContainer();
     const isClosedByChild =
@@ -467,8 +463,7 @@ class _TreeBuilder {
     const componentName = startToken.parts[0];
     const attrs: html.Attribute[] = [];
     const directives: html.Directive[] = [];
-    const comments: html.StartTagComment[] = [];
-    this._consumeAttributesAndDirectives(attrs, directives, comments);
+    this._consumeAttributesAndDirectives(attrs, directives);
 
     const closestElement = this._getClosestElementLikeParent();
     const tagName = this._getComponentTagName(startToken, closestElement);
@@ -498,8 +493,6 @@ class _TreeBuilder {
       span,
       startSpan,
       undefined,
-      undefined,
-      comments,
     );
     const parent = this._getContainer();
     const isClosedByChild =
@@ -521,26 +514,15 @@ class _TreeBuilder {
   private _consumeAttributesAndDirectives(
     attributesResult: html.Attribute[],
     directivesResult: html.Directive[],
-    commentsResult: html.StartTagComment[],
   ) {
     while (
       this._peek.type === TokenType.ATTR_NAME ||
-      this._peek.type === TokenType.DIRECTIVE_NAME ||
-      this._peek.type === TokenType.IN_ELEMENT_COMMENT
+      this._peek.type === TokenType.DIRECTIVE_NAME
     ) {
       if (this._peek.type === TokenType.DIRECTIVE_NAME) {
         directivesResult.push(this._consumeDirective(this._peek));
-      } else if (this._peek.type === TokenType.ATTR_NAME) {
-        attributesResult.push(this._consumeAttr(this._advance<AttributeNameToken>()));
       } else {
-        const commentToken = this._advance<InElementCommentToken>();
-        commentsResult.push(
-          new html.StartTagComment(
-            commentToken.parts[0],
-            commentToken.parts[1],
-            commentToken.sourceSpan,
-          ),
-        );
+        attributesResult.push(this._consumeAttr(this._advance<AttributeNameToken>()));
       }
     }
   }
@@ -771,30 +753,13 @@ class _TreeBuilder {
   }
 
   private _consumeBlockClose(token: BlockCloseToken) {
-    const initialStackLength = this._containerStack.length;
-    const topNode = this._containerStack[initialStackLength - 1];
     if (!this._popContainer(null, html.Block, token.sourceSpan)) {
-      if (this._containerStack.length < initialStackLength) {
-        const nodeName = topNode instanceof html.Component ? topNode.fullName : topNode.name;
-        this.errors.push(
-          TreeError.create(
-            null,
-            token.sourceSpan,
-            `Unexpected closing block. The block may have been closed earlier. ` +
-              `Did you forget to close the <${nodeName}> element? ` +
-              `If you meant to write the \`}\` character, you should use the "&#125;" ` +
-              `HTML entity instead.`,
-          ),
-        );
-        return;
-      }
-
       this.errors.push(
         TreeError.create(
           null,
           token.sourceSpan,
           `Unexpected closing block. The block may have been closed earlier. ` +
-            `If you meant to write the \`}\` character, you should use the "&#125;" ` +
+            `If you meant to write the } character, you should use the "&#125;" ` +
             `HTML entity instead.`,
         ),
       );
@@ -861,7 +826,7 @@ class _TreeBuilder {
       endToken = this._advance();
     }
 
-    const end = endToken.sourceSpan.end;
+    const end = endToken.sourceSpan.fullStart;
     const span = new ParseSourceSpan(
       startToken.sourceSpan.start,
       end,

@@ -211,7 +211,7 @@ export function patchError(Zone: ZoneType): void {
       });
     }
 
-    if (Object.hasOwn(NativeError, 'stackTraceLimit')) {
+    if (NativeError.hasOwnProperty('stackTraceLimit')) {
       // Extend default stack limit as we will be removing few frames.
       NativeError.stackTraceLimit = Math.max(NativeError.stackTraceLimit, 15);
 
@@ -226,7 +226,7 @@ export function patchError(Zone: ZoneType): void {
       });
     }
 
-    if (Object.hasOwn(NativeError, 'captureStackTrace')) {
+    if (NativeError.hasOwnProperty('captureStackTrace')) {
       Object.defineProperty(ZoneAwareError, 'captureStackTrace', {
         // add named function here because we need to remove this
         // stack frame when prepareStackTrace below

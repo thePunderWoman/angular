@@ -10,12 +10,16 @@ import {Identifiers as R3} from '../r3_identifiers';
 import {
   convertFromMaybeForwardRefExpression,
   generateForwardRef,
-  isUnsafeObjectKey,
   R3CompiledExpression,
 } from '../util';
 import {R3DirectiveMetadata, R3HostMetadata, R3QueryMetadata} from '../view/api';
 import {createDirectiveType, createHostDirectivesMappingArray} from '../view/compiler';
-import {asLiteral, conditionallyCreateDirectiveBindingLiteral, DefinitionMap} from '../view/util';
+import {
+  asLiteral,
+  conditionallyCreateDirectiveBindingLiteral,
+  DefinitionMap,
+  UNSAFE_OBJECT_KEY_NAME_REGEXP,
+} from '../view/util';
 
 import {R3DeclareDirectiveMetadata, R3DeclareQueryMetadata} from './api';
 import {toOptionalLiteralMap} from './util';
@@ -92,19 +96,6 @@ export function createDirectiveDefinitionMap(
 
   if (meta.lifecycle.usesOnChanges) {
     definitionMap.set('usesOnChanges', o.literal(true));
-  }
-
-  if (meta.controlCreate) {
-    definitionMap.set(
-      'controlCreate',
-      o.literalMap([
-        {
-          key: 'passThroughInput',
-          value: o.literal(meta.controlCreate.passThroughInput),
-          quoted: false,
-        },
-      ]),
-    );
   }
 
   if (meta.hostDirectives?.length) {
@@ -282,7 +273,7 @@ function createInputsPartialMetadata(inputs: R3DirectiveMetadata['inputs']): o.E
       return {
         key: declaredName,
         // put quotes around keys that contain potentially unsafe characters
-        quoted: isUnsafeObjectKey(declaredName),
+        quoted: UNSAFE_OBJECT_KEY_NAME_REGEXP.test(declaredName),
         value: o.literalMap([
           {key: 'classPropertyName', quoted: false, value: asLiteral(value.classPropertyName)},
           {key: 'publicName', quoted: false, value: asLiteral(value.bindingPropertyName)},
@@ -336,7 +327,7 @@ function legacyInputsPartialMetadata(inputs: R3DirectiveMetadata['inputs']): o.E
       return {
         key: declaredName,
         // put quotes around keys that contain potentially unsafe characters
-        quoted: isUnsafeObjectKey(declaredName),
+        quoted: UNSAFE_OBJECT_KEY_NAME_REGEXP.test(declaredName),
         value: result,
       };
     }),

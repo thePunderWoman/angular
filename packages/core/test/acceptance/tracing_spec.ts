@@ -10,12 +10,11 @@ import {
   afterEveryRender,
   Component,
   provideZoneChangeDetection,
-  signal,
   ɵTracingAction as TracingAction,
   ɵTracingService as TracingService,
   ɵTracingSnapshot as TracingSnapshot,
 } from '../../src/core';
-import {TestBed} from '../../testing';
+import {fakeAsync, TestBed} from '../../testing';
 
 describe('TracingService', () => {
   beforeEach(() => {
@@ -28,15 +27,13 @@ describe('TracingService', () => {
   let fakeSnapshot: TracingSnapshot;
   let mockTracingService: TracingService<TracingSnapshot>;
   let clickCount: number;
-  let createdComponents: (string | null)[];
 
   beforeEach(() => {
     actions = [];
     listeners = [];
     clickCount = 0;
-    createdComponents = [];
     fakeSnapshot = {
-      run: <T>(action: TracingAction, fn: () => T): T => {
+      run: function <T>(action: TracingAction, fn: () => T): T {
         actions.push(action);
         return fn();
       },
@@ -57,10 +54,6 @@ describe('TracingService', () => {
           listeners.push({event, handler});
           return handler;
         }),
-      componentCreate: (name, fn) => {
-        createdComponents.push(name);
-        return fn();
-      },
     };
   });
 
@@ -86,7 +79,7 @@ describe('TracingService', () => {
     expect(actions).toEqual([TracingAction.CHANGE_DETECTION, TracingAction.CHANGE_DETECTION]);
   });
 
-  it('should take a snapshot after `afterRender`', async () => {
+  it('should take a snapshot after `afterRender`', fakeAsync(() => {
     TestBed.configureTestingModule({
       providers: [{provide: TracingService, useValue: mockTracingService}],
     });
@@ -107,9 +100,9 @@ describe('TracingService', () => {
       TracingAction.CHANGE_DETECTION,
       TracingAction.AFTER_NEXT_RENDER,
     ]);
-  });
+  }));
 
-  it('should be able to wrap event listeners through the tracing service', async () => {
+  it('should be able to wrap event listeners through the tracing service', fakeAsync(() => {
     TestBed.configureTestingModule({
       providers: [{provide: TracingService, useValue: mockTracingService}],
     });
@@ -120,7 +113,7 @@ describe('TracingService', () => {
     }
 
     const fixture = TestBed.createComponent(App);
-    await fixture.whenStable();
+    fixture.detectChanges();
 
     expect(listeners).toEqual([
       {event: 'click', handler: jasmine.any(Function)},
@@ -129,55 +122,8 @@ describe('TracingService', () => {
     expect(clickCount).toBe(0);
 
     fixture.nativeElement.querySelector('button').click();
-    await fixture.whenStable();
+    fixture.detectChanges();
 
     expect(clickCount).toBe(1);
-  });
-
-  it('should trace component creations', () => {
-    TestBed.configureTestingModule({
-      providers: [{provide: TracingService, useValue: mockTracingService}],
-    });
-
-    @Component({template: 'hello', selector: 'grandchild'})
-    class GrandChild {}
-
-    @Component({template: 'extra', selector: 'extra'})
-    class Extra {}
-
-    @Component({
-      template: '<grandchild/>',
-      selector: 'child',
-      imports: [GrandChild],
-    })
-    class Child {}
-
-    @Component({
-      template: ` <child />
-        <child />
-
-        @if (showExtra()) {
-          <extra />
-        }`,
-      imports: [Child, Extra],
-    })
-    class App {
-      showExtra = signal(false);
-    }
-
-    const fixture = TestBed.createComponent(App);
-    fixture.detectChanges();
-    expect(createdComponents).toEqual(['App', 'Child', 'Child', 'GrandChild', 'GrandChild']);
-
-    fixture.componentInstance.showExtra.set(true);
-    fixture.detectChanges();
-    expect(createdComponents).toEqual([
-      'App',
-      'Child',
-      'Child',
-      'GrandChild',
-      'GrandChild',
-      'Extra',
-    ]);
-  });
+  }));
 });

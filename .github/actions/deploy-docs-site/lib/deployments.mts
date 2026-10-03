@@ -1,9 +1,6 @@
-import {
-  fetchLongTermSupportBranchesFromNpm,
-  ActiveReleaseTrains,
-  AuthenticatedGitClient,
-  ReleaseConfig,
-} from '@angular/ng-dev';
+import {fetchLongTermSupportBranchesFromNpm, ActiveReleaseTrains} from '@angular/ng-dev';
+import {ReleaseConfig} from '@angular/ng-dev';
+import {AuthenticatedGitClient} from '@angular/ng-dev';
 
 export interface Deployment {
   branch: string;
@@ -12,7 +9,6 @@ export interface Deployment {
     to: string;
   };
   destination?: string;
-  servingUrl: string;
 }
 
 export type Deployments = Map<string, Deployment>;
@@ -35,7 +31,6 @@ export async function getDeployments(): Promise<Deployments> {
     docSites.set(branch.name, {
       branch: branch.name,
       destination: `v${branch.version.major}-angular-dev`,
-      servingUrl: `https://v${branch.version.major}.angular.dev/`,
     });
   });
 
@@ -45,14 +40,12 @@ export async function getDeployments(): Promise<Deployments> {
       from: `v${releaseTrains.latest.version.major}-angular-dev`,
       to: 'https://angular.dev',
     },
-    servingUrl: 'https://angular.dev/',
     destination: 'angular-dev-site',
   });
 
   if (releaseTrains.releaseCandidate) {
     docSites.set(releaseTrains.next.branchName, {
       branch: releaseTrains.next.branchName,
-      servingUrl: 'https://next.angular.dev/',
     });
 
     docSites.set(releaseTrains.releaseCandidate.branchName, {
@@ -62,13 +55,11 @@ export async function getDeployments(): Promise<Deployments> {
         from: `v${releaseTrains.releaseCandidate.version.major}-angular-dev`,
         to: 'https://next.angular.dev',
       },
-      servingUrl: 'https://next.angular.dev/',
     });
   } else {
     docSites.set(releaseTrains.next.branchName, {
       branch: releaseTrains.next.branchName,
       destination: 'next-angular-dev',
-      servingUrl: 'https://next.angular.dev/',
     });
   }
 

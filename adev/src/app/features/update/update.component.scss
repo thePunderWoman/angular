@@ -1,13 +1,12 @@
 @use '@angular/docs/styles/media-queries' as mq;
-@use '@angular/docs/styles/links' as links;
 
-$ver-dropdown-width: clamp(165px, 20vw, 200px);
+$ver-dropdown-width: 200px;
 
 :host {
   display: flex;
   flex-flow: column;
   align-items: center;
-  padding: var(--layout-padding);
+  padding: var(--layout-padding) 0px;
   container: update-guide-page / inline-size;
 
   .docs-viewer {
@@ -47,6 +46,8 @@ h4 {
 }
 
 .wizard {
+  padding-inline: 1rem;
+
   .show-button {
     display: block;
     margin-block-start: 2rem;
@@ -65,7 +66,6 @@ h4 {
   transform: translateY(-0.7rem);
   max-height: 200px;
   overflow-y: auto;
-  overscroll-behavior: contain;
   width: $ver-dropdown-width;
   box-sizing: border-box;
   background: var(--page-background);
@@ -126,63 +126,14 @@ h4 {
 
 .adev-recommendation-item {
   display: flex;
+  align-items: center;
 
-  mat-checkbox {
-    margin-top: 0.5rem;
-  }
-
-  .adev-recommendation-content {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    cursor: pointer;
-  }
-
-  .adev-complexity-badge {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    white-space: nowrap;
-    flex-shrink: 0;
-
-    --badge-color: var(--primary-text, black);
-
-    color: var(--badge-color);
-    background: color-mix(in srgb, var(--badge-color) 10%, var(--page-background));
-
-    .docs-dark-mode & {
-      background: color-mix(in srgb, var(--badge-color) 17%, var(--page-background));
-    }
-
-    @include mq.for-tablet-landscape-down {
-      display: none;
-    }
-  }
-
-  .adev-complexity-1 {
-    --badge-color: var(--super-green);
-  }
-  .adev-complexity-2 {
-    --badge-color: var(--bright-blue);
-  }
-  .adev-complexity-3 {
-    --badge-color: var(--symbolic-orange);
+  > div {
+    margin-inline-start: 2rem;
   }
 
   // Code blocks are generable from the markdown, we need to opt-out of the scoping
-  ::ng-deep {
-    code {
-      cursor: pointer;
-    }
-
-    // External links (rendered with target="_blank") get an "open in new" icon
-    a[target='_blank'] {
-      @include links.external-link-with-icon;
-    }
+  ::ng-deep code {
+    cursor: pointer;
   }
 }

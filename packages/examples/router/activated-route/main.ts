@@ -8,13 +8,8 @@
 
 import 'zone.js';
 
-import {bootstrapApplication, provideProtractorTestingSupport} from '@angular/platform-browser';
-import {ApplicationConfig, provideZoneChangeDetection} from '@angular/core';
-import {provideRouter} from '@angular/router';
-import {ActivatedRouteComponent} from './activated_route_component';
+import {platformBrowser} from '@angular/platform-browser';
 
-const appConfig: ApplicationConfig = {
-  providers: [provideRouter([]), provideZoneChangeDetection(), provideProtractorTestingSupport()],
-};
+import {AppModule} from './module';
 
-bootstrapApplication(ActivatedRouteComponent, appConfig).catch((err) => console.error(err));
+platformBrowser().bootstrapModule(AppModule);

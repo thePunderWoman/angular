@@ -8,7 +8,7 @@ For example, consider a component that fetches user data from an API. The code r
 
 ## Unhandled errors are reported to the `ErrorHandler`
 
-Angular reports unhandled errors to the application's root `ErrorHandler`. When providing a custom `ErrorHandler`, provide it in your `ApplicationConfig` as part of calling `bootstrapApplication`.
+Angular reports unhandled errors to the application's root [ErrorHandler](api/core/ErrorHandler). When providing a custom `ErrorHandler`, provide it in your `ApplicationConfig` as part of calling `bootstrapApplication`.
 
 When building an Angular application, often you write code that is called automatically _by_ the framework. For example, Angular is responsible for calling a component's constructor and lifecycle methods when that component appears in a template. When the framework runs your code, there's nowhere you could reasonably add a `try` block to gracefully handle errors. In situations like this, Angular catches errors and sends them to the `ErrorHandler`.
 
@@ -16,49 +16,16 @@ Angular does _not_ catch errors inside of APIs that are called directly by your 
 
 Angular catches _asynchronous_ errors from user promises or observables only when:
 
-- There is an explicit contract for Angular to wait for and use the result of the asynchronous operation, and
-- When errors are not presented in the return value or state.
+* There is an explicit contract for Angular to wait for and use the result of the asynchronous operation, and
+* When errors are not presented in the return value or state.
 
 For example, `AsyncPipe` and `PendingTasks.run` forward errors to the `ErrorHandler`, whereas `resource` presents the error in the `status` and `error` properties.
 
 Errors that Angular reports to the `ErrorHandler` are _unexpected_ errors. These errors may be unrecoverable or an indication that the state of the application is corrupted. Applications should provide error handling using `try` blocks or appropriate error handling operators (like `catchError` in RxJS) where the error occurs whenever possible rather than relying on the `ErrorHandler`, which is most frequently and appropriately used only as a mechanism to report potentially fatal errors to the error tracking and logging infrastructure.
 
-```ts
-export class GlobalErrorHandler implements ErrorHandler {
-  private readonly analyticsService = inject(AnalyticsService);
-  private readonly router = inject(Router);
-
-  handleError(error: any) {
-    const url = this.router.url;
-    const errorMessage = error?.message ?? 'unknown';
-
-    this.analyticsService.trackEvent({
-      eventName: 'exception',
-      description: `Screen: ${url} | ${errorMessage}`,
-    });
-
-    console.error(GlobalErrorHandler.name, {error});
-  }
-}
-```
-
 ### `TestBed` rethrows errors by default
 
 In many cases, `ErrorHandler` may only log errors and otherwise allow the application to continue running. In tests, however, you almost always want to surface these errors. Angular's `TestBed` rethrows unexpected errors to ensure that errors caught by the framework cannot be unintentionally missed or ignored. In rare circumstances, a test may specifically attempt to ensure errors do not cause the application to be unresponsive or crash. In these situations, you can [configure `TestBed` to _not_ rethrow application errors](api/core/testing/TestModuleMetadata#rethrowApplicationErrors) with `TestBed.configureTestingModule({rethrowApplicationErrors: false})`.
-
-### Errors thrown while your app is still starting up
-
-There's a brief moment when Angular can't send errors to your `ErrorHandler` yet: while it is still creating your app's root module or root component. Angular needs that root instance to exist before it can look up the `ErrorHandler` you provided, so an error thrown before then has nowhere to go. It behaves like a normal uncaught error instead of being reported through `ErrorHandler`.
-
-You're most likely to run into this with [Angular elements](guide/elements). If you define a custom element while its tag is already present on the page, the browser upgrades it right away, running the component's constructor and `ngOnInit` as part of that early startup work. Any error thrown there can get lost.
-
-If this happens to you, move the code that throws so it runs after your app has finished starting up, for example:
-
-- Wrap it in `setTimeout(() => /* your code */)` so it runs on its own turn instead of during startup.
-- Provide it as an `APP_BOOTSTRAP_LISTENER` instead of running it from a constructor.
-- Define your custom elements in `ngDoBootstrap` instead of your root module's constructor.
-
-Turning on `provideBrowserGlobalErrorListeners()` (see below) can also help catch these errors, since they still reach the browser as uncaught errors.
 
 ## Global error listeners
 
@@ -66,7 +33,7 @@ Errors that are caught neither by the application code nor by the framework's ap
 
 ### Client-side rendering
 
-Adding [`provideBrowserGlobalErrorListeners()`](/api/core/provideBrowserGlobalErrorListeners) to the [ApplicationConfig](guide/di/defining-dependency-providers#application-bootstrap) adds the `'error'` and `'unhandledrejection'` listeners to the browser window and forwards those errors to `ErrorHandler`. The Angular CLI generates new applications with this provider by default. The Angular team recommends handling these global errors for most applications, either with the framework's built-in listeners or with your own custom listeners. If you provide custom listeners, you can remove `provideBrowserGlobalErrorListeners`.
+Adding [`provideBrowserGlobalErrorListeners()`](/api/core/provideBrowserGlobalErrorListeners) to the [ApplicationConfig](guide/di/dependency-injection#at-the-application-root-level-using-applicationconfig) adds the `'error'` and `'unhandledrejection'` listeners to the browser window and forwards those errors to `ErrorHandler`. The Angular CLI generates new applications with this provider by default. The Angular team recommends handling these global errors for most applications, either with the framework's built-in listeners or with your own custom listeners. If you provide custom listeners, you can remove `provideBrowserGlobalErrorListeners`.
 
 ### Server-side and hybrid rendering
 

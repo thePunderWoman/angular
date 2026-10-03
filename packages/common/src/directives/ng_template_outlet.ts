@@ -9,10 +9,10 @@
 import {
   Directive,
   EmbeddedViewRef,
-  inject,
   Injector,
   Input,
   OnChanges,
+  SimpleChange,
   SimpleChanges,
   TemplateRef,
   ViewContainerRef,
@@ -41,8 +41,6 @@ import {
  * {@example common/ngTemplateOutlet/ts/module.ts region='NgTemplateOutlet'}
  *
  * @publicApi
- *
- * @see [Using NgTemplateOutlet](guide/templates/ng-template#using-ngtemplateoutlet)
  */
 @Directive({
   selector: '[ngTemplateOutlet]',
@@ -63,13 +61,8 @@ export class NgTemplateOutlet<C = unknown> implements OnChanges {
    */
   @Input() public ngTemplateOutlet: TemplateRef<C> | null | undefined = null;
 
-  /**
-   * Injector to be used within the embedded view. A value of "outlet" can be used to indicate
-   * that the injector should be inherited from the template outlet's location in the instantiated DOM.
-   */
-  @Input() public ngTemplateOutletInjector: Injector | 'outlet' | null | undefined = null;
-
-  protected injector = inject(Injector);
+  /** Injector to be used within the embedded view. */
+  @Input() public ngTemplateOutletInjector: Injector | null | undefined = null;
 
   constructor(private _viewContainerRef: ViewContainerRef) {}
 
@@ -91,19 +84,9 @@ export class NgTemplateOutlet<C = unknown> implements OnChanges {
       // without having to destroy and re-create views whenever the context changes.
       const viewContext = this._createContextForwardProxy();
       this._viewRef = viewContainerRef.createEmbeddedView(this.ngTemplateOutlet, viewContext, {
-        injector: this._getInjector(),
+        injector: this.ngTemplateOutletInjector ?? undefined,
       });
     }
-  }
-
-  /**
-   * Gets the injector to use for the template outlet based on ngTemplateOutletInjector.
-   */
-  private _getInjector(): Injector | undefined {
-    if (this.ngTemplateOutletInjector === 'outlet') {
-      return this.injector;
-    }
-    return this.ngTemplateOutletInjector ?? undefined;
   }
 
   /**

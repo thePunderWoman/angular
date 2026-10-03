@@ -53,7 +53,8 @@ export function checkForPrivateExports(
   const exportedSymbols = checker.getExportsOfModule(moduleSymbol);
 
   // Loop through the exported symbols, de-alias if needed, and add them to `topLevelExports`.
-  for (let symbol of exportedSymbols) {
+  // TODO(alxhub): use proper iteration when build.sh is removed. (#27762)
+  exportedSymbols.forEach((symbol) => {
     if (symbol.flags & ts.SymbolFlags.Alias) {
       symbol = checker.getAliasedSymbol(symbol);
     }
@@ -61,7 +62,7 @@ export function checkForPrivateExports(
     if (decl !== undefined) {
       topLevelExports.add(decl);
     }
-  }
+  });
 
   // Next, go through each exported class and expand it to the set of classes it makes Visible,
   // using the `ReferenceGraph`. For each Visible class, verify that it's also Exported, and queue
@@ -69,12 +70,13 @@ export function checkForPrivateExports(
   const checkedSet = new Set<DeclarationNode>();
 
   // Loop through each Exported class.
-  for (const mainExport of topLevelExports) {
+  // TODO(alxhub): use proper iteration when the legacy build is removed. (#27762)
+  topLevelExports.forEach((mainExport) => {
     // Loop through each class made Visible by the Exported class.
-    for (const transitiveReference of refGraph.transitiveReferencesOf(mainExport)) {
+    refGraph.transitiveReferencesOf(mainExport).forEach((transitiveReference) => {
       // Skip classes which have already been checked.
       if (checkedSet.has(transitiveReference)) {
-        continue;
+        return;
       }
       checkedSet.add(transitiveReference);
 
@@ -104,8 +106,8 @@ export function checkForPrivateExports(
 
         diagnostics.push(diagnostic);
       }
-    }
-  }
+    });
+  });
 
   return diagnostics;
 }

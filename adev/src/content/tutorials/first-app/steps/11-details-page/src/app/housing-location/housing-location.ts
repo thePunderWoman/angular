@@ -1,10 +1,10 @@
 import {Component, input} from '@angular/core';
 import {HousingLocationInfo} from '../housinglocation';
-import {RouterLink} from '@angular/router';
+import {RouterModule} from '@angular/router';
 
 @Component({
   selector: 'app-housing-location',
-  imports: [RouterLink],
+  imports: [RouterModule],
   template: `
     <section class="listing">
       <img
@@ -13,7 +13,7 @@ import {RouterLink} from '@angular/router';
         alt="Exterior photo of {{ housingLocation().name }}"
         crossorigin
       />
-      <h2 class="listing-heading">{{ housingLocation().name }}</h2>
+      <h2 class="listing-heading">{{ housingLocatio()).name }}</h2>
       <p class="listing-location">{{ housingLocation().city }}, {{ housingLocation().state }}</p>
     </section>
   `,

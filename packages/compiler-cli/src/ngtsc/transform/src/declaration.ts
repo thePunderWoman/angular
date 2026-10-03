@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {isUnsafeObjectKey, Type} from '@angular/compiler';
+import {Type} from '@angular/compiler';
 import ts from 'typescript';
 
 import {ImportRewriter, ReferenceEmitter} from '../../imports';
@@ -175,9 +175,7 @@ export class IvyDeclarationDtsTransform implements DtsTransform {
       markForEmitAsSingleLine(typeRef);
       return ts.factory.createPropertyDeclaration(
         /* modifiers */ modifiers,
-        /* name */ isUnsafeObjectKey(decl.name)
-          ? ts.factory.createStringLiteral(decl.name)
-          : decl.name,
+        /* name */ decl.name,
         /* questionOrExclamationToken */ undefined,
         /* type */ typeRef,
         /* initializer */ undefined,

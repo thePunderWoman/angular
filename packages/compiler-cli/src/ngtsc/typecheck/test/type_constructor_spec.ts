@@ -6,11 +6,9 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 import ts from 'typescript';
-import {ClassPropertyMapping, TcbInputMapping} from '@angular/compiler';
 
 import {
   absoluteFrom,
-  absoluteFromSourceFile,
   getFileSystem,
   getSourceFileOrError,
   LogicalFileSystem,
@@ -25,16 +23,20 @@ import {
   Reference,
   ReferenceEmitter,
 } from '../../imports';
-import {InputMapping} from '../../metadata';
+import {ClassPropertyMapping, InputMapping} from '../../metadata';
 import {NOOP_PERF_RECORDER} from '../../perf';
-import {InliningMode, TsCreateProgramDriver, UpdateMode} from '../../program_driver';
+import {TsCreateProgramDriver, UpdateMode} from '../../program_driver';
 import {isNamedClassDeclaration, TypeScriptReflectionHost} from '../../reflection';
 import {getDeclaration, makeProgram} from '../../testing';
 import {getRootDirs} from '../../util/src/typescript';
-import {PendingFileTypeCheckingData, TypeCheckContextImpl, TypeCheckingHost} from '../src/context';
+import {
+  InliningMode,
+  PendingFileTypeCheckingData,
+  TypeCheckContextImpl,
+  TypeCheckingHost,
+} from '../src/context';
 import {DirectiveSourceManager} from '../src/source';
 import {TypeCheckFile} from '../src/type_check_file';
-import {TypeCheckShimGenerator} from '../src/shim';
 import {ALL_ENABLED_CONFIG} from '../testing';
 
 runInEachFileSystem(() => {
@@ -59,9 +61,10 @@ runInEachFileSystem(() => {
         _('/_typecheck_.ts'),
         ALL_ENABLED_CONFIG,
         new ReferenceEmitter([]),
+        /* reflector */ null!,
         host,
       );
-      const sf = file.render();
+      const sf = file.render(false /* removeComments */);
       expect(sf).toContain('export const IS_A_MODULE = true;');
     });
 
@@ -120,6 +123,7 @@ TestClass.ngTypeCtor({value: 'test'});
             body: true,
             fields: {
               inputs: ClassPropertyMapping.fromMappedObject<InputMapping>({value: 'value'}),
+              queries: [],
             },
             coercedInputFields: new Set(),
           },
@@ -175,6 +179,7 @@ TestClass.ngTypeCtor({value: 'test'});
             body: true,
             fields: {
               inputs: ClassPropertyMapping.fromMappedObject<InputMapping>({value: 'value'}),
+              queries: ['queryField'],
             },
             coercedInputFields: new Set(),
           },
@@ -240,27 +245,34 @@ TestClass.ngTypeCtor({value: 'test'});
             fnName: 'ngTypeCtor',
             body: true,
             fields: {
-              inputs: ClassPropertyMapping.fromMappedObject<TcbInputMapping>({
-                foo: {
-                  classPropertyName: 'foo',
-                  bindingPropertyName: 'foo',
-                  required: false,
-                  isSignal: false,
-                },
-                bar: {
-                  classPropertyName: 'bar',
-                  bindingPropertyName: 'bar',
-                  required: false,
-                  isSignal: false,
-                },
+              inputs: ClassPropertyMapping.fromMappedObject<InputMapping>({
+                foo: 'foo',
+                bar: 'bar',
                 baz: {
                   classPropertyName: 'baz',
                   bindingPropertyName: 'baz',
                   required: false,
                   isSignal: false,
-                  transformType: 'boolean | string',
+                  transform: {
+                    type: new Reference(
+                      ts.factory.createUnionTypeNode([
+                        ts.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword),
+                        ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                      ]),
+                    ),
+                    node: ts.factory.createFunctionDeclaration(
+                      undefined,
+                      undefined,
+                      undefined,
+                      undefined,
+                      [],
+                      undefined,
+                      undefined,
+                    ),
+                  },
                 },
               }),
+              queries: [],
             },
             coercedInputFields: new Set(['bar', 'baz']),
           },

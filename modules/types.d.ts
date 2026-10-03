@@ -8,6 +8,7 @@
 
 // This file contains all ambient imports needed to compile the modules/ source code
 
+/// <reference types="hammerjs" />
 /// <reference types="jasmine" />
 /// <reference types="jasminewd2" />
 /// <reference types="node" />

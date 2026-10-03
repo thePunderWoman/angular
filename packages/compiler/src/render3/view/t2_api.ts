@@ -6,14 +6,12 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {AST, BindingPipe} from '../../expression_parser/ast';
-import {ClassPropertyMapping} from '../../property_mapping';
+import {AST} from '../../expression_parser/ast';
 import {
   BoundAttribute,
   BoundEvent,
   Component,
   Content,
-  ContentBlock,
   DeferredBlock,
   DeferredBlockError,
   DeferredBlockLoading,
@@ -28,7 +26,7 @@ import {
   LetDeclaration,
   Node,
   Reference,
-  SwitchBlockCaseGroup,
+  SwitchBlockCase,
   Template,
   TextAttribute,
   Variable,
@@ -37,7 +35,7 @@ import {
 /** Node that has a `Scope` associated with it. */
 export type ScopedNode =
   | Template
-  | SwitchBlockCaseGroup
+  | SwitchBlockCase
   | IfBlockBranch
   | ForLoopBlock
   | ForLoopBlockEmpty
@@ -46,30 +44,19 @@ export type ScopedNode =
   | DeferredBlockLoading
   | DeferredBlockPlaceholder
   | Content
-  | ContentBlock
   | HostElement;
 
 /** Possible values that a reference can be resolved to. */
 export type ReferenceTarget<DirectiveT> =
-  {directive: DirectiveT; node: Exclude<DirectiveOwner, HostElement>} | Element | Template;
+  | {directive: DirectiveT; node: Exclude<DirectiveOwner, HostElement>}
+  | Element
+  | Template;
 
 /** Entity that is local to the template and defined within the template. */
 export type TemplateEntity = Reference | Variable | LetDeclaration;
 
 /** Nodes that can have directives applied to them. */
 export type DirectiveOwner = Element | Template | Component | Directive | HostElement;
-
-/** Information about a host directive binding that was exposed under conflicting aliases. */
-export interface ConflictingHostDirectiveBinding<DirectiveT> {
-  /** Metadata of the directive that the binding belongs to. */
-  directive: DirectiveT;
-  /** Name of the class member that the binding would write into. */
-  classPropertyName: string;
-  /** Aliases that caused the conflict. */
-  conflictingAliases: Set<string>;
-  /** Type of the binding. */
-  kind: 'input' | 'output';
-}
 
 /*
  * t2 is the replacement for the `TemplateDefinitionBuilder`. It handles the operations of
@@ -92,6 +79,16 @@ export interface Target<DirectiveT> {
 }
 
 /**
+ * A data structure which can indicate whether a given property name is present or not.
+ *
+ * This is used to represent the set of inputs or outputs present on a directive, and allows the
+ * binder to query for the presence of a mapping for property names.
+ */
+export interface InputOutputPropertySet {
+  hasBindingPropertyName(propertyName: string): boolean;
+}
+
+/**
  * A data structure which captures the animation trigger names that are statically resolvable
  * and whether some names could not be statically evaluated.
  */
@@ -110,14 +107,6 @@ export interface DirectiveMeta {
    */
   name: string;
 
-  /** Reference to the directive declaration site. */
-  ref: {
-    /** Key that uniquely identifies the reference. */
-    key: string;
-
-    // Normally we have some more fields here depending on where the reference originated from.
-  };
-
   /** The selector for the directive or `null` if there isn't one. */
   selector: string | null;
 
@@ -131,14 +120,14 @@ export interface DirectiveMeta {
    *
    * Goes from property names to field names.
    */
-  inputs: ClassPropertyMapping;
+  inputs: InputOutputPropertySet;
 
   /**
    * Set of outputs which this directive claims.
    *
    * Goes from property names to field names.
    */
-  outputs: ClassPropertyMapping;
+  outputs: InputOutputPropertySet;
 
   /**
    * Name under which the directive is exported, if any (exportAs in Angular).
@@ -167,30 +156,6 @@ export interface DirectiveMeta {
    * Only includes the legacy animation names.
    */
   animationTriggerNames: LegacyAnimationTriggerNames | null;
-
-  /** Tracks how the directive was matched. */
-  matchSource: MatchSource;
-}
-
-/**
- * Metadata regarding a foreign component that's needed to match it against template elements.
- */
-export interface ForeignComponentMeta {
-  /**
-   * Name of the foreign component (used for matching and debugging).
-   */
-  name: string;
-}
-
-/**
- * Possible ways that a directive can be matched.
- */
-export enum MatchSource {
-  /** The directive was matched by its selector. */
-  Selector,
-
-  /** The directive was applied as a host directive. */
-  HostDirective,
 }
 
 /**
@@ -222,12 +187,6 @@ export interface BoundTarget<DirectiveT extends DirectiveMeta> {
    * which matched the node, if any.
    */
   getDirectivesOfNode(node: DirectiveOwner): DirectiveT[] | null;
-
-  /**
-   * For a given template node (usually an `Element`), get the foreign component that matched
-   * the node, if any.
-   */
-  getForeignComponent(element: Element): ForeignComponentMeta | null;
 
   /**
    * For a given `Reference`, get the reference's target - either an `Element`, a `Template`, or
@@ -316,29 +275,11 @@ export interface BoundTarget<DirectiveT extends DirectiveMeta> {
   /**
    * Whether a given node is located in a `@defer` block.
    */
-  isDeferred(node: DirectiveOwner): boolean;
-
-  /**
-   * Gets the list of `@defer` blocks enclosing a given element, ordered from outermost to innermost.
-   */
-  getDeferBlocksOfNode(node: DirectiveOwner): DeferredBlock[];
-
-  /**
-   * Gets the list of `@defer` blocks enclosing a given pipe, ordered from outermost to innermost.
-   */
-  getDeferBlocksOfPipe(ast: BindingPipe): DeferredBlock[];
+  isDeferred(node: Element): boolean;
 
   /**
    * Checks whether a component/directive that was referenced directly in the template exists.
    * @param name Name of the component/directive.
    */
   referencedDirectiveExists(name: string): boolean;
-
-  /**
-   * Returns any cases of conflicting host bindings that were detected during directive matching.
-   * @param node Node for which to look up the conflicting bindings.
-   */
-  getConflictingHostDirectiveBindings(
-    node: DirectiveOwner,
-  ): ConflictingHostDirectiveBinding<DirectiveT>[] | null;
 }

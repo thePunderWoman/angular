@@ -11,5 +11,3 @@ export {
   getDOM as ɵgetDOM,
   setRootDomAdapter as ɵsetRootDomAdapter,
 } from './dom_adapter';
-export {NavigationAdapterForLocation as ɵNavigationAdapterForLocation} from './location/navigation_adapter_for_location';
-export {PRECOMMIT_HANDLER_SUPPORTED as ɵPRECOMMIT_HANDLER_SUPPORTED} from './navigation/platform_navigation';

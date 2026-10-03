@@ -6,6 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
+import {isNamedClassDeclaration} from '@angular/compiler-cli/src/ngtsc/reflection';
 import {
   LetDeclarationSymbol,
   PotentialDirective,
@@ -13,11 +14,8 @@ import {
   Symbol,
   SymbolKind,
   TcbLocation,
-  TemplateTypeChecker,
   VariableSymbol,
-  isNamedClassDeclaration,
-} from '@angular/compiler-cli';
-
+} from '@angular/compiler-cli/src/ngtsc/typecheck/api';
 import ts from 'typescript';
 
 // Reverse mappings of enum would generate strings
@@ -59,7 +57,6 @@ export function getSymbolDisplayInfo(
   tsLS: ts.LanguageService,
   typeChecker: ts.TypeChecker,
   symbol: ReferenceSymbol | VariableSymbol | LetDeclarationSymbol,
-  templateTypeChecker: TemplateTypeChecker,
 ): DisplayInfo {
   let kind: DisplayInfoKind;
   if (symbol.kind === SymbolKind.Reference) {
@@ -78,12 +75,12 @@ export function getSymbolDisplayInfo(
     symbol.declaration.name,
     kind,
     /* containerName */ undefined,
-    typeChecker.typeToString(templateTypeChecker.getTypeOfSymbol(symbol)!),
+    typeChecker.typeToString(symbol.tsType),
   );
   const quickInfo =
     symbol.kind === SymbolKind.Reference
       ? getQuickInfoFromTypeDefAtLocation(tsLS, symbol.targetLocation)
-      : getQuickInfoFromTypeDefAtLocation(tsLS, symbol.localVarLocation);
+      : getQuickInfoFromTypeDefAtLocation(tsLS, symbol.initializerLocation);
   return {
     kind,
     displayParts,
@@ -167,11 +164,17 @@ export function getDirectiveDisplayInfo(
   dir: PotentialDirective,
 ): DisplayInfo {
   const kind = dir.isComponent ? DisplayInfoKind.COMPONENT : DisplayInfoKind.DIRECTIVE;
-  const filePath = dir.ref.filePath;
-  const position = dir.ref.position;
-  const name = dir.ref.name;
+  const decl = dir.tsSymbol.declarations.find(ts.isClassDeclaration);
+  if (decl === undefined || decl.name === undefined) {
+    return {
+      kind,
+      displayParts: [],
+      documentation: [],
+      tags: undefined,
+    };
+  }
 
-  const res = tsLS.getQuickInfoAtPosition(filePath, position);
+  const res = tsLS.getQuickInfoAtPosition(decl.getSourceFile().fileName, decl.name.getStart());
   if (res === undefined) {
     return {
       kind,
@@ -181,7 +184,12 @@ export function getDirectiveDisplayInfo(
     };
   }
 
-  const displayParts = createDisplayParts(name, kind, dir.ngModule?.name?.text, undefined);
+  const displayParts = createDisplayParts(
+    dir.tsSymbol.name,
+    kind,
+    dir.ngModule?.name?.text,
+    undefined,
+  );
 
   return {
     kind,

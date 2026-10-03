@@ -16,7 +16,7 @@ import {
   HttpResponse,
   HttpXhrBackend,
 } from '@angular/common/http';
-import {inject, Inject, Injectable, Injector, Optional, runInInjectionContext} from '@angular/core';
+import {Inject, Injectable, Optional} from '@angular/core';
 import {Observable} from 'rxjs';
 import {map} from 'rxjs/operators';
 
@@ -58,8 +58,6 @@ import {
  */
 @Injectable()
 export class HttpClientBackendService extends BackendService implements HttpBackend {
-  private injector = inject(Injector);
-
   constructor(
     inMemDbService: InMemoryDbService,
     @Inject(InMemoryBackendConfig) @Optional() config: InMemoryBackendConfigArgs,
@@ -111,7 +109,7 @@ export class HttpClientBackendService extends BackendService implements HttpBack
 
   protected override createPassThruBackend() {
     try {
-      return runInInjectionContext(this.injector, () => new HttpXhrBackend(this.xhrFactory));
+      return new HttpXhrBackend(this.xhrFactory);
     } catch (ex: any) {
       ex.message = 'Cannot create passThru404 backend; ' + (ex.message || '');
       throw ex;

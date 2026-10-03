@@ -8,7 +8,6 @@
 
 import {ɵRuntimeError as RuntimeError} from '@angular/core';
 
-import {RuntimeErrorCode} from '../errors';
 import {
   getLocaleNumberFormat,
   getLocaleNumberSymbol,
@@ -16,6 +15,7 @@ import {
   NumberFormatStyle,
   NumberSymbol,
 } from './locale_data_api';
+import {RuntimeErrorCode} from '../errors';
 
 export const NUMBER_FORMAT_REGEXP = /^(\d+)?\.((\d+)(-(\d+))?)?$/;
 const MAX_DIGITS = 22;
@@ -43,11 +43,7 @@ function formatNumberToLocaleString(
   let isZero = false;
 
   if (!isFinite(value)) {
-    // `Number.isNaN` (not `!isFinite`) so NaN uses the locale NaN symbol, not Infinity.
-    formattedText = getLocaleNumberSymbol(
-      locale,
-      Number.isNaN(value) ? NumberSymbol.NaN : NumberSymbol.Infinity,
-    );
+    formattedText = getLocaleNumberSymbol(locale, NumberSymbol.Infinity);
   } else {
     let parsedNumber = parseNumber(value);
 
@@ -80,20 +76,6 @@ function formatNumberToLocaleString(
         maxFraction = parseIntAutoRadix(maxFractionPart);
       } else if (minFractionPart != null && minFraction > maxFraction) {
         maxFraction = minFraction;
-      }
-
-      // Prevent DoS via resource exhaustion by capping the maximum padding iterations
-      const MAX_ALLOWED_DIGITS = 100;
-      if (
-        minInt > MAX_ALLOWED_DIGITS ||
-        minFraction > MAX_ALLOWED_DIGITS ||
-        maxFraction > MAX_ALLOWED_DIGITS
-      ) {
-        throw new RuntimeError(
-          RuntimeErrorCode.INVALID_DIGIT_INFO,
-          ngDevMode &&
-            `${digitsInfo} is not a valid digit info. Exceeded maximum limits of ${MAX_ALLOWED_DIGITS} digits.`,
-        );
       }
     }
 

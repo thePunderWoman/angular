@@ -27,6 +27,7 @@ export const PRESERVE_HOST_CONTENT_DEFAULT = false;
 export const PRESERVE_HOST_CONTENT = new InjectionToken<boolean>(
   typeof ngDevMode === 'undefined' || ngDevMode ? 'PRESERVE_HOST_CONTENT' : '',
   {
+    providedIn: 'root',
     factory: () => PRESERVE_HOST_CONTENT_DEFAULT,
   },
 );
@@ -50,21 +51,6 @@ export const IS_EVENT_REPLAY_ENABLED = new InjectionToken<boolean>(
 export const EVENT_REPLAY_ENABLED_DEFAULT = false;
 
 /**
- * A type of the queue that stores events occurring during the hydration process.
- */
-export type EventReplayQueue = {
-  event: Event;
-  currentTarget: Element;
-}[];
-
-export const EVENT_REPLAY_QUEUE = new InjectionToken<EventReplayQueue>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'EVENT_REPLAY_QUEUE' : '',
-  {
-    factory: () => [],
-  },
-);
-
-/**
  * Internal token that indicates whether incremental hydration support
  * is enabled.
  */
@@ -76,8 +62,9 @@ export const IS_INCREMENTAL_HYDRATION_ENABLED = new InjectionToken<boolean>(
  * A map of DOM elements with `jsaction` attributes grouped by action names.
  */
 export const JSACTION_BLOCK_ELEMENT_MAP = new InjectionToken<Map<string, Set<Element>>>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'JSACTION_BLOCK_ELEMENT_MAP' : '',
+  typeof ngDevMode !== undefined && ngDevMode ? 'JSACTION_BLOCK_ELEMENT_MAP' : '',
   {
+    providedIn: 'root',
     factory: () => new Map<string, Set<Element>>(),
   },
 );

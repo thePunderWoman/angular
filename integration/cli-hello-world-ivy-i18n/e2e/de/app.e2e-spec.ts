@@ -1,39 +1,33 @@
-import * as webdriver from 'selenium-webdriver';
 import {AppPage} from '../app.po';
-import {createWebDriver, verifyNoBrowserErrors} from '../driver-util';
+import {browser, logging} from 'protractor';
 
-describe('cli-hello-world-ivy App (de)', () => {
-  let driver: webdriver.WebDriver;
+describe('cli-hello-world-ivy App', () => {
   let page: AppPage;
-  const baseUrl = process.env['E2E_BASE_URL'] || 'http://localhost:4207';
-
-  beforeAll(() => {
-    driver = createWebDriver();
-    page = new AppPage(driver, baseUrl);
+  beforeEach(() => {
+    page = new AppPage();
+    page.navigateTo();
   });
 
-  afterAll(async () => {
-    await driver.quit();
+  it('should display title', () => {
+    expect(page.getHeading()).toEqual('Hallo cli-hello-world-ivy-i18n!');
   });
 
-  beforeEach(async () => {
-    await page.navigateTo();
+  it('should display the locale', () => {
+    expect(page.getParagraph('locale')).toEqual('de');
   });
 
-  it('should display title', async () => {
-    expect(await page.getHeading()).toEqual('Hallo cli-hello-world-ivy-i18n!');
-  });
-
-  it('should display the locale', async () => {
-    expect(await page.getParagraph('locale')).toEqual('de');
-  });
-
-  it('the date pipe should show the localized month', async () => {
-    await page.navigateTo();
-    expect(await page.getParagraph('date')).toEqual('Januar');
+  it('the date pipe should show the localized month', () => {
+    page.navigateTo();
+    expect(page.getParagraph('date')).toEqual('Januar');
   });
 
   afterEach(async () => {
-    await verifyNoBrowserErrors(driver);
+    // Assert that there are no errors emitted from the browser
+    const logs = await browser.manage().logs().get(logging.Type.BROWSER);
+    expect(logs).not.toContain(
+      jasmine.objectContaining({
+        level: logging.Level.SEVERE,
+      } as logging.Entry),
+    );
   });
 });

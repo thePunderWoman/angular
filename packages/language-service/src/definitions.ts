@@ -15,14 +15,13 @@ import {
   TmplAstTemplate,
   TmplAstTextAttribute,
 } from '@angular/compiler';
+import {NgCompiler} from '@angular/compiler-cli/src/ngtsc/core';
+import {absoluteFrom} from '@angular/compiler-cli/src/ngtsc/file_system';
+import {isExternalResource, Resource} from '@angular/compiler-cli/src/ngtsc/metadata';
 import {
-  absoluteFrom,
   DirectiveSymbol,
   DomBindingSymbol,
   ElementSymbol,
-  isExternalResource,
-  NgCompiler,
-  Resource,
   SelectorlessComponentSymbol,
   SelectorlessDirectiveSymbol,
   Symbol,
@@ -30,8 +29,7 @@ import {
   TcbLocation,
   TemplateSymbol,
   TemplateTypeChecker,
-} from '@angular/compiler-cli';
-
+} from '@angular/compiler-cli/src/ngtsc/typecheck/api';
 import ts from 'typescript';
 
 import {convertToTemplateDocumentSpan} from './references_and_rename_utils';
@@ -131,7 +129,7 @@ export class DefinitionBuilder {
         // taken to the directive or HTML class.
         return this.getTypeDefinitionsForTemplateInstance(symbol, node);
       case SymbolKind.Pipe: {
-        if (this.ttc.getTsSymbolOfSymbol(symbol) !== null) {
+        if (symbol.tsSymbol !== null) {
           return this.getDefinitionsForSymbols(symbol);
         } else {
           // If there is no `ts.Symbol` for the pipe transform, we want to return the
@@ -173,6 +171,11 @@ export class DefinitionBuilder {
               fileName: mapping.templateUrl,
             });
           }
+        }
+        if (symbol.kind === SymbolKind.Variable || symbol.kind === SymbolKind.LetDeclaration) {
+          definitions.push(
+            ...this.getDefinitionsForSymbols({tcbLocation: symbol.initializerLocation}),
+          );
         }
         return definitions;
       }
@@ -258,7 +261,7 @@ export class DefinitionBuilder {
           break;
         }
         case SymbolKind.Pipe: {
-          if (this.ttc.getTsSymbolOfSymbol(symbol) !== null) {
+          if (symbol.tsSymbol !== null) {
             definitions.push(...this.getTypeDefinitionsForSymbols(symbol));
           } else {
             // If there is no `ts.Symbol` for the pipe transform, we want to return the
@@ -278,7 +281,7 @@ export class DefinitionBuilder {
         case SymbolKind.Variable:
         case SymbolKind.LetDeclaration: {
           definitions.push(
-            ...this.getTypeDefinitionsForSymbols({tcbLocation: symbol.localVarLocation}),
+            ...this.getTypeDefinitionsForSymbols({tcbLocation: symbol.initializerLocation}),
           );
           break;
         }

@@ -6,10 +6,10 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {ImportManager} from '@angular/compiler-cli/private/migrations';
+import {ImportManager} from '@angular/compiler-cli/src/ngtsc/translator';
 import assert from 'assert';
 import ts from 'typescript';
-import {ProgramInfo} from '../../../../utils/tsurge';
+import {ProgramInfo, projectFile, Replacement, TextUpdate} from '../../../../utils/tsurge';
 import {convertToSignalInput} from '../convert-input/convert_to_signal';
 import {KnownInputs} from '../input_detection/known_inputs';
 import {MigrationHost} from '../migration_host';

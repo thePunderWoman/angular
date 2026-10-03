@@ -38,7 +38,6 @@ import {
   Import,
   ImportedTypeValueReference,
   LocalTypeValueReference,
-  reflectObjectLiteral,
   ReflectionHost,
   TypeValueReference,
   TypeValueReferenceKind,
@@ -406,7 +405,7 @@ export function resolveProvidersRequiringFactory(
  * The `value` is the exported declaration of the class from its source file.
  * The `type` is an expression that would be used in the typings (.d.ts) files.
  */
-export function wrapTypeReference(clazz: ClassDeclaration): R3Reference {
+export function wrapTypeReference(reflector: ReflectionHost, clazz: ClassDeclaration): R3Reference {
   const value = new WrappedNodeExpr(clazz.name);
   const type = value;
   return {value, type};
@@ -533,27 +532,4 @@ export function isAbstractClassDeclaration(clazz: ClassDeclaration): boolean {
   return ts.canHaveModifiers(clazz) && clazz.modifiers !== undefined
     ? clazz.modifiers.some((mod) => mod.kind === ts.SyntaxKind.AbstractKeyword)
     : false;
-}
-
-export function parseStandaloneOption(
-  decorator: Readonly<Decorator | null>,
-  evaluator: PartialEvaluator,
-  implicitStandaloneValue: boolean,
-): boolean {
-  if (decorator === null || decorator.args === null || decorator.args.length !== 1) {
-    return implicitStandaloneValue;
-  }
-  const meta = unwrapExpression(decorator.args[0]);
-  if (!ts.isObjectLiteralExpression(meta)) {
-    return implicitStandaloneValue;
-  }
-  const obj = reflectObjectLiteral(meta);
-  if (obj.has('standalone')) {
-    const expr = obj.get('standalone')!;
-    const resolved = evaluator.evaluate(expr);
-    // If the value is not a boolean, default to true so that it falls through to the main analysis
-    // phase which will report a proper diagnostic.
-    return typeof resolved === 'boolean' ? resolved : true;
-  }
-  return implicitStandaloneValue;
 }

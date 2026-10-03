@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {registerLocaleData, DecimalPipe} from '@angular/common';
+import {registerLocaleData} from '@angular/common';
 import {Component} from '@angular/core';
 // we need to import data for the french locale
 import localeFr from './locale-fr';
@@ -16,7 +16,6 @@ registerLocaleData(localeFr, 'fr');
 // #docregion NumberPipe
 @Component({
   selector: 'number-pipe',
-  imports: [DecimalPipe],
   template: `<div>
     <p>
       No specified formatting:
@@ -36,6 +35,7 @@ registerLocaleData(localeFr, 'fr');
       <!--output: '0 003,14159'-->
     </p>
   </div>`,
+  standalone: false,
 })
 export class NumberPipeComponent {
   pi: number = 3.14159265359;

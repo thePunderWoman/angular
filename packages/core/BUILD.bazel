@@ -1,12 +1,8 @@
-load("@bazel_lib//lib:write_source_files.bzl", "write_source_file")
-load("@npm//:defs.bzl", "npm_link_all_packages")
 load("//adev/shared-docs/pipeline/api-gen:generate_api_docs.bzl", "generate_api_docs")
 load("//packages/common/locales:index.bzl", "generate_base_locale_file")
 load("//tools:defaults.bzl", "api_golden_test", "api_golden_test_npm_package", "ng_package", "ng_project", "ts_config", "tsec_test")
 
 package(default_visibility = ["//visibility:public"])
-
-npm_link_all_packages(name = "node_modules")
 
 # This generates the `src/i18n/locale_en.ts` file through the `generate-locales` tool. Since
 # the base locale file is checked-in for Google3, it is additionally stored in a golden location.
@@ -40,7 +36,6 @@ ng_project(
         "//:node_modules/zone.js",
         "//packages:goog_types",
         "//packages/core/primitives/defer:triggers",
-        "//packages/core/primitives/devtools",
         "//packages/core/primitives/di",
         "//packages/core/primitives/dom-navigation",
         "//packages/core/primitives/event-dispatch",
@@ -50,8 +45,6 @@ ng_project(
         "//packages/core/src/interface",
         "//packages/core/src/reflection",
         "//packages/core/src/util",
-        "//packages/core/third_party/@mcp-b/webmcp-types",
-        "//packages/core/third_party/@modelcontextprotocol/server",
     ],
 )
 
@@ -65,26 +58,11 @@ ng_package(
     srcs = [
         "package.json",
         ":event_dispatch_contract_binary",
-        "//packages/core/resources",
-    ],
-    externals = [
-        # Don't bundle vendored `@mcp-b/webmcp-types` dependency.
-        "../third_party/@mcp-b/webmcp-types",
-        "../../third_party/@mcp-b/webmcp-types",
-        "../third_party/@modelcontextprotocol/server",
-        "../../third_party/@modelcontextprotocol/server",
     ],
     nested_packages = [
         "//packages/core/schematics:npm_package",
-        "//packages/core/third_party/@mcp-b/webmcp-types",
-        "//packages/core/third_party/@modelcontextprotocol/server",
     ],
     package = "@angular/core",
-    substitutions = {
-        # Link `@mcp-b/webmcp-types` to the vendored package.
-        "\\./third_party/@mcp-b/webmcp-types": "../third_party/@mcp-b/webmcp-types/index.js",
-        "\\./third_party/@modelcontextprotocol/server": "../third_party/@modelcontextprotocol/server/index.js",
-    },
     tags = [
         "release-with-framework",
     ],
@@ -96,6 +74,9 @@ ng_package(
         "//integration:__subpackages__",
         "//modules/ssr-benchmarks:__subpackages__",
         "//packages/bazel/test/ng_package:__pkg__",
+        "//packages/compiler-cli/src/ngtsc/metadata/test:__subpackages__",
+        "//packages/compiler-cli/src/ngtsc/typecheck/extended/test:__subpackages__",
+        "//packages/compiler-cli/src/ngtsc/typecheck/test:__subpackages__",
         "//packages/compiler-cli/test:__subpackages__",
         "//packages/compiler/test:__pkg__",
         "//packages/language-service/test:__pkg__",
@@ -170,11 +151,4 @@ genrule(
     srcs = ["//packages/core/primitives/event-dispatch:contract_bundle_min.js"],
     outs = ["event-dispatch-contract.min.js"],
     cmd = "cp $< $@",
-)
-
-write_source_file(
-    name = "dom_security_schema",
-    check_that_out_file_exists = False,
-    in_file = "//packages/compiler:src/schema/dom_security_schema.ts",
-    out_file = ":src/sanitization/dom_security_schema.ts",
 )

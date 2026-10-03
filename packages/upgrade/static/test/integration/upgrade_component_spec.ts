@@ -7,7 +7,6 @@
  */
 
 import {
-  ChangeDetectionStrategy,
   Component,
   destroyPlatform,
   Directive,
@@ -108,7 +107,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -162,7 +160,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -209,7 +206,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -259,7 +255,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -316,7 +311,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -367,7 +361,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -422,7 +415,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -511,7 +503,6 @@ withEachNg1Version(() => {
             <ng1D>Ignore this</ng1D>
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -584,7 +575,6 @@ withEachNg1Version(() => {
             | Outside: {{ dataA }}, {{ dataB }}
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           dataA = 'foo';
@@ -665,7 +655,6 @@ withEachNg1Version(() => {
             | Outside: {{ dataA.value }}, {{ dataB.value }}
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           dataA = {value: 'foo'};
@@ -747,7 +736,6 @@ withEachNg1Version(() => {
             <ng1 [(inputAttrA)]="dataA" [(inputB)]="dataB"></ng1>
             | Outside: {{ dataA.value }}, {{ dataB.value }}
           `,
-          changeDetection: ChangeDetectionStrategy.Eager,
           standalone: false,
         })
         class Ng2Component {
@@ -827,7 +815,6 @@ withEachNg1Version(() => {
             | Outside: {{ dataA }}, {{ dataB }}
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           dataA = 'foo';
@@ -927,7 +914,6 @@ withEachNg1Version(() => {
             {{ event }} - {{ last }}, {{ first }}, {{ city }}
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           first = 'Victor';
@@ -1007,7 +993,6 @@ withEachNg1Version(() => {
             {{ dataB.value }}
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           dataA = {value: 'foo'};
@@ -1102,7 +1087,6 @@ withEachNg1Version(() => {
             | {{ someText }} - Data: {{ dataA }} - Length: {{ dataA.length }}
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           someText = 'ng2';
@@ -1183,7 +1167,6 @@ withEachNg1Version(() => {
           selector: 'ng2-x',
           template: 'ng2X(<ng1A></ng1A>)',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2ComponentX {}
 
@@ -1243,7 +1226,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -1296,7 +1278,6 @@ withEachNg1Version(() => {
         @Component({
           selector: 'ng2',
           template: '<ng1A></ng1A>',
-          changeDetection: ChangeDetectionStrategy.Eager,
           standalone: false,
         })
         class Ng2Component {}
@@ -1351,7 +1332,6 @@ withEachNg1Version(() => {
         @Component({
           selector: 'ng2',
           template: '<ng1A></ng1A>',
-          changeDetection: ChangeDetectionStrategy.Eager,
           standalone: false,
         })
         class Ng2Component {}
@@ -1406,7 +1386,6 @@ withEachNg1Version(() => {
         @Component({
           selector: 'ng2',
           template: '<ng1A></ng1A>',
-          changeDetection: ChangeDetectionStrategy.Eager,
           standalone: false,
         })
         class Ng2Component {}
@@ -1465,7 +1444,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -1541,7 +1519,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -1619,7 +1596,6 @@ withEachNg1Version(() => {
             <ng1B title="WORKS"></ng1B>
           `,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -1678,7 +1654,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1 title="WORKS"></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           dataA = 'foo';
@@ -1735,7 +1710,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1 title="WORKS"></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -1801,7 +1775,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -1866,7 +1839,6 @@ withEachNg1Version(() => {
             selector: 'ng2',
             template: '<ng1></ng1>',
             standalone: false,
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class Ng2Component {}
 
@@ -1927,7 +1899,6 @@ withEachNg1Version(() => {
             selector: 'ng2',
             template: '<ng1A></ng1A>',
             standalone: false,
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class Ng2Component {}
 
@@ -1997,7 +1968,6 @@ withEachNg1Version(() => {
             selector: 'ng2-a',
             template: '<ng1A></ng1A>',
             standalone: false,
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class Ng2ComponentA {}
 
@@ -2005,7 +1975,6 @@ withEachNg1Version(() => {
             selector: 'ng2-b',
             template: '<ng1B></ng1B>',
             standalone: false,
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class Ng2ComponentB {}
 
@@ -2013,7 +1982,6 @@ withEachNg1Version(() => {
             selector: 'ng2-c',
             template: '<ng1C></ng1C>',
             standalone: false,
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class Ng2ComponentC {}
 
@@ -2095,7 +2063,6 @@ withEachNg1Version(() => {
             selector: 'ng2',
             template: '<ng1></ng1>',
             standalone: false,
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class Ng2Component {}
 
@@ -2181,7 +2148,6 @@ withEachNg1Version(() => {
             selector: 'ng2',
             template: 'ng2(<div><ng1B></ng1B> | <ng1C></ng1C></div>)',
             standalone: false,
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class Ng2Component {}
 
@@ -2257,7 +2223,6 @@ withEachNg1Version(() => {
             selector: 'ng2',
             template: 'ng2(<div><ng1B></ng1B></div>)',
             standalone: false,
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class Ng2Component {}
 
@@ -2323,7 +2288,6 @@ withEachNg1Version(() => {
             selector: 'ng2',
             template: '<ng1B></ng1B>',
             standalone: false,
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class Ng2Component {}
 
@@ -2396,7 +2360,6 @@ withEachNg1Version(() => {
             selector: 'ng2',
             template: '<ng1C></ng1C>',
             standalone: false,
-            changeDetection: ChangeDetectionStrategy.Eager,
           })
           class Ng2Component {}
 
@@ -2454,7 +2417,6 @@ withEachNg1Version(() => {
           selector: 'ng2A',
           template: 'ng2A(<ng1>{{ value }} | <ng2B *ngIf="showB"></ng2B></ng1>)',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2ComponentA {
           value = 'foo';
@@ -2468,7 +2430,6 @@ withEachNg1Version(() => {
           selector: 'ng2B',
           template: 'ng2B({{ value }})',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2ComponentB {
           value = 'bar';
@@ -2543,7 +2504,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: 'ng2(<ng1>{{ value }}</ng1> | <ng1></ng1>)',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           value = 'from-ng2';
@@ -2614,7 +2574,6 @@ withEachNg1Version(() => {
             </ng1>
             )`,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           x = 'foo';
@@ -2700,7 +2659,6 @@ withEachNg1Version(() => {
             <ng1><content-x>ignored x</content-x><content-y>ignored y</content-y></ng1>
             )`,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           x = 'foo';
@@ -2790,7 +2748,6 @@ withEachNg1Version(() => {
             >
             )`,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           x = 'ng2X';
@@ -2863,7 +2820,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -2928,7 +2884,6 @@ withEachNg1Version(() => {
             </ng1>
             )`,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           x = 'foo';
@@ -3038,7 +2993,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1A [inputA]="data"></ng1A> | <ng1B [inputB]="data"></ng1B>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           data = {foo: 'bar'};
@@ -3201,7 +3155,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1A [inputA]="data"></ng1A> | <ng1B [inputB]="data"></ng1B>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           data = {foo: 'bar'};
@@ -3351,7 +3304,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1A></ng1A> | <ng1B></ng1B>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -3431,7 +3383,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1A></ng1A> | <ng1B></ng1B>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -3512,7 +3463,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1A></ng1A> | <ng1B></ng1B>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -3592,7 +3542,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1A></ng1A> | <ng1B></ng1B>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -3671,7 +3620,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1A></ng1A> | <ng1B></ng1B>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -3767,7 +3715,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1A></ng1A> | <ng1B></ng1B>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -3859,7 +3806,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<div *ngIf="show"><ng1A></ng1A> | <ng1B></ng1B></div>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           @Input() show: boolean = false;
@@ -3969,7 +3915,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<div *ngIf="show"><ng1A></ng1A> | <ng1B></ng1B></div>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           @Input() show: boolean = false;
@@ -4063,7 +4008,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1 value="foo"></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {}
 
@@ -4123,7 +4067,6 @@ withEachNg1Version(() => {
           selector: 'ng2A',
           template: '<ng2B *ngIf="!destroyIt"></ng2B>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2ComponentA {
           destroyIt = false;
@@ -4137,7 +4080,6 @@ withEachNg1Version(() => {
           selector: 'ng2B',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2ComponentB {}
 
@@ -4201,7 +4143,6 @@ withEachNg1Version(() => {
           selector: 'ng2A',
           template: '<ng2B *ngIf="!destroyIt"></ng2B>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2ComponentA {
           destroyIt = false;
@@ -4215,7 +4156,6 @@ withEachNg1Version(() => {
           selector: 'ng2B',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2ComponentB {}
 
@@ -4282,7 +4222,6 @@ withEachNg1Version(() => {
           selector: 'ng2A',
           template: '<ng2B *ngIf="!destroyIt"></ng2B>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2ComponentA {
           destroyIt = false;
@@ -4296,7 +4235,6 @@ withEachNg1Version(() => {
           selector: 'ng2B',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2ComponentB {}
 
@@ -4365,7 +4303,6 @@ withEachNg1Version(() => {
           selector: 'ng2A',
           template: '<ng2B *ngIf="!destroyIt"></ng2B>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2ComponentA {
           destroyIt = false;
@@ -4379,7 +4316,6 @@ withEachNg1Version(() => {
           selector: 'ng2B',
           template: '<ng1></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2ComponentB {}
 
@@ -4442,7 +4378,6 @@ withEachNg1Version(() => {
           selector: 'ng2',
           template: '<ng1 *ngIf="doShow"></ng1>',
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class Ng2Component {
           doShow: boolean = false;
@@ -4514,7 +4449,6 @@ withEachNg1Version(() => {
         selector: 'ng2-a',
         template: 'ng2A(<ng1X></ng1X>)',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Ng2ComponentA {}
 
@@ -4522,7 +4456,6 @@ withEachNg1Version(() => {
         selector: 'ng2-b',
         template: 'ng2B',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Ng2ComponentB {}
 
@@ -4618,7 +4551,6 @@ withEachNg1Version(() => {
           </ng1X>
         `,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Ng2ComponentA {
         ng2ADataA = {value: 'foo'};
@@ -4634,7 +4566,6 @@ withEachNg1Version(() => {
         selector: 'ng2-b',
         template: 'ng2B({{ ng2BInputA }}, {{ ng2BInputC }})',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Ng2ComponentB {
         @Input('ng2BInput1') ng2BInputA: any;
@@ -4806,7 +4737,6 @@ withEachNg1Version(() => {
         selector: 'ng2-a',
         template: 'ng2A(<ng1A></ng1A>)',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Ng2ComponentA {}
 
@@ -4814,7 +4744,6 @@ withEachNg1Version(() => {
         selector: 'ng2-b',
         template: 'ng2B(<ng1B></ng1B>)',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Ng2ComponentB {}
 
@@ -4859,12 +4788,7 @@ withEachNg1Version(() => {
         }
 
         // Define `Ng2Component`
-        @Component({
-          selector: 'ng2',
-          template: '<ng1></ng1>',
-          standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
-        })
+        @Component({selector: 'ng2', template: '<ng1></ng1>', standalone: false})
         class Ng2Component {}
 
         // Define `ng1Module`

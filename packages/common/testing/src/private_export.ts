@@ -8,4 +8,3 @@
 
 export {provideFakePlatformNavigation as ɵprovideFakePlatformNavigation} from './navigation/provide_fake_platform_navigation';
 export {FakeNavigation as ɵFakeNavigation} from './navigation/fake_navigation';
-export {FakeNavigationPlatformLocation as ɵFakeNavigationPlatformLocation} from './mock_platform_location';

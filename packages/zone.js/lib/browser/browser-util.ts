@@ -31,7 +31,7 @@ export function patchCallbacks(
         // We don't want to stop the application rendering if we couldn't patch some
         // callback, e.g. `attributeChangedCallback`.
         try {
-          if (Object.hasOwn(prototype, callback)) {
+          if (prototype.hasOwnProperty(callback)) {
             const descriptor = api.ObjectGetOwnPropertyDescriptor(prototype, callback);
             if (descriptor && descriptor.value) {
               descriptor.value = api.wrapWithCurrentZone(descriptor.value, source);

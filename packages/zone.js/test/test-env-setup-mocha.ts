@@ -33,7 +33,7 @@ declare const global: any;
       let isEqual = true;
 
       for (let prop in a) {
-        if (Object.hasOwn(a, prop)) {
+        if (a.hasOwnProperty(prop)) {
           if (!eq(a[prop], b[prop])) {
             isEqual = false;
             break;
@@ -50,7 +50,7 @@ declare const global: any;
       let isEqual = true;
 
       for (let prop in a) {
-        if (Object.hasOwn(a, prop)) {
+        if (a.hasOwnProperty(prop)) {
           if (!eq(a[prop], b[prop])) {
             isEqual = false;
             break;

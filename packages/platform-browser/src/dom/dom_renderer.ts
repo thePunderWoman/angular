@@ -15,21 +15,18 @@ import {
   InjectionToken,
   NgZone,
   OnDestroy,
+  PLATFORM_ID,
   Renderer2,
   RendererFactory2,
   RendererStyleFlags2,
   RendererType2,
   ViewEncapsulation,
-  ɵdescribeDomNode as describeDomNode,
   ɵRuntimeError as RuntimeError,
   type ListenerOptions,
   ɵTracingService as TracingService,
   ɵTracingSnapshot as TracingSnapshot,
   Optional,
   ɵallLeavingAnimations as allLeavingAnimations,
-  ɵSHARED_STYLES_HOST as SHARED_STYLES_HOST,
-  makeEnvironmentProviders,
-  type EnvironmentProviders,
 } from '@angular/core';
 
 import {RuntimeErrorCode} from '../errors';
@@ -47,7 +44,7 @@ export const NAMESPACE_URIS: {[ns: string]: string} = {
 };
 
 const COMPONENT_REGEX = /%COMP%/g;
-const SOURCEMAP_URL_REGEXP = /\/\*#\s*sourceMappingURL=([^\s*]+)\s*\*\//;
+const SOURCEMAP_URL_REGEXP = /\/\*#\s*sourceMappingURL=(.+?)\s*\*\//;
 const PROTOCOL_REGEXP = /^https?:/;
 
 export const COMPONENT_VARIABLE = '%COMP%';
@@ -67,38 +64,12 @@ const REMOVE_STYLES_ON_COMPONENT_DESTROY_DEFAULT = true;
  * @publicApi
  */
 export const REMOVE_STYLES_ON_COMPONENT_DESTROY = new InjectionToken<boolean>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'RemoveStylesOnCompDestroy' : '',
+  typeof ngDevMode !== undefined && ngDevMode ? 'RemoveStylesOnCompDestroy' : '',
   {
+    providedIn: 'root',
     factory: () => REMOVE_STYLES_ON_COMPONENT_DESTROY_DEFAULT,
   },
 );
-
-/**
- * An injection token that allows an application to configure a prefix to be used for all
- * CSS variables generated compiled with CSS namespacing enabled.
- *
- * Typically set via {@link provideCssVarNamespacing}.
- */
-export const CSS_VAR_NAMESPACE = new InjectionToken<string>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'CSS_VAR_NAMESPACE' : '',
-);
-
-/**
- * Configures the application to use the given namespace for all CSS variables.
- *
- * @param namespace The prefix string to use as a namespace. If not provided, it defaults
- *     to the `APP_ID`. An underscore is appended unconditionally.
- * @publicApi
- */
-export function provideCssVarNamespacing(namespace?: string): EnvironmentProviders {
-  return makeEnvironmentProviders([
-    {
-      provide: CSS_VAR_NAMESPACE,
-      useFactory: (appId: string) => `${namespace ?? appId}_`,
-      deps: [APP_ID],
-    },
-  ]);
-}
 
 export function shimContentAttribute(componentShortId: string): string {
   return CONTENT_ATTR.replace(COMPONENT_REGEX, componentShortId);
@@ -165,28 +136,28 @@ export class DomRendererFactory2 implements RendererFactory2, OnDestroy {
     EmulatedEncapsulationDomRenderer2 | NoneEncapsulationDomRenderer
   >();
   private readonly defaultRenderer: Renderer2;
-  private readonly cssVarNamespace: string;
+  private readonly platformIsServer: boolean;
 
   constructor(
     private readonly eventManager: EventManager,
-    @Inject(SHARED_STYLES_HOST) private readonly sharedStylesHost: SharedStylesHost,
+    private readonly sharedStylesHost: SharedStylesHost,
     @Inject(APP_ID) private readonly appId: string,
     @Inject(REMOVE_STYLES_ON_COMPONENT_DESTROY) private removeStylesOnCompDestroy: boolean,
     @Inject(DOCUMENT) private readonly doc: Document,
+    @Inject(PLATFORM_ID) readonly platformId: Object,
     readonly ngZone: NgZone,
     @Inject(CSP_NONCE) private readonly nonce: string | null = null,
     @Inject(TracingService)
     @Optional()
     private readonly tracingService: TracingService<TracingSnapshot> | null = null,
-    @Inject(CSS_VAR_NAMESPACE) @Optional() cssVarNamespace: string | null = null,
   ) {
-    this.cssVarNamespace = cssVarNamespace ?? '';
+    this.platformIsServer = typeof ngServerMode !== 'undefined' && ngServerMode;
     this.defaultRenderer = new DefaultDomRenderer2(
       eventManager,
       doc,
       ngZone,
+      this.platformIsServer,
       this.tracingService,
-      this.cssVarNamespace,
     );
   }
 
@@ -199,7 +170,7 @@ export class DomRendererFactory2 implements RendererFactory2, OnDestroy {
       typeof ngServerMode !== 'undefined' &&
       ngServerMode &&
       (type.encapsulation === ViewEncapsulation.ShadowDom ||
-        type.encapsulation === ViewEncapsulation.ExperimentalIsolatedShadowDom)
+        type.encapsulation === ViewEncapsulation.IsolatedShadowDom)
     ) {
       // Domino does not support shadow DOM.
       type = {...type, encapsulation: ViewEncapsulation.Emulated};
@@ -227,6 +198,7 @@ export class DomRendererFactory2 implements RendererFactory2, OnDestroy {
       const eventManager = this.eventManager;
       const sharedStylesHost = this.sharedStylesHost;
       const removeStylesOnCompDestroy = this.removeStylesOnCompDestroy;
+      const platformIsServer = this.platformIsServer;
       const tracingService = this.tracingService;
 
       switch (type.encapsulation) {
@@ -239,8 +211,8 @@ export class DomRendererFactory2 implements RendererFactory2, OnDestroy {
             removeStylesOnCompDestroy,
             doc,
             ngZone,
+            platformIsServer,
             tracingService,
-            this.cssVarNamespace,
           );
           break;
         case ViewEncapsulation.ShadowDom:
@@ -251,11 +223,11 @@ export class DomRendererFactory2 implements RendererFactory2, OnDestroy {
             doc,
             ngZone,
             this.nonce,
+            platformIsServer,
             tracingService,
-            this.cssVarNamespace,
             sharedStylesHost,
           );
-        case ViewEncapsulation.ExperimentalIsolatedShadowDom:
+        case ViewEncapsulation.IsolatedShadowDom:
           return new ShadowDomRenderer(
             eventManager,
             element,
@@ -263,8 +235,8 @@ export class DomRendererFactory2 implements RendererFactory2, OnDestroy {
             doc,
             ngZone,
             this.nonce,
+            platformIsServer,
             tracingService,
-            this.cssVarNamespace,
           );
 
         default:
@@ -275,8 +247,8 @@ export class DomRendererFactory2 implements RendererFactory2, OnDestroy {
             removeStylesOnCompDestroy,
             doc,
             ngZone,
+            platformIsServer,
             tracingService,
-            this.cssVarNamespace,
           );
           break;
       }
@@ -313,8 +285,8 @@ class DefaultDomRenderer2 implements Renderer2 {
     private readonly eventManager: EventManager,
     private readonly doc: Document,
     protected readonly ngZone: NgZone,
+    private readonly platformIsServer: boolean,
     private readonly tracingService: TracingService<TracingSnapshot> | null,
-    private readonly cssVarNamespace: string = '',
   ) {}
 
   destroy(): void {}
@@ -354,18 +326,6 @@ class DefaultDomRenderer2 implements Renderer2 {
   insertBefore(parent: any, newChild: any, refChild: any): void {
     if (parent) {
       const targetParent = isTemplateNode(parent) ? parent.content : parent;
-      // If something outside Angular removed or moved `refChild` (a browser extension, for
-      // example), the native call below throws a `NotFoundError` with no useful info. Catch it
-      // here so we can say what actually happened.
-      if (refChild != null && refChild.parentNode !== targetParent) {
-        throw new RuntimeError(
-          RuntimeErrorCode.INSERT_BEFORE_NODE_NOT_FOUND,
-          ngDevMode &&
-            `Angular could not insert a node before ${describeDomNode(refChild)} because it is no longer a child of ${describeDomNode(targetParent)}. ` +
-              `This can happen when code outside of Angular's control (for example, a browser extension or a script that directly manipulates the DOM) ` +
-              `has moved or removed a node that Angular is still managing.`,
-        );
-      }
       targetParent.insertBefore(newChild, refChild);
     }
   }
@@ -435,11 +395,7 @@ class DefaultDomRenderer2 implements Renderer2 {
   }
 
   setStyle(el: any, style: string, value: any, flags: RendererStyleFlags2): void {
-    const isVariable = style.startsWith('--');
-    if (isVariable) {
-      style = style.replace('%NS%', this.cssVarNamespace);
-    }
-    if (isVariable || flags & (RendererStyleFlags2.DashCase | RendererStyleFlags2.Important)) {
+    if (flags & (RendererStyleFlags2.DashCase | RendererStyleFlags2.Important)) {
       el.style.setProperty(style, value, flags & RendererStyleFlags2.Important ? 'important' : '');
     } else {
       el.style[style] = value;
@@ -447,11 +403,7 @@ class DefaultDomRenderer2 implements Renderer2 {
   }
 
   removeStyle(el: any, style: string, flags: RendererStyleFlags2): void {
-    const isVariable = style.startsWith('--');
-    if (isVariable) {
-      style = style.replace('%NS%', this.cssVarNamespace);
-    }
-    if (isVariable || flags & RendererStyleFlags2.DashCase) {
+    if (flags & RendererStyleFlags2.DashCase) {
       // removeProperty has no effect when used on camelCased properties.
       el.style.removeProperty(style);
     } else {
@@ -556,24 +508,24 @@ function isTemplateNode(node: any): node is HTMLTemplateElement {
 }
 
 class ShadowDomRenderer extends DefaultDomRenderer2 {
-  private readonly shadowRoot: ShadowRoot;
+  private shadowRoot: any;
 
   constructor(
     eventManager: EventManager,
-    private readonly hostEl: Element,
+    private hostEl: any,
     component: RendererType2,
     doc: Document,
     ngZone: NgZone,
     nonce: string | null,
+    platformIsServer: boolean,
     tracingService: TracingService<TracingSnapshot> | null,
-    cssVarNamespace: string,
     private sharedStylesHost?: SharedStylesHost,
   ) {
-    super(eventManager, doc, ngZone, tracingService, cssVarNamespace);
-    this.shadowRoot = hostEl.attachShadow({mode: 'open'});
+    super(eventManager, doc, ngZone, platformIsServer, tracingService);
+    this.shadowRoot = (hostEl as any).attachShadow({mode: 'open'});
 
     // SharedStylesHost is used to add styles to the shadow root by ShadowDom.
-    // This is optional as it is not used by ExperimentalIsolatedShadowDom.
+    // This is optional as it is not used by IsolatedShadowDom.
     if (this.sharedStylesHost) {
       this.sharedStylesHost.addHost(this.shadowRoot);
     }
@@ -584,9 +536,7 @@ class ShadowDomRenderer extends DefaultDomRenderer2 {
       styles = addBaseHrefToCssSourceMap(baseHref, styles);
     }
 
-    styles = shimStylesContent(component.id, styles).map((s) =>
-      s.replace(/%NS%/g, cssVarNamespace),
-    );
+    styles = shimStylesContent(component.id, styles);
 
     for (const style of styles) {
       const styleEl = document.createElement('style');
@@ -655,11 +605,11 @@ class NoneEncapsulationDomRenderer extends DefaultDomRenderer2 {
     private removeStylesOnCompDestroy: boolean,
     doc: Document,
     ngZone: NgZone,
+    platformIsServer: boolean,
     tracingService: TracingService<TracingSnapshot> | null,
-    cssVarNamespace: string,
     compId?: string,
   ) {
-    super(eventManager, doc, ngZone, tracingService, cssVarNamespace);
+    super(eventManager, doc, ngZone, platformIsServer, tracingService);
     let styles = component.styles;
     if (ngDevMode) {
       // We only do this in development, as for production users should not add CSS sourcemaps to components.
@@ -667,8 +617,7 @@ class NoneEncapsulationDomRenderer extends DefaultDomRenderer2 {
       styles = addBaseHrefToCssSourceMap(baseHref, styles);
     }
 
-    const shimmed = compId ? shimStylesContent(compId, styles) : styles;
-    this.styles = shimmed.map((s) => s.replace(/%NS%/g, cssVarNamespace));
+    this.styles = compId ? shimStylesContent(compId, styles) : styles;
     this.styleUrls = component.getExternalStyles?.(compId);
   }
 
@@ -698,8 +647,8 @@ class EmulatedEncapsulationDomRenderer2 extends NoneEncapsulationDomRenderer {
     removeStylesOnCompDestroy: boolean,
     doc: Document,
     ngZone: NgZone,
+    platformIsServer: boolean,
     tracingService: TracingService<TracingSnapshot> | null,
-    cssVarNamespace: string,
   ) {
     const compId = appId + '-' + component.id;
     super(
@@ -709,8 +658,8 @@ class EmulatedEncapsulationDomRenderer2 extends NoneEncapsulationDomRenderer {
       removeStylesOnCompDestroy,
       doc,
       ngZone,
+      platformIsServer,
       tracingService,
-      cssVarNamespace,
       compId,
     );
     this.contentAttr = shimContentAttribute(compId);

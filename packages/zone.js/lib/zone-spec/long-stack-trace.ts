@@ -56,7 +56,7 @@ export function patchLongStackTrace(Zone: ZoneType): void {
     for (let i = 0; i < trace.length; i++) {
       const frame = trace[i];
       // Filter out the Frames which are part of stack capturing.
-      if (!Object.hasOwn(IGNORE_FRAMES, frame)) {
+      if (!IGNORE_FRAMES.hasOwnProperty(frame)) {
         lines.push(trace[i]);
       }
     }

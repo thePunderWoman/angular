@@ -1,4 +1,4 @@
-load("//devtools/tools:defaults.bzl", "ng_project", "ts_project", "ts_test_library", "zoneless_web_test_suite")
+load("//devtools/tools:defaults.bzl", "ng_project", "ng_web_test_suite", "ts_project", "ts_test_library")
 
 package(default_visibility = ["//devtools:__subpackages__"])
 
@@ -49,7 +49,6 @@ ng_project(
     deps = [
         "//:node_modules/@angular/core",
         "//devtools/projects/ng-devtools/src/lib/application-operations",
-        "//devtools/projects/ng-devtools/src/lib/application-providers:settings_versions",
     ],
 )
 
@@ -60,7 +59,6 @@ ng_project(
         ":settings_store",
         ":theme_types_lib",
         "//:node_modules/@angular/core",
-        "//devtools/projects/ng-devtools/src/lib/application-providers:settings_versions",
     ],
 )
 
@@ -84,7 +82,7 @@ ts_test_library(
     ],
 )
 
-zoneless_web_test_suite(
+ng_web_test_suite(
     name = "test_application_services",
     deps = [
         ":test_application_services_lib",

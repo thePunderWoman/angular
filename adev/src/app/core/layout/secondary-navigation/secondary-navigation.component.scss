@@ -35,7 +35,6 @@
 
   @include mq.for-tablet-landscape-down {
     position: absolute;
-    height: 100dvh;
   }
 
   @media (prefers-reduced-motion: no-preference) {

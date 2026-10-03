@@ -19,20 +19,7 @@
         ]
       },
       {
-        "source": "assets/others/versions.json",
-        "headers": [
-          {
-            "key": "Cross-Origin-Resource-Policy",
-            "value": "cross-origin"
-          },
-          {
-            "key": "Access-Control-Allow-Origin",
-            "value": "*"
-          }
-        ]
-      },
-      {
-        "source": "/**/*-[0-9A-Za-z_][0-9A-Za-z_][0-9A-Za-z_][0-9A-Za-z_][0-9A-Za-z_][0-9A-Za-z_][0-9A-Za-z_][0-9A-Za-z_].*",
+        "source": "/**/*-[0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z].*",
         "headers": [
           {
             "key": "Cache-Control",
@@ -49,7 +36,7 @@
         "headers": [
           {
             "key": "Cross-Origin-Embedder-Policy",
-            "value": "credentialless"
+            "value": "require-corp"
           }
         ]
       },
@@ -69,9 +56,10 @@
             "key": "Cross-Origin-Opener-Policy",
             "value": "same-origin"
           },
+
           {
             "key": "Cross-Origin-Embedder-Policy",
-            "value": "credentialless"
+            "value": "require-corp"
           }
         ]
       }

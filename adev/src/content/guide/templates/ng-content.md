@@ -4,26 +4,34 @@
 
 Here is an example of a `BaseButton` component that accepts any markup from its parent.
 
-```angular-ts {header:'base-button/base-button.ts'}
-import {Component} from '@angular/core';
+```angular-ts
+// ./base-button/base-button.component.ts
+import { Component } from '@angular/core';
 
 @Component({
   selector: 'button[baseButton]',
-  template: `<ng-content />`,
+  template: `
+      <ng-content />
+  `,
 })
 export class BaseButton {}
 ```
 
-```angular-ts {header:'app.ts'}
-import {Component} from '@angular/core';
-import {BaseButton} from './base-button';
+```angular-ts
+// ./app.component.ts
+import { Component } from '@angular/core';
+import { BaseButton } from './base-button/base-button.component.ts';
 
 @Component({
   selector: 'app-root',
   imports: [BaseButton],
-  template: `<button baseButton>Next <span class="icon arrow-right"></span></button>`,
+  template: `
+    <button baseButton>
+      Next <span class="icon arrow-right" />
+    </button>
+  `,
 })
-export class App {}
+export class AppComponent {}
 ```
 
 For more detail, check out the [`<ng-content>` in-depth guide](/guide/components/content-projection) for other ways you can leverage this pattern.

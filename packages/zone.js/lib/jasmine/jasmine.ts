@@ -16,7 +16,7 @@ declare let jest: any;
 export function patchJasmine(Zone: ZoneType): void {
   Zone.__load_patch('jasmine', (global: any, Zone: ZoneType, api: _ZonePrivate) => {
     const __extends = function (d: any, b: any) {
-      for (const p in b) if (Object.hasOwn(b, p)) d[p] = b[p];
+      for (const p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
       function __(this: Object) {
         this.constructor = d;
       }
@@ -239,15 +239,10 @@ export function patchJasmine(Zone: ZoneType): void {
       timeout: {setTimeout: Function; clearTimeout: Function};
     }
     type QueueRunnerUserContext = {queueRunner?: QueueRunner};
-    const j$ = jasmine as any;
-    const privateApis: {
-      QueueRunner: {};
-      UserContext: new (...args: any[]) => QueueRunnerUserContext;
-    } = j$?.private?.QueueRunner ? j$?.private : j$;
-    const QueueRunner = privateApis.QueueRunner as {
+    const QueueRunner = (jasmine as any).QueueRunner as {
       new (attrs: QueueRunnerAttrs): QueueRunner;
     };
-    privateApis.QueueRunner = (function (_super) {
+    (jasmine as any).QueueRunner = (function (_super) {
       __extends(ZoneQueueRunner, _super);
       function ZoneQueueRunner(this: QueueRunner, attrs: QueueRunnerAttrs) {
         if (attrs.onComplete) {
@@ -271,9 +266,9 @@ export function patchJasmine(Zone: ZoneType): void {
 
         // create a userContext to hold the queueRunner itself
         // so we can access the testProxy in it/xit/beforeEach ...
-        if (privateApis.UserContext) {
+        if ((jasmine as any).UserContext) {
           if (!attrs.userContext) {
-            attrs.userContext = new privateApis.UserContext();
+            attrs.userContext = new (jasmine as any).UserContext();
           }
           attrs.userContext.queueRunner = this;
         } else {

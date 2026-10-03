@@ -14,35 +14,33 @@ import {
   SafePropertyRead,
   TmplAstBoundAttribute,
   TmplAstBoundEvent,
-  TmplAstComponent,
-  TmplAstDirective,
-  TmplAstElement,
   TmplAstLetDeclaration,
   TmplAstNode,
-  TmplAstRecursiveVisitor,
+  TmplAstElement,
   TmplAstReference,
   TmplAstTextAttribute,
   TmplAstVariable,
+  TmplAstComponent,
+  TmplAstDirective,
+  TmplAstRecursiveVisitor,
   tmplAstVisitAll,
 } from '@angular/compiler';
+import {NgCompiler} from '@angular/compiler-cli/src/ngtsc/core';
+import {absoluteFrom} from '@angular/compiler-cli/src/ngtsc/file_system';
+import {DirectiveMeta, PipeMeta} from '@angular/compiler-cli/src/ngtsc/metadata';
 import {
-  absoluteFrom,
-  DirectiveMeta,
   DirectiveSymbol,
-  NgCompiler,
-  PipeMeta,
   SelectorlessComponentSymbol,
   SelectorlessDirectiveSymbol,
   Symbol,
   SymbolKind,
   TcbLocation,
   TemplateTypeChecker,
-} from '@angular/compiler-cli';
-
+} from '@angular/compiler-cli/src/ngtsc/typecheck/api';
 import {
   ExpressionIdentifier,
   hasExpressionIdentifier,
-} from '@angular/compiler-cli/private/hybrid_analysis';
+} from '@angular/compiler-cli/src/ngtsc/typecheck/src/comments';
 import ts from 'typescript';
 
 import {getTargetAtPosition, TargetNodeKind} from './template_target';
@@ -119,30 +117,14 @@ export function getTargetDetailsAtTemplatePosition(
     const templateTarget = node;
     switch (symbol.kind) {
       case SymbolKind.Directive:
-        // If the symbol is a Directive and the target is an attribute, it means the attribute
-        // matched a directive selector. We need to handle this to support finding references
-        // for directives matching an attribute (e.g. `<div dir></div>`).
-        if (
-          templateTarget instanceof TmplAstTextAttribute ||
-          templateTarget instanceof TmplAstBoundAttribute
-        ) {
-          const pos = getPositionForDirective(symbol, templateTypeChecker);
-          details.push({
-            typescriptLocations: pos ? [pos] : [],
-            templateTarget,
-            symbol,
-          });
-          break;
-        }
+      case SymbolKind.Template:
         // References to elements, templates, and directives will be through template references
         // (#ref). They shouldn't be used directly for a Language Service reference request.
-        break;
-      case SymbolKind.Template:
         break;
       case SymbolKind.Element: {
         const matches = getDirectiveMatchesForElementTag(symbol.templateNode, symbol.directives);
         details.push({
-          typescriptLocations: getPositionsForDirectives(matches, templateTypeChecker),
+          typescriptLocations: getPositionsForDirectives(matches),
           templateTarget,
           symbol,
         });
@@ -161,7 +143,7 @@ export function getTargetDetailsAtTemplatePosition(
           symbol.host.directives,
         );
         details.push({
-          typescriptLocations: getPositionsForDirectives(directives, templateTypeChecker),
+          typescriptLocations: getPositionsForDirectives(directives),
           templateTarget,
           symbol,
         });
@@ -242,7 +224,7 @@ export function getTargetDetailsAtTemplatePosition(
       }
       case SymbolKind.SelectorlessDirective:
       case SymbolKind.SelectorlessComponent:
-        const dirPosition = getPositionForDirective(symbol, templateTypeChecker);
+        const dirPosition = getPositionForDirective(symbol);
         if (dirPosition !== null) {
           details.push({
             typescriptLocations: [dirPosition],
@@ -260,13 +242,10 @@ export function getTargetDetailsAtTemplatePosition(
 /**
  * Given a set of `DirectiveSymbol`s, finds the equivalent `FilePosition` of the class declaration.
  */
-function getPositionsForDirectives(
-  directives: Set<DirectiveSymbol>,
-  ttc: import('@angular/compiler-cli/src/ngtsc/typecheck/api').TemplateTypeChecker,
-): FilePosition[] {
+function getPositionsForDirectives(directives: Set<DirectiveSymbol>): FilePosition[] {
   const allDirectives: FilePosition[] = [];
   for (const dir of directives.values()) {
-    const position = getPositionForDirective(dir, ttc);
+    const position = getPositionForDirective(dir);
     if (position !== null) {
       allDirectives.push(position);
     }
@@ -277,9 +256,8 @@ function getPositionsForDirectives(
 /** Gets the `FilePosition` for a single directive symbol. */
 function getPositionForDirective(
   directive: DirectiveSymbol | SelectorlessComponentSymbol | SelectorlessDirectiveSymbol,
-  ttc: import('@angular/compiler-cli/src/ngtsc/typecheck/api').TemplateTypeChecker,
 ): FilePosition | null {
-  const declaration = ttc.getTsSymbolOfSymbol(directive)?.valueDeclaration;
+  const declaration = directive.tsSymbol?.valueDeclaration;
 
   if (
     declaration !== undefined &&
@@ -409,12 +387,13 @@ export function getRenameTextAndSpanAtPosition(
     return getRenameTextAndSpanAtPosition(node.left, position);
   } else if (node instanceof LiteralPrimitive) {
     const span = toTextSpan(node.sourceSpan);
-    if (typeof node.value === 'string') {
+    const text = node.value;
+    if (typeof text === 'string') {
       // The span of a string literal includes the quotes but they should be removed for renaming.
       span.start += 1;
       span.length -= 2;
     }
-    return {text: `${node.value}`, span};
+    return {text, span};
   } else if (node instanceof TmplAstElement || node instanceof TmplAstDirective) {
     return {text: node.name, span: toTextSpan(node.startSourceSpan)};
   } else if (node instanceof TmplAstComponent) {

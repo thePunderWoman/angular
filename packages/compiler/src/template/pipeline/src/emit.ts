@@ -9,7 +9,6 @@
 
 import * as o from '../../../../src/output/output_ast';
 import {ConstantPool} from '../../../constant_pool';
-import {CONTEXT_NAME, RENDER_FLAGS} from '../../../render3/view/util';
 import * as ir from '../ir';
 
 import {
@@ -29,21 +28,17 @@ import {specializeBindings} from './phases/binding_specialization';
 import {chain} from './phases/chaining';
 import {collapseSingletonInterpolations} from './phases/collapse_singleton_interpolations';
 import {generateConditionalExpressions} from './phases/conditionals';
-import {generateBoundaryConditions} from './phases/boundary_conditions';
 import {collectElementConsts} from './phases/const_collection';
-import {specializeControlProperties} from './phases/control_directives';
 import {convertAnimations} from './phases/convert_animations';
 import {convertI18nBindings} from './phases/convert_i18n_bindings';
 import {createI18nContexts} from './phases/create_i18n_contexts';
 import {deduplicateTextBindings} from './phases/deduplicate_text_bindings';
 import {configureDeferInstructions} from './phases/defer_configs';
-import {insertIncrementalHydrationRuntime} from './phases/insert_incremental_hydration_runtime';
 import {resolveDeferTargetNames} from './phases/defer_resolve_targets';
 import {collapseEmptyInstructions} from './phases/empty_elements';
 import {expandSafeReads} from './phases/expand_safe_reads';
 import {extractI18nMessages} from './phases/extract_i18n_messages';
 import {generateAdvance} from './phases/generate_advance';
-import {generateArrowFunctions} from './phases/generate_arrow_functions';
 import {generateLocalLetReferences} from './phases/generate_local_let_references';
 import {generateProjectionDefs} from './phases/generate_projection_def';
 import {generateVariables} from './phases/generate_variables';
@@ -71,17 +66,13 @@ import {removeEmptyBindings} from './phases/remove_empty_bindings';
 import {removeI18nContexts} from './phases/remove_i18n_contexts';
 import {removeIllegalLetReferences} from './phases/remove_illegal_let_references';
 import {removeUnusedI18nAttributesOps} from './phases/remove_unused_i18n_attrs';
-import {resolveBoundaries} from './phases/resolve_boundaries';
 import {resolveContexts} from './phases/resolve_contexts';
 import {resolveDeferDepsFns} from './phases/resolve_defer_deps_fns';
 import {resolveDollarEvent} from './phases/resolve_dollar_event';
-import {resolveForeignContent} from './phases/resolve_foreign_content';
 import {resolveI18nElementPlaceholders} from './phases/resolve_i18n_element_placeholders';
 import {resolveI18nExpressionPlaceholders} from './phases/resolve_i18n_expression_placeholders';
-import {resolveI18nAttrSanitizers} from './phases/resolve_i18n_attr_sanitizers';
 import {resolveNames} from './phases/resolve_names';
 import {resolveSanitizers} from './phases/resolve_sanitizers';
-import {removeSafeNavigationMigration} from './phases/safe_navigation_migration';
 import {saveAndRestoreView} from './phases/save_restore_view';
 import {allocateSlots} from './phases/slot_allocation';
 import {optimizeStoreLet} from './phases/store_let_optimization';
@@ -110,7 +101,6 @@ type Phase =
     };
 
 const phases: Phase[] = [
-  {kind: Kind.Tmpl, fn: resolveForeignContent},
   {kind: Kind.Tmpl, fn: removeContentSelectors},
   {kind: Kind.Both, fn: optimizeRegularExpressions},
   {kind: Kind.Host, fn: parseHostStyleProperties},
@@ -120,7 +110,6 @@ const phases: Phase[] = [
   {kind: Kind.Both, fn: deduplicateTextBindings},
   {kind: Kind.Both, fn: specializeStyleBindings},
   {kind: Kind.Both, fn: specializeBindings},
-  {kind: Kind.Tmpl, fn: specializeControlProperties},
   {kind: Kind.Both, fn: convertAnimations},
   {kind: Kind.Both, fn: extractAttributes},
   {kind: Kind.Tmpl, fn: createI18nContexts},
@@ -129,20 +118,15 @@ const phases: Phase[] = [
   {kind: Kind.Both, fn: collapseSingletonInterpolations},
   {kind: Kind.Both, fn: orderOps},
   {kind: Kind.Tmpl, fn: generateConditionalExpressions},
-  {kind: Kind.Tmpl, fn: generateBoundaryConditions},
   {kind: Kind.Tmpl, fn: createPipes},
   {kind: Kind.Tmpl, fn: configureDeferInstructions},
-  {kind: Kind.Tmpl, fn: insertIncrementalHydrationRuntime},
   {kind: Kind.Tmpl, fn: createVariadicPipes},
-  {kind: Kind.Both, fn: generateArrowFunctions},
   {kind: Kind.Both, fn: generatePureLiteralStructures},
   {kind: Kind.Tmpl, fn: generateProjectionDefs},
   {kind: Kind.Tmpl, fn: generateLocalLetReferences},
   {kind: Kind.Tmpl, fn: generateVariables},
-  {kind: Kind.Tmpl, fn: resolveBoundaries},
   {kind: Kind.Tmpl, fn: saveAndRestoreView},
   {kind: Kind.Both, fn: deleteAnyCasts},
-  {kind: Kind.Both, fn: removeSafeNavigationMigration},
   {kind: Kind.Both, fn: resolveDollarEvent},
   {kind: Kind.Tmpl, fn: generateTrackVariables},
   {kind: Kind.Tmpl, fn: removeIllegalLetReferences},
@@ -168,7 +152,6 @@ const phases: Phase[] = [
   {kind: Kind.Tmpl, fn: resolveI18nExpressionPlaceholders},
   {kind: Kind.Tmpl, fn: extractI18nMessages},
   {kind: Kind.Tmpl, fn: collectI18nConsts},
-  {kind: Kind.Tmpl, fn: resolveI18nAttrSanitizers},
   {kind: Kind.Tmpl, fn: collectConstExpressions},
   {kind: Kind.Both, fn: collectElementConsts},
   {kind: Kind.Tmpl, fn: removeI18nContexts},
@@ -259,7 +242,7 @@ function emitView(view: ViewCompilationUnit): o.FunctionExpr {
   const createCond = maybeGenerateRfBlock(1, createStatements);
   const updateCond = maybeGenerateRfBlock(2, updateStatements);
   return o.fn(
-    [new o.FnParam(RENDER_FLAGS, o.NUMBER_TYPE), new o.FnParam(CONTEXT_NAME, o.DYNAMIC_TYPE)],
+    [new o.FnParam('rf'), new o.FnParam('ctx')],
     [...createCond, ...updateCond],
     /* type */ undefined,
     /* sourceSpan */ undefined,
@@ -274,11 +257,7 @@ function maybeGenerateRfBlock(flag: number, statements: o.Statement[]): o.Statem
 
   return [
     o.ifStmt(
-      new o.BinaryOperatorExpr(
-        o.BinaryOperator.BitwiseAnd,
-        o.variable(RENDER_FLAGS),
-        o.literal(flag),
-      ),
+      new o.BinaryOperatorExpr(o.BinaryOperator.BitwiseAnd, o.variable('rf'), o.literal(flag)),
       statements,
     ),
   ];
@@ -319,7 +298,7 @@ export function emitHostBindingFunction(job: HostBindingCompilationJob): o.Funct
   const createCond = maybeGenerateRfBlock(1, createStatements);
   const updateCond = maybeGenerateRfBlock(2, updateStatements);
   return o.fn(
-    [new o.FnParam(RENDER_FLAGS, o.NUMBER_TYPE), new o.FnParam(CONTEXT_NAME, o.DYNAMIC_TYPE)],
+    [new o.FnParam('rf'), new o.FnParam('ctx')],
     [...createCond, ...updateCond],
     /* type */ undefined,
     /* sourceSpan */ undefined,

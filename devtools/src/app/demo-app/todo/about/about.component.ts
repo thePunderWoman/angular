@@ -7,21 +7,16 @@
  */
 
 import {Component} from '@angular/core';
+import {RouterLink} from '@angular/router';
 
 @Component({
   selector: 'app-about',
   template: `
-    <h1>About Component</h1>
-    <p>This is the default about component (no guard).</p>
+    About component
+    <a [routerLink]="">Home</a>
+    <a [routerLink]="">Home</a>
+    <a [routerLink]="">Home</a>
   `,
+  imports: [RouterLink],
 })
 export class AboutComponent {}
-
-@Component({
-  selector: 'app-protected-about',
-  template: `
-    <h1>Protected About Component</h1>
-    <p>This component is rendered when the canMatch guard allows access.</p>
-  `,
-})
-export class ProtectedAboutComponent {}

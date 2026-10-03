@@ -1,9 +1,0 @@
-{
-  "spec_dir": "",
-  "helpers": ["e2e/setup.js"],
-  "jsLoader": "require",
-  "env": {
-    "stopSpecOnExpectationFailure": false,
-    "random": false
-  }
-}

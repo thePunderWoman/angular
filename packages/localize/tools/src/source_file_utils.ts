@@ -10,7 +10,6 @@ import {
   getFileSystem,
   PathManipulation,
 } from '@angular/compiler-cli/private/localize';
-import {File, NodePath, types as t} from '@babel/core';
 import {
   ɵisMissingTranslationError,
   ɵmakeTemplateObject,
@@ -18,6 +17,7 @@ import {
   ɵSourceLocation,
   ɵtranslate,
 } from '../../index';
+import {BabelFile, NodePath, types as t} from '@babel/core';
 
 import {DiagnosticHandlingStrategy, Diagnostics} from './diagnostics';
 
@@ -118,6 +118,12 @@ export function unwrapMessagePartsFromLocalizeCall(
     const right = cooked.get('right');
     if (right.isAssignmentExpression()) {
       cooked = right.get('right');
+      if (!cooked.isExpression()) {
+        throw new BabelParseError(
+          cooked.node,
+          'Unexpected "makeTemplateObject()" function (expected an expression).',
+        );
+      }
     } else if (right.isSequenceExpression()) {
       const expressions = right.get('expressions');
       if (expressions.length > 2) {
@@ -228,7 +234,7 @@ export function unwrapMessagePartsFromTemplateLiteral(
         `Unexpected undefined message part in "${elements.map((q) => q.node.value.cooked)}"`,
       );
     }
-    return q.node.value.cooked!;
+    return q.node.value.cooked;
   });
   const raw = elements.map((q) => q.node.value.raw);
   const locations = elements.map((q) => getLocation(fs, q));
@@ -458,7 +464,7 @@ export function isBabelParseError(e: any): e is BabelParseError {
 export function buildCodeFrameError(
   fs: PathManipulation,
   path: NodePath,
-  file: File,
+  file: BabelFile,
   e: BabelParseError,
 ): string {
   let filename = file.opts.filename;
@@ -472,7 +478,7 @@ export function buildCodeFrameError(
   } else {
     filename = '(unknown file)';
   }
-  const {message} = file.hub.buildError(e.node, e.message, Error);
+  const {message} = file.hub.buildError(e.node, e.message);
   return `${filename}: ${message}`;
 }
 
@@ -508,7 +514,7 @@ export function serializeLocationPosition(location: ɵSourceLocation): string {
 
 function getFileFromPath(fs: PathManipulation, path: NodePath | undefined): AbsoluteFsPath | null {
   // The file field is not guaranteed to be present for all node paths
-  const opts = (path?.hub as {file?: File}).file?.opts;
+  const opts = (path?.hub as {file?: BabelFile}).file?.opts;
   const filename = opts?.filename;
   if (!filename || !opts.cwd) {
     return null;

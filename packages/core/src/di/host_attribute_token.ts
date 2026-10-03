@@ -27,7 +27,6 @@ import {ɵɵinjectAttribute} from '../render3/instructions/di_attr';
  *   attr: string | null = inject(new HostAttributeToken('some-attr'), {optional: true});
  * }
  * ```
- * @see [Injecting host element attributes](guide/components/host-elements#injecting-host-element-attributes)
  * @publicApi
  */
 export class HostAttributeToken {

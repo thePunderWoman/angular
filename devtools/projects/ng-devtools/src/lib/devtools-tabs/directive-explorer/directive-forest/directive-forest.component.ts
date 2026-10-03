@@ -14,41 +14,29 @@ import {
 import {FlatTreeControl} from '@angular/cdk/tree';
 import {
   afterRenderEffect,
+  ChangeDetectionStrategy,
   Component,
   computed,
   DestroyRef,
   effect,
   ElementRef,
+  HostListener,
   inject,
   input,
   output,
   signal,
-  untracked,
   viewChild,
 } from '@angular/core';
-import {MatSnackBar} from '@angular/material/snack-bar';
-import {
-  CdElementData,
-  DevToolsNode,
-  ElementPosition,
-  Events,
-  MessageBus,
-} from '../../../../../../protocol';
+import {DevToolsNode, ElementPosition, Events, MessageBus} from '../../../../../../protocol';
 
 import {TabUpdate} from '../../tab-update/index';
-import {DEEP_LINK_INSTANCE_ID} from '../../../application-providers/deep_link';
 
 import {ComponentDataSource, FlatNode} from './component-data-source';
-import {
-  getFullNodeNameString,
-  isChildOf,
-  matchesDirectiveOrComponentId,
-  parentCollapsed,
-} from './directive-forest-utils';
+import {getFullNodeNameString, isChildOf, parentCollapsed} from './directive-forest-utils';
 import {IndexedNode} from './index-forest';
-import {FilterComponent, FilterFn} from '../../../shared/filter/filter.component';
+import {FilterComponent, FilterFn} from './filter/filter.component';
 import {TreeNodeComponent, NodeTextMatch} from './tree-node/tree-node.component';
-import {directiveForestFilterFnGenerator} from './directive-forest-filter-fn-generator';
+import {directiveForestFilterFnGenerator} from './filter/directive-forest-filter-fn-generator';
 import {Debouncer} from '../../../shared/utils/debouncer';
 
 const NODE_ITEM_HEIGHT = 18; // px; Required for CDK Virtual Scroll
@@ -58,6 +46,7 @@ const RESIZE_OBSERVER_DEBOUNCE = 250; // ms
   selector: 'ng-directive-forest',
   templateUrl: './directive-forest.component.html',
   styleUrls: ['./directive-forest.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FilterComponent,
     CdkVirtualScrollViewport,
@@ -65,24 +54,15 @@ const RESIZE_OBSERVER_DEBOUNCE = 250; // ms
     CdkVirtualForOf,
     TreeNodeComponent,
   ],
-  host: {
-    '(document:keydown.ArrowUp)': 'navigateUp($event)',
-    '(document:keydown.ArrowDown)': 'navigateDown($event)',
-    '(document:keydown.ArrowLeft)': 'collapseCurrent($event)',
-    '(document:keydown.ArrowRight)': 'expandCurrent($event)',
-  },
 })
 export class DirectiveForestComponent {
   private readonly tabUpdate = inject(TabUpdate);
   private readonly messageBus = inject<MessageBus<Events>>(MessageBus);
   private readonly elementRef = inject(ElementRef);
-  private readonly deepLinkInstanceId = inject(DEEP_LINK_INSTANCE_ID);
-  private readonly snackBar = inject(MatSnackBar);
 
   readonly forest = input<DevToolsNode[]>([]);
   readonly showCommentNodes = input<boolean>(false);
   readonly currentSelectedElement = input.required<IndexedNode>();
-  readonly cdData = input<CdElementData[]>();
 
   readonly selectNode = output<IndexedNode | null>();
   readonly selectDomElement = output<IndexedNode>();
@@ -104,38 +84,6 @@ export class DirectiveForestComponent {
       return this.dataSource.data.indexOf(node);
     }
     return -1;
-  });
-
-  protected readonly mappedCdData = computed<Map<DevToolsNode, CdElementData>>(() => {
-    const mapped = new Map<DevToolsNode, CdElementData>();
-    const cdData = this.cdData();
-    if (!cdData || !cdData.length) {
-      return mapped;
-    }
-
-    const forest = this.forest();
-
-    for (const data of cdData ?? []) {
-      // Wrap the forest in a fake root node-like object.
-      let node: DevToolsNode | null = {children: forest} as DevToolsNode;
-
-      // Attempt to find the target node using the
-      // non-indexed `DevToolsNode[]` structure.
-      for (const pos of data.element) {
-        if (node.children[pos]) {
-          node = node.children[pos];
-        } else {
-          node = null;
-          break;
-        }
-      }
-
-      if (node) {
-        mapped.set(node, data);
-      }
-    }
-
-    return mapped;
   });
 
   readonly treeControl = new FlatTreeControl<FlatNode>(
@@ -173,19 +121,6 @@ export class DirectiveForestComponent {
       if (changed) {
         this.reselectNodeOnUpdate();
       }
-    });
-
-    // Deep link: react to requests from the Chrome Performance panel.
-    effect(() => {
-      const instanceId = this.deepLinkInstanceId();
-      this.forest(); // Ensure we update when the forest changes, so we can find the node that matches the instanceId.
-      if (instanceId === null || this.dataSource.data.length === 0) return;
-
-      untracked(() => {
-        this.selectNodeByInstanceId(instanceId);
-        this.expandParents();
-        this.deepLinkInstanceId.set(null);
-      });
     });
 
     this.handleViewportResize();
@@ -227,10 +162,6 @@ export class DirectiveForestComponent {
   }
 
   select(node: FlatNode): void {
-    if (node.static) {
-      return;
-    }
-
     this.populateParents(node.position);
     this.selectNode.emit(node.original);
     this.selectedNode.set(node);
@@ -243,6 +174,7 @@ export class DirectiveForestComponent {
     this.setParents.emit(null);
   }
 
+  @HostListener('document:keydown.ArrowUp', ['$event'])
   navigateUp(event: Event): void {
     if (this.isEditingDirectiveState(event)) {
       return;
@@ -267,6 +199,7 @@ export class DirectiveForestComponent {
     this.selectAndEnsureVisible(data[prevIdx]);
   }
 
+  @HostListener('document:keydown.ArrowDown', ['$event'])
   navigateDown(event: Event): void {
     if (this.isEditingDirectiveState(event)) {
       return;
@@ -294,6 +227,7 @@ export class DirectiveForestComponent {
     this.selectAndEnsureVisible(data[idx]);
   }
 
+  @HostListener('document:keydown.ArrowLeft', ['$event'])
   collapseCurrent(event: Event): void {
     if (this.isEditingDirectiveState(event)) {
       return;
@@ -306,6 +240,7 @@ export class DirectiveForestComponent {
     event.preventDefault();
   }
 
+  @HostListener('document:keydown.ArrowRight', ['$event'])
   expandCurrent(event: Event): void {
     if (this.isEditingDirectiveState(event)) {
       return;
@@ -319,12 +254,12 @@ export class DirectiveForestComponent {
   }
 
   isEditingDirectiveState(event: Event): boolean {
-    return (event.target as Element).tagName === 'INPUT' || !this.selectedNode();
+    return (event.target as Element).tagName === 'INPUT' || !this.selectedNode;
   }
 
   handleFilter(filterFn: FilterFn): void {
     this.currentlyMatchedIndex.set(-1);
-    const matched = new Map<number, NodeTextMatch[]>();
+    this.matchedNodes.set(new Map());
 
     for (let i = 0; i < this.dataSource.data.length; i++) {
       const node = this.dataSource.data[i];
@@ -332,11 +267,13 @@ export class DirectiveForestComponent {
       const matches = filterFn(fullName);
 
       if (matches.length) {
-        matched.set(i, matches);
+        this.matchedNodes.update((matched) => {
+          const map = new Map(matched);
+          map.set(i, matches);
+          return map;
+        });
       }
     }
-
-    this.matchedNodes.set(matched);
 
     // Select the first match, if there are any.
     if (this.matchesCount()) {
@@ -388,23 +325,13 @@ export class DirectiveForestComponent {
     this.forestRoot = this.dataSource.data[0];
 
     if (!this.initialized && forest && forest.length) {
-      for (const n of this.treeControl.dataNodes) {
-        if (!n.collapsedByDefault) {
-          this.treeControl.expand(n);
-        } else {
-          this.treeControl.collapse(n);
-        }
-      }
-
+      this.treeControl.expandAll();
       this.initialized = true;
       result.newItems.forEach((item) => (item.newItem = false));
     }
-    // We want to expand them once they are rendered unless
-    // they are `collapsedByDefault`.
+    // We want to expand them once they are rendered.
     result.newItems.forEach((item) => {
-      if (!item.collapsedByDefault) {
-        this.treeControl.expand(item);
-      }
+      this.treeControl.expand(item);
     });
     return result;
   }
@@ -442,24 +369,9 @@ export class DirectiveForestComponent {
   }
 
   private selectNodeByComponentId(id: number): void {
-    const foundNode = this.dataSource.data.find((node) => matchesDirectiveOrComponentId(node, id));
+    const foundNode = this.dataSource.data.find((node) => node.original.component?.id === id);
     if (foundNode) {
       this.selectAndEnsureVisible(foundNode);
-    }
-  }
-
-  private selectNodeByInstanceId(instanceId: number): void {
-    const foundNode = this.dataSource.data.find(
-      (node) => node.original.component?.instanceId === instanceId,
-    );
-    if (foundNode) {
-      this.selectAndEnsureVisible(foundNode);
-    } else {
-      this.snackBar.open(
-        'The referenced component instance has been destroyed and is no longer available.',
-        'Dismiss',
-        {duration: 5000},
-      );
     }
   }
 

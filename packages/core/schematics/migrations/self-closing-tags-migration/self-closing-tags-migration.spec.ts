@@ -6,9 +6,9 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {absoluteFrom} from '@angular/compiler-cli';
-import {initMockFileSystem} from '@angular/compiler-cli/private/testing';
+import {initMockFileSystem} from '@angular/compiler-cli/src/ngtsc/file_system/testing';
 import {runTsurgeMigration, diffText} from '../../utils/tsurge/testing';
+import {absoluteFrom} from '@angular/compiler-cli';
 import {SelfClosingTagsMigration} from './self-closing-tags-migration';
 
 describe('self-closing tags', () => {

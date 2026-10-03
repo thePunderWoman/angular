@@ -41,18 +41,17 @@ import {DirectiveDef} from '../interfaces/definition';
  *
  * @codeGenApi
  */
-export function ɵɵProvidersFeature<T>(providers: Provider[], viewProviders?: Provider[]) {
+export function ɵɵProvidersFeature<T>(providers: Provider[], viewProviders: Provider[] = []) {
   return (definition: DirectiveDef<T>) => {
-    definition.providersResolver = (def, processProvidersFn) =>
-      providersResolver(def, processProvidersFn ? processProvidersFn(providers) : providers, false);
-
-    if (viewProviders) {
-      definition.viewProvidersResolver = (def, processProvidersFn) =>
-        providersResolver(
-          def,
-          processProvidersFn ? processProvidersFn(viewProviders) : viewProviders,
-          true,
-        );
-    }
+    definition.providersResolver = (
+      def: DirectiveDef<T>,
+      processProvidersFn?: ProcessProvidersFunction,
+    ) => {
+      return providersResolver(
+        def, //
+        processProvidersFn ? processProvidersFn(providers) : providers, //
+        viewProviders,
+      );
+    };
   };
 }

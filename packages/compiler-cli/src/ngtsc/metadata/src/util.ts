@@ -12,7 +12,6 @@ import {OwningModule, Reference} from '../../imports';
 import {
   ClassDeclaration,
   ClassMember,
-  ClassMemberAccessLevel,
   ClassMemberKind,
   isNamedClassDeclaration,
   ReflectionHost,
@@ -29,15 +28,10 @@ import {
   MetadataReader,
   NgModuleMeta,
   PipeMeta,
-  ForeignComponentMeta,
-} from './api';
-import {TypeEntityToDeclarationError} from '../../reflection/src/typescript';
-import {
-  ClassPropertyMapping,
-  ClassPropertyName,
   TemplateGuardMeta,
-  SelectorlessMatcher,
-} from '@angular/compiler';
+} from './api';
+import {ClassPropertyMapping, ClassPropertyName} from './property_mapping';
+import {TypeEntityToDeclarationError} from '../../reflection/src/typescript';
 
 export function extractReferencesFromType(
   checker: ts.TypeChecker,
@@ -182,24 +176,7 @@ export function extractDirectiveTypeCheckMeta(
   reflector: ReflectionHost,
 ): DirectiveTypeCheckMeta {
   const members = reflector.getMembersOfClass(node);
-  const publicMethods = new Set<string>();
-  const staticMembers: ClassMember[] = [];
-
-  for (const member of members) {
-    if (member.isStatic) {
-      staticMembers.push(member);
-    }
-
-    if (
-      member.kind === ClassMemberKind.Method &&
-      !member.isStatic &&
-      (member.accessLevel === ClassMemberAccessLevel.PublicReadonly ||
-        member.accessLevel === ClassMemberAccessLevel.PublicWritable)
-    ) {
-      publicMethods.add(member.name);
-    }
-  }
-
+  const staticMembers = members.filter((member) => member.isStatic);
   const ngTemplateGuards = staticMembers
     .map(extractTemplateGuard)
     .filter((guard): guard is TemplateGuardMeta => guard !== null);
@@ -248,7 +225,6 @@ export function extractDirectiveTypeCheckMeta(
     restrictedInputFields,
     stringLiteralInputFields,
     undeclaredInputFields,
-    publicMethods,
     isGeneric: arity !== null && arity > 0,
   };
 }
@@ -360,18 +336,4 @@ export function isHostDirectiveMetaForGlobalMode(
   hostDirectiveMeta: HostDirectiveMeta,
 ): hostDirectiveMeta is HostDirectiveMetaForGlobalMode {
   return hostDirectiveMeta.directive instanceof Reference;
-}
-
-/** Extracts foreign component names from foreignImports and creates a SelectorlessMatcher. */
-export function createForeignComponentMatcher(
-  foreignImports: ForeignComponentMeta[] | null,
-): SelectorlessMatcher<ForeignComponentMeta> | null {
-  if (foreignImports === null || foreignImports.length === 0) {
-    return null;
-  }
-  const registry = new Map<string, ForeignComponentMeta[]>();
-  for (const meta of foreignImports) {
-    registry.set(meta.name, [meta]);
-  }
-  return new SelectorlessMatcher(registry);
 }

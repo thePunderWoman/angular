@@ -48,6 +48,7 @@ describe('TypingsLoader', () => {
   } as unknown as WebContainer;
 
   beforeEach(() => {
+    TestBed.configureTestingModule({});
     service = TestBed.inject(TypingsLoader);
   });
 
@@ -63,13 +64,11 @@ describe('TypingsLoader', () => {
     ).toBeTrue();
   });
 
-  it('should only contain type definitions files or package metadata', async () => {
+  it('should only contain type definitions files', async () => {
     await service.retrieveTypeDefinitions(fakeWebContainer);
 
     for (const {path} of service.typings()) {
-      const isDts = path.endsWith('.d.ts');
-      const isPackageJson = path.endsWith('/package.json');
-      expect(isDts || isPackageJson).toBeTrue();
+      expect(path.endsWith('.d.ts')).toBeTrue();
     }
   });
 

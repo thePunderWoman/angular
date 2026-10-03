@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.issue.pull_request && startsWith(github.event.comment.body, '/benchmark-compare ')}}
     steps:
-      - uses: TheModdingInquisition/actions-team-membership@057d91bb80f2976a1bc6dfab5b4ae1da9aebbd89 # v1.0
+      - uses: TheModdingInquisition/actions-team-membership@a69636a92bc927f32c3910baac06bacc949c984c # v1.0
         with:
           team: 'team'
           organization: angular
@@ -19,40 +19,26 @@ jobs:
           exit: true
 
       # Indicate that the benchmark command was received.
-      - uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
+      - uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
         with:
           comment-id: ${{github.event.comment.id}}
           token: '${{secrets.BENCHMARK_POST_RESULTS_GITHUB_TOKEN}}'
           reactions: 'rocket'
 
-      - uses: alessbell/pull-request-comment-branch@ef3408c9757d05f89cb525036383033a313758a0 # v2.1.0
+      - uses: alessbell/pull-request-comment-branch@aad01d65d6982b8eacabed5e9a684cd8ceb98da6 # v1.1
         id: comment-branch
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           # Specify repository as the PR branch might be from a fork.
           repository: ${{steps.comment-branch.outputs.head_owner}}/${{steps.comment-branch.outputs.head_repo}}
           # Checkout the pull request and assume it being trusted given we've checked
           # that the action was triggered by a team member.
-          ref: ${{steps.comment-branch.outputs.head_sha}}
-
-      # We cannot use `angular/dev-infra/github-actions/npm/checkout-and-setup-node` here
-      # because it does not support checking out from a fork (as it lacks a `repository` input).
-      # Thus, we checkout and setup Node/pnpm manually.
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: '.nvmrc'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+          ref: ${{steps.comment-branch.outputs.head_ref}}
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Setup Bazel
-        uses: angular/dev-infra/github-actions/bazel/setup@4a09f9588769980eacb41fcc76e2c76d048eac42 # main
-
-      - uses: angular/dev-infra/github-actions/bazel/configure-remote@4a09f9588769980eacb41fcc76e2c76d048eac42 # main
+      - uses: angular/dev-infra/github-actions/bazel/configure-remote@b7672ff60456719e6d9b0cc052abc73a7adc8df2
         with:
           bazelrc: ./.bazelrc.user
 
@@ -63,14 +49,11 @@ jobs:
           COMMENT_BODY: ${{ github.event.comment.body }}
         run: pnpm benchmarks prepare-for-github-action "$COMMENT_BODY"
 
-      - env:
-          COMPARE_SHA: ${{steps.info.outputs.compareSha}}
-          BENCHMARK_TARGET: ${{steps.info.outputs.benchmarkTarget}}
-        run: pnpm benchmarks run-compare "$COMPARE_SHA" "$BENCHMARK_TARGET"
+      - run: pnpm benchmarks run-compare ${{steps.info.outputs.compareSha}} ${{steps.info.outputs.benchmarkTarget}}
         id: benchmark
         name: Running benchmark
 
-      - uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
+      - uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
         with:
           issue-number: ${{github.event.issue.number}}
           token: '${{secrets.BENCHMARK_POST_RESULTS_GITHUB_TOKEN}}'

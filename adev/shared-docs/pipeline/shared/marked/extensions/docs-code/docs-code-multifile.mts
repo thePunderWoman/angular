@@ -63,7 +63,7 @@ export const docsCodeMultifileExtension = {
   },
   renderer(this: RendererThis, token: DocsCodeMultifileToken) {
     const el = JSDOM.fragment(`
-    <div class="docs-code-multifile" style="display: none">
+    <div class="docs-code-multifile">
     ${this.parser.parse(token.paneTokens)}
     </div>
     `).firstElementChild!;

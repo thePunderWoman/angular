@@ -6,40 +6,24 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import * as webdriver from 'selenium-webdriver';
-import {
-  createWebDriver,
-  verifyNoBrowserErrors,
-  waitForAngular,
-} from '../../../../packages/examples/test-utils/index.js';
+import {verifyNoBrowserErrors} from '../../../utilities/index';
+import {browser} from 'protractor';
 
 describe('jsonp', function () {
-  let driver: webdriver.WebDriver;
-  let baseUrl: string;
-
-  beforeAll(async () => {
-    ({driver, baseUrl} = await createWebDriver());
-  });
-
-  afterAll(async () => {
-    await driver.quit();
-  });
-
-  afterEach(async () => {
-    await verifyNoBrowserErrors(driver);
-  });
+  afterEach(verifyNoBrowserErrors);
 
   describe('fetching', function () {
+    const URL = '/';
+
     it('should fetch and display people', async function () {
-      await driver.get(`${baseUrl}/`);
-      await waitForAngular(driver);
-      expect(await getComponentText(driver, 'jsonp-app', '.people')).toEqual('hello, caitp');
+      browser.get(URL);
+      expect(await getComponentText('jsonp-app', '.people')).toEqual('hello, caitp');
     });
   });
 });
 
-function getComponentText(driver: webdriver.WebDriver, selector: string, innerSelector: string) {
-  return driver.executeScript<string>(
+function getComponentText(selector: string, innerSelector: string) {
+  return browser.executeScript(
     `return document.querySelector("${selector}").querySelector("${innerSelector}").textContent.trim()`,
   );
 }

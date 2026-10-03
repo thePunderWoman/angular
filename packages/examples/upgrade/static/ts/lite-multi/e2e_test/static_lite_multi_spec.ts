@@ -6,42 +6,22 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import * as webdriver from 'selenium-webdriver';
-import {createWebDriver, verifyNoBrowserErrors, waitForAngular} from '../../../../../test-utils';
+import {browser, by, element} from 'protractor';
+
+import {verifyNoBrowserErrors} from '../../../../../test-utils';
 
 describe('upgrade/static (lite with multiple downgraded modules)', () => {
-  let driver: webdriver.WebDriver;
-  let baseUrl: string;
+  const navButtons = element.all(by.css('nav button'));
+  const mainContent = element(by.css('main'));
 
-  beforeAll(async () => {
-    ({driver, baseUrl} = await createWebDriver());
-  });
+  beforeEach(() => browser.get('/'));
+  afterEach(verifyNoBrowserErrors);
 
-  afterAll(async () => {
-    await driver.quit();
-  });
+  it('should correctly bootstrap multiple downgraded modules', () => {
+    navButtons.get(1).click();
+    expect(mainContent.getText()).toBe('Component B');
 
-  afterEach(async () => {
-    await verifyNoBrowserErrors(driver);
-  });
-
-  beforeEach(async () => {
-    await driver.get(`${baseUrl}/`);
-    await waitForAngular(driver);
-  });
-
-  it('should correctly bootstrap multiple downgraded modules', async () => {
-    const navButtons = await driver.findElements(webdriver.By.css('nav button'));
-    await navButtons[1].click();
-    await waitForAngular(driver);
-
-    const mainContent = await driver.findElement(webdriver.By.css('main'));
-    expect(await mainContent.getText()).toBe('Component B');
-
-    const updatedNavButtons = await driver.findElements(webdriver.By.css('nav button'));
-    await updatedNavButtons[0].click();
-    await waitForAngular(driver);
-
-    expect(await mainContent.getText()).toBe('Component A | ng1(ng2)');
+    navButtons.get(0).click();
+    expect(mainContent.getText()).toBe('Component A | ng1(ng2)');
   });
 });

@@ -14,7 +14,10 @@ import type {XrefId} from './operations';
  * Union type for the different kinds of variables.
  */
 export type SemanticVariable =
-  ContextVariable | IdentifierVariable | SavedViewVariable | AliasVariable | BoundaryStateVariable;
+  | ContextVariable
+  | IdentifierVariable
+  | SavedViewVariable
+  | AliasVariable;
 
 export interface SemanticVariableBase {
   kind: SemanticVariableKind;
@@ -80,12 +83,4 @@ export interface AliasVariable extends SemanticVariableBase {
   kind: SemanticVariableKind.Alias;
   identifier: string;
   expression: o.Expression;
-}
-
-/**
- * A variable that holds the state of a boundary.
- */
-export interface BoundaryStateVariable extends SemanticVariableBase {
-  kind: SemanticVariableKind.BoundaryState;
-  boundaryXref: XrefId;
 }

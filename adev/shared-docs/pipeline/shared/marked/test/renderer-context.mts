@@ -19,13 +19,11 @@ export const rendererContext: RendererContext = {
   markdownFilePath: '',
   highlighter: null!,
   apiEntries: {
-    CommonModule: {moduleName: 'angular/common'},
-    bootstrapApplication: {moduleName: 'angular/platform-browser'},
-    ApplicationRef: {moduleName: 'angular/core'},
-    Router: {moduleName: 'angular/router'},
+    CommonModule: 'angular/common',
+    bootstrapApplication: 'angular/platform-browser',
+    ApplicationRef: 'angular/core',
+    Router: 'angular/router',
   },
-  headerIds: new Map<string, number>(),
-  disableAutoLinking: false,
 };
 
 export async function setHighlighter() {

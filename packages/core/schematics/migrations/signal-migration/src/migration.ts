@@ -6,9 +6,9 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {AbsoluteFsPath, FileSystem} from '@angular/compiler-cli';
+import {AbsoluteFsPath, FileSystem} from '@angular/compiler-cli/src/ngtsc/file_system';
 import {confirmAsSerializable, Serializable} from '../../../utils/tsurge/helpers/serializable';
-import {ProgramInfo} from '../../../utils/tsurge/program_info';
+import {BaseProgramInfo, ProgramInfo} from '../../../utils/tsurge/program_info';
 import {TsurgeComplexMigration} from '../../../utils/tsurge/migration';
 import {CompilationUnitData} from './batch/unit_data';
 import {KnownInputs} from './input_detection/known_inputs';

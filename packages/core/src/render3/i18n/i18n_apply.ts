@@ -49,10 +49,8 @@ import {
 } from '../dom_node_manipulation';
 import {
   getBindingIndex,
-  getSelectedIndex,
   isInSkipHydrationBlock,
   lastNodeWasCreated,
-  setSelectedIndex,
   wasLastNodeCreated,
 } from '../state';
 import {renderStringify} from '../util/stringify_utils';
@@ -103,22 +101,19 @@ export function setMaskBit(hasChange: boolean) {
 }
 
 export function applyI18n(tView: TView, lView: LView, index: number) {
-  try {
-    if (changeMaskCounter > 0) {
-      ngDevMode && assertDefined(tView, `tView should be defined`);
-      const tI18n = tView.data[index] as TI18n | I18nUpdateOpCodes;
-      // When `index` points to an `ɵɵi18nAttributes` then we have an array otherwise `TI18n`
-      const updateOpCodes: I18nUpdateOpCodes = Array.isArray(tI18n)
-        ? (tI18n as I18nUpdateOpCodes)
-        : (tI18n as TI18n).update;
-      const bindingsStartIndex = getBindingIndex() - changeMaskCounter - 1;
-      applyUpdateOpCodes(tView, lView, updateOpCodes, bindingsStartIndex, changeMask);
-    }
-  } finally {
-    // Reset changeMask & maskBit to default for the next update cycle
-    changeMask = 0b0;
-    changeMaskCounter = 0;
+  if (changeMaskCounter > 0) {
+    ngDevMode && assertDefined(tView, `tView should be defined`);
+    const tI18n = tView.data[index] as TI18n | I18nUpdateOpCodes;
+    // When `index` points to an `ɵɵi18nAttributes` then we have an array otherwise `TI18n`
+    const updateOpCodes: I18nUpdateOpCodes = Array.isArray(tI18n)
+      ? (tI18n as I18nUpdateOpCodes)
+      : (tI18n as TI18n).update;
+    const bindingsStartIndex = getBindingIndex() - changeMaskCounter - 1;
+    applyUpdateOpCodes(tView, lView, updateOpCodes, bindingsStartIndex, changeMask);
   }
+  // Reset changeMask & maskBit to default for the next update cycle
+  changeMask = 0b0;
+  changeMaskCounter = 0;
 }
 
 function createNodeWithoutHydration(
@@ -242,7 +237,7 @@ export function applyCreateOpCodes(
  * @param lView Current `LView`
  * @param anchorRNode place where the i18n node should be inserted.
  */
-function applyMutableOpCodes(
+export function applyMutableOpCodes(
   tView: TView,
   mutableOpCodes: IcuCreateOpCodes,
   lView: LView,
@@ -399,7 +394,7 @@ function applyMutableOpCodes(
  * @param changeMask Each bit corresponds to a `ɵɵi18nExp` (Counting backwards from
  *     `bindingsStartIndex`)
  */
-function applyUpdateOpCodes(
+export function applyUpdateOpCodes(
   tView: TView,
   lView: LView,
   updateOpCodes: I18nUpdateOpCodes,
@@ -444,20 +439,14 @@ function applyUpdateOpCodes(
                     sanitizeFn,
                   );
                 } else {
-                  const prevSelectedIndex = getSelectedIndex();
-                  setSelectedIndex(nodeIndex);
-                  try {
-                    setPropertyAndInputs(
-                      tNodeOrTagName,
-                      lView,
-                      propName,
-                      value,
-                      lView[RENDERER],
-                      sanitizeFn,
-                    );
-                  } finally {
-                    setSelectedIndex(prevSelectedIndex);
-                  }
+                  setPropertyAndInputs(
+                    tNodeOrTagName,
+                    lView,
+                    propName,
+                    value,
+                    lView[RENDERER],
+                    sanitizeFn,
+                  );
                 }
                 break;
               case I18nUpdateOpCode.Text:

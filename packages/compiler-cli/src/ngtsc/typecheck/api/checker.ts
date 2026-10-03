@@ -7,9 +7,7 @@
  */
 
 import {
-  AbsoluteSourceSpan,
   AST,
-  ForeignComponentMeta,
   LiteralPrimitive,
   ParseSourceSpan,
   PropertyRead,
@@ -47,8 +45,6 @@ import {
   TsCompletionEntryInfo,
 } from './scope';
 import {
-  BindingSymbol,
-  ClassSymbol,
   ElementSymbol,
   SelectorlessComponentSymbol,
   SelectorlessDirectiveSymbol,
@@ -181,17 +177,6 @@ export interface TemplateTypeChecker {
     component: ts.ClassDeclaration,
   ): SelectorlessDirectiveSymbol | null;
   getSymbolOfNode(node: AST | TmplAstNode, component: ts.ClassDeclaration): Symbol | null;
-
-  /**
-   * Translates a symbol's TCB location to its corresponding ts.Type using the program's type checker.
-   * This is used by compiler checks that need semantic type information from a positional symbol.
-   */
-  getTypeOfSymbol(symbol: Symbol | BindingSymbol | ClassSymbol): ts.Type | null;
-
-  /**
-   * Translates a symbol's TCB location to its corresponding ts.Symbol using the program's type checker.
-   */
-  getTsSymbolOfSymbol(symbol: Symbol | BindingSymbol | ClassSymbol): ts.Symbol | null;
 
   /**
    * Get "global" `Completion`s in the given context.
@@ -328,22 +313,6 @@ export interface TemplateTypeChecker {
   getPipeMetadata(pipe: ts.ClassDeclaration): PipeMeta | null;
 
   /**
-   * Gets the directives that apply to the given template node in a component's template.
-   */
-  getDirectivesOfNode(
-    component: ts.ClassDeclaration,
-    node: TmplAstElement | TmplAstTemplate,
-  ): TypeCheckableDirectiveMeta[] | null;
-
-  /**
-   * Gets the foreign component that matched the given template element.
-   */
-  getForeignComponent(
-    component: ts.ClassDeclaration,
-    element: TmplAstElement,
-  ): ForeignComponentMeta | null;
-
-  /**
    * Gets the directives that have been used in a component's template.
    */
   getUsedDirectives(component: ts.ClassDeclaration): TypeCheckableDirectiveMeta[] | null;
@@ -367,14 +336,10 @@ export interface TemplateTypeChecker {
 
   /**
    * Constructs a `ts.Diagnostic` for a given `ParseSourceSpan` within a template.
-   *
-   * @param relatedInformation Optional list of secondary related messages:
-   *   - Omit `sourceFile` when `start` and `end` offsets are locations within the template itself.
-   *   - Specify `sourceFile` only when referencing a separate file (e.g. directive class declaration).
    */
   makeTemplateDiagnostic<T extends ErrorCode>(
     clazz: ts.ClassDeclaration,
-    sourceSpan: ParseSourceSpan | AbsoluteSourceSpan,
+    sourceSpan: ParseSourceSpan,
     category: ts.DiagnosticCategory,
     errorCode: T,
     message: string,
@@ -382,7 +347,7 @@ export interface TemplateTypeChecker {
       text: string;
       start: number;
       end: number;
-      sourceFile?: ts.SourceFile;
+      sourceFile: ts.SourceFile;
     }[],
   ): NgTemplateDiagnostic<T>;
 }

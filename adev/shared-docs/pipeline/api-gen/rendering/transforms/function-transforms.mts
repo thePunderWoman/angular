@@ -20,7 +20,7 @@ import {
   setEntryFlags,
 } from './jsdoc-transforms.mjs';
 import {addModuleName} from './module-name.mjs';
-import {addHtmlReturnDescription, addRenderableFunctionParams} from './params-transforms.mjs';
+import {addRenderableFunctionParams} from './params-transforms.mjs';
 import {addRepo} from './repo.mjs';
 
 /** Given an unprocessed function entry, get the fully renderable function entry. */
@@ -50,13 +50,11 @@ export function getFunctionMetadataRenderable(
   repo: string,
 ): FunctionSignatureMetadataRenderable {
   return addHtmlAdditionalLinks(
-    addHtmlReturnDescription(
-      addRenderableFunctionParams(
-        addHtmlUsageNotes(
-          setEntryFlags(
-            addHtmlJsDocTagComments(
-              addHtmlDescription(addRepo(addModuleName(entry, moduleName), repo)),
-            ),
+    addRenderableFunctionParams(
+      addHtmlUsageNotes(
+        setEntryFlags(
+          addHtmlJsDocTagComments(
+            addHtmlDescription(addRepo(addModuleName(entry, moduleName), repo)),
           ),
         ),
       ),

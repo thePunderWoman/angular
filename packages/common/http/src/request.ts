@@ -7,9 +7,33 @@
  */
 import {ɵRuntimeError as RuntimeError} from '@angular/core';
 import {HttpContext} from './context';
-import {RuntimeErrorCode} from './errors';
 import {HttpHeaders} from './headers';
 import {HttpParams} from './params';
+import {RuntimeErrorCode} from './errors';
+
+/**
+ * Construction interface for `HttpRequest`s.
+ *
+ * All values are optional and will override default values if provided.
+ */
+interface HttpRequestInit {
+  headers?: HttpHeaders;
+  context?: HttpContext;
+  reportProgress?: boolean;
+  params?: HttpParams;
+  responseType?: 'arraybuffer' | 'blob' | 'json' | 'text';
+  withCredentials?: boolean;
+  credentials?: RequestCredentials;
+  transferCache?: {includeHeaders?: string[]} | boolean;
+  keepalive?: boolean;
+  priority?: RequestPriority;
+  cache?: RequestCache;
+  timeout?: number;
+  mode?: RequestMode;
+  redirect?: RequestRedirect;
+  referrer?: string;
+  integrity?: string;
+}
 
 /**
  * Determine whether the given HTTP method may include a body.
@@ -97,49 +121,6 @@ export const JSON_CONTENT_TYPE = 'application/json';
  */
 export const ACCEPT_HEADER_VALUE = `${JSON_CONTENT_TYPE}, ${TEXT_CONTENT_TYPE}, */*`;
 
-export type HttpResponseType = 'arraybuffer' | 'blob' | 'json' | 'text';
-
-export type HttpTransferCacheRequestOptions = {includeHeaders?: string[]} | boolean;
-
-/**
- * Options to configure the `HttpRequest`, like headers, parameters, etc.
- *
- * @publicApi 22.0
- */
-export interface HttpRequestOptions {
-  headers?: HttpHeaders;
-  context?: HttpContext;
-  /** @deprecated 22.0 Use `reportUploadProgress` and `reportDownloadProgress` instead */
-  reportProgress?: boolean;
-  /**
-   * When set to `true` a request emited against the `FetchBackend` will throw an error.
-   */
-  reportUploadProgress?: boolean;
-  reportDownloadProgress?: boolean;
-  params?: HttpParams;
-  responseType?: HttpResponseType;
-  withCredentials?: boolean;
-  credentials?: RequestCredentials;
-  keepalive?: boolean;
-  priority?: RequestPriority;
-  cache?: RequestCache;
-  mode?: RequestMode;
-  redirect?: RequestRedirect;
-  referrer?: string;
-  integrity?: string;
-  referrerPolicy?: ReferrerPolicy;
-  /**
-   * This property accepts either a boolean to enable/disable transferring cache for eligible
-   * requests performed using `HttpClient`, or an object, which allows to configure cache
-   * parameters, such as which headers should be included (no headers are included by default).
-   *
-   * Setting this property will override the options passed to `provideClientHydration()` for this
-   * particular request
-   */
-  transferCache?: HttpTransferCacheRequestOptions;
-  timeout?: number;
-}
-
 /**
  * An outgoing HTTP request with an optional typed body.
  *
@@ -150,7 +131,7 @@ export interface HttpRequestOptions {
  *
  * @publicApi
  */
-export class HttpRequest<T> implements HttpRequestOptions {
+export class HttpRequest<T> {
   /**
    * The request body, or `null` if one isn't set.
    *
@@ -176,19 +157,9 @@ export class HttpRequest<T> implements HttpRequestOptions {
    * Progress events are expensive (change detection runs on each event) and so
    * they should only be requested if the consumer intends to monitor them.
    *
-   * Note: The default `HttpBackend` based on fetch, does not support progress report for uploads.
-   * Set the `HttpXhrBackend` with `withXhr()` if you need this feature.
-   *
-   * @deprecated 22.0 Use `reportUploadProgress` and `reportDownloadProgress` instead
+   * Note: The `FetchBackend` doesn't support progress report on uploads.
    */
   readonly reportProgress: boolean = false;
-
-  /**
-   * When set to `true` a request emited against the `FetchBackend` will throw an error.
-   */
-  readonly reportUploadProgress: boolean = false;
-
-  readonly reportDownloadProgress: boolean = false;
 
   /**
    * Whether this request should be sent with outgoing credentials (cookies).
@@ -243,18 +214,12 @@ export class HttpRequest<T> implements HttpRequestOptions {
   readonly integrity!: string;
 
   /**
-   * The referrer policy of the request, which can be used to specify the referrer information to be included with the request.
-   * This can affect the amount of referrer information sent with the request, and can be used to enhance privacy and security.
-   */
-  readonly referrerPolicy!: ReferrerPolicy;
-
-  /**
    * The expected response type of the server.
    *
    * This is used to parse the response appropriately before returning it to
    * the requestee.
    */
-  readonly responseType: HttpResponseType = 'json';
+  readonly responseType: 'arraybuffer' | 'blob' | 'json' | 'text' = 'json';
 
   /**
    * The outgoing HTTP request method.
@@ -281,28 +246,195 @@ export class HttpRequest<T> implements HttpRequestOptions {
   /**
    * The HttpTransferCache option for the request
    */
-  readonly transferCache?: HttpTransferCacheRequestOptions;
+  readonly transferCache?: {includeHeaders?: string[]} | boolean;
 
   /**
    * The timeout for the backend HTTP request in ms.
    */
   readonly timeout?: number;
 
-  constructor(method: 'GET' | 'HEAD', url: string, init?: HttpRequestOptions);
-  constructor(method: 'DELETE' | 'JSONP' | 'OPTIONS', url: string, init?: HttpRequestOptions);
-  constructor(method: 'POST', url: string, body: T | null, init?: HttpRequestOptions);
-  constructor(method: 'PUT' | 'PATCH', url: string, body: T | null, init?: HttpRequestOptions);
-  constructor(method: string, url: string, body: T | null, init?: HttpRequestOptions);
+  constructor(
+    method: 'GET' | 'HEAD',
+    url: string,
+    init?: {
+      headers?: HttpHeaders;
+      context?: HttpContext;
+      reportProgress?: boolean;
+      params?: HttpParams;
+      responseType?: 'arraybuffer' | 'blob' | 'json' | 'text';
+      withCredentials?: boolean;
+      credentials?: RequestCredentials;
+      keepalive?: boolean;
+      priority?: RequestPriority;
+      cache?: RequestCache;
+      mode?: RequestMode;
+      redirect?: RequestRedirect;
+      referrer?: string;
+      integrity?: string;
+      /**
+       * This property accepts either a boolean to enable/disable transferring cache for eligible
+       * requests performed using `HttpClient`, or an object, which allows to configure cache
+       * parameters, such as which headers should be included (no headers are included by default).
+       *
+       * Setting this property will override the options passed to `provideClientHydration()` for this
+       * particular request
+       */
+      transferCache?: {includeHeaders?: string[]} | boolean;
+      timeout?: number;
+    },
+  );
+  constructor(
+    method: 'DELETE' | 'JSONP' | 'OPTIONS',
+    url: string,
+    init?: {
+      headers?: HttpHeaders;
+      context?: HttpContext;
+      reportProgress?: boolean;
+      params?: HttpParams;
+      responseType?: 'arraybuffer' | 'blob' | 'json' | 'text';
+      withCredentials?: boolean;
+      credentials?: RequestCredentials;
+      keepalive?: boolean;
+      priority?: RequestPriority;
+      cache?: RequestCache;
+      timeout?: number;
+      mode?: RequestMode;
+      redirect?: RequestRedirect;
+      referrer?: string;
+      integrity?: string;
+    },
+  );
+  constructor(
+    method: 'POST',
+    url: string,
+    body: T | null,
+    init?: {
+      headers?: HttpHeaders;
+      context?: HttpContext;
+      reportProgress?: boolean;
+      params?: HttpParams;
+      responseType?: 'arraybuffer' | 'blob' | 'json' | 'text';
+      withCredentials?: boolean;
+      credentials?: RequestCredentials;
+      keepalive?: boolean;
+      priority?: RequestPriority;
+      cache?: RequestCache;
+      mode?: RequestMode;
+      redirect?: RequestRedirect;
+      referrer?: string;
+      integrity?: string;
+      /**
+       * This property accepts either a boolean to enable/disable transferring cache for eligible
+       * requests performed using `HttpClient`, or an object, which allows to configure cache
+       * parameters, such as which headers should be included (no headers are included by default).
+       *
+       * Setting this property will override the options passed to `provideClientHydration()` for this
+       * particular request
+       */
+      transferCache?: {includeHeaders?: string[]} | boolean;
+      timeout?: number;
+    },
+  );
+  constructor(
+    method: 'PUT' | 'PATCH',
+    url: string,
+    body: T | null,
+    init?: {
+      headers?: HttpHeaders;
+      context?: HttpContext;
+      reportProgress?: boolean;
+      params?: HttpParams;
+      responseType?: 'arraybuffer' | 'blob' | 'json' | 'text';
+      withCredentials?: boolean;
+      credentials?: RequestCredentials;
+      keepalive?: boolean;
+      priority?: RequestPriority;
+      cache?: RequestCache;
+      timeout?: number;
+      mode?: RequestMode;
+      redirect?: RequestRedirect;
+      referrer?: string;
+      integrity?: string;
+    },
+  );
+  constructor(
+    method: string,
+    url: string,
+    body: T | null,
+    init?: {
+      headers?: HttpHeaders;
+      context?: HttpContext;
+      reportProgress?: boolean;
+      params?: HttpParams;
+      responseType?: 'arraybuffer' | 'blob' | 'json' | 'text';
+      withCredentials?: boolean;
+      credentials?: RequestCredentials;
+      keepalive?: boolean;
+      priority?: RequestPriority;
+      cache?: RequestCache;
+      mode?: RequestMode;
+      redirect?: RequestRedirect;
+      referrer?: string;
+      integrity?: string;
+      /**
+       * This property accepts either a boolean to enable/disable transferring cache for eligible
+       * requests performed using `HttpClient`, or an object, which allows to configure cache
+       * parameters, such as which headers should be included (no headers are included by default).
+       *
+       * Setting this property will override the options passed to `provideClientHydration()` for this
+       * particular request
+       */
+      transferCache?: {includeHeaders?: string[]} | boolean;
+      timeout?: number;
+    },
+  );
   constructor(
     method: string,
     readonly url: string,
-    third?: T | HttpRequestOptions | null,
-    fourth?: HttpRequestOptions,
+    third?:
+      | T
+      | {
+          headers?: HttpHeaders;
+          context?: HttpContext;
+          reportProgress?: boolean;
+          params?: HttpParams;
+          responseType?: 'arraybuffer' | 'blob' | 'json' | 'text';
+          withCredentials?: boolean;
+          credentials?: RequestCredentials;
+          keepalive?: boolean;
+          priority?: RequestPriority;
+          cache?: RequestCache;
+          mode?: RequestMode;
+          redirect?: RequestRedirect;
+          referrer?: string;
+          integrity?: string;
+          transferCache?: {includeHeaders?: string[]} | boolean;
+          timeout?: number;
+        }
+      | null,
+    fourth?: {
+      headers?: HttpHeaders;
+      context?: HttpContext;
+      reportProgress?: boolean;
+      params?: HttpParams;
+      responseType?: 'arraybuffer' | 'blob' | 'json' | 'text';
+      withCredentials?: boolean;
+      credentials?: RequestCredentials;
+      keepalive?: boolean;
+      priority?: RequestPriority;
+      cache?: RequestCache;
+      mode?: RequestMode;
+      redirect?: RequestRedirect;
+      referrer?: string;
+      integrity?: string;
+      transferCache?: {includeHeaders?: string[]} | boolean;
+      timeout?: number;
+    },
   ) {
     this.method = method.toUpperCase();
-    // Next, need to figure out which argument holds the HttpRequestOptions
+    // Next, need to figure out which argument holds the HttpRequestInit
     // options, if any.
-    let options: HttpRequestOptions | undefined;
+    let options: HttpRequestInit | undefined;
 
     // Check whether a body argument is expected. The only valid way to omit
     // the body argument is to use a known no-body method like GET.
@@ -312,15 +444,13 @@ export class HttpRequest<T> implements HttpRequestOptions {
       options = fourth;
     } else {
       // No body required, options are the third argument. The body stays null.
-      options = third as HttpRequestOptions;
+      options = third as HttpRequestInit;
     }
 
     // If options have been passed, interpret them.
     if (options) {
-      // Normalize progress and credential flags.
+      // Normalize reportProgress and withCredentials.
       this.reportProgress = !!options.reportProgress;
-      this.reportUploadProgress = !!options.reportUploadProgress;
-      this.reportDownloadProgress = !!options.reportDownloadProgress;
       this.withCredentials = !!options.withCredentials;
       this.keepalive = !!options.keepalive;
 
@@ -379,12 +509,8 @@ export class HttpRequest<T> implements HttpRequestOptions {
         this.integrity = options.integrity;
       }
 
-      if (options.referrer !== undefined) {
+      if (options.referrer) {
         this.referrer = options.referrer;
-      }
-
-      if (options.referrerPolicy) {
-        this.referrerPolicy = options.referrerPolicy;
       }
 
       // We do want to assign transferCache even if it's falsy (false is valid value)
@@ -408,20 +534,8 @@ export class HttpRequest<T> implements HttpRequestOptions {
         // No parameters, the visible URL is just the URL given at creation time.
         this.urlWithParams = url;
       } else {
-        // Strip the fragment (e.g. #bypass) from the URL before checking for existing query parameters.
-        // This ensures that new query parameters are inserted before the fragment, preventing
-        // situations where parameters are mistakenly appended after the fragment and thus
-        // only exposed to the frontend, which could bypass security checks.
-        let urlWithoutFragment = url;
-        let fragment = '';
-        const hashIdx = url.indexOf('#');
-        if (hashIdx !== -1) {
-          fragment = url.substring(hashIdx);
-          urlWithoutFragment = url.substring(0, hashIdx);
-        }
-
         // Does the URL already have query parameters? Look for '?'.
-        const qIdx = urlWithoutFragment.indexOf('?');
+        const qIdx = url.indexOf('?');
         // There are 3 cases to handle:
         // 1) No existing parameters -> append '?' followed by params.
         // 2) '?' exists and is followed by existing query string ->
@@ -429,8 +543,8 @@ export class HttpRequest<T> implements HttpRequestOptions {
         // 3) '?' exists at the end of the url -> append params directly.
         // This basically amounts to determining the character, if any, with
         // which to join the URL and parameters.
-        const sep: string = qIdx === -1 ? '?' : qIdx < urlWithoutFragment.length - 1 ? '&' : '';
-        this.urlWithParams = urlWithoutFragment + sep + params + fragment;
+        const sep: string = qIdx === -1 ? '?' : qIdx < url.length - 1 ? '&' : '';
+        this.urlWithParams = url + sep + params;
       }
     }
   }
@@ -517,26 +631,70 @@ export class HttpRequest<T> implements HttpRequestOptions {
   }
 
   clone(): HttpRequest<T>;
+  clone(update: {
+    headers?: HttpHeaders;
+    context?: HttpContext;
+    reportProgress?: boolean;
+    params?: HttpParams;
+    responseType?: 'arraybuffer' | 'blob' | 'json' | 'text';
+    withCredentials?: boolean;
+    credentials?: RequestCredentials;
+    keepalive?: boolean;
+    priority?: RequestPriority;
+    cache?: RequestCache;
+    mode?: RequestMode;
+    redirect?: RequestRedirect;
+    referrer?: string;
+    integrity?: string;
+    transferCache?: {includeHeaders?: string[]} | boolean;
+    timeout?: number;
+    body?: T | null;
+    method?: string;
+    url?: string;
+    setHeaders?: {[name: string]: string | string[]};
+    setParams?: {[param: string]: string};
+  }): HttpRequest<T>;
+  clone<V>(update: {
+    headers?: HttpHeaders;
+    context?: HttpContext;
+    reportProgress?: boolean;
+    params?: HttpParams;
+    responseType?: 'arraybuffer' | 'blob' | 'json' | 'text';
+    keepalive?: boolean;
+    priority?: RequestPriority;
+    cache?: RequestCache;
+    mode?: RequestMode;
+    redirect?: RequestRedirect;
+    referrer?: string;
+    integrity?: string;
+    withCredentials?: boolean;
+    credentials?: RequestCredentials;
+    transferCache?: {includeHeaders?: string[]} | boolean;
+    timeout?: number;
+    body?: V | null;
+    method?: string;
+    url?: string;
+    setHeaders?: {[name: string]: string | string[]};
+    setParams?: {[param: string]: string};
+  }): HttpRequest<V>;
   clone(
-    update: HttpRequestOptions & {
-      body?: T | null;
-      method?: string;
-      url?: string;
-      setHeaders?: {[name: string]: string | string[]};
-      setParams?: {[param: string]: string};
-    },
-  ): HttpRequest<T>;
-  clone<V>(
-    update: HttpRequestOptions & {
-      body?: V | null;
-      method?: string;
-      url?: string;
-      setHeaders?: {[name: string]: string | string[]};
-      setParams?: {[param: string]: string};
-    },
-  ): HttpRequest<V>;
-  clone(
-    update: HttpRequestOptions & {
+    update: {
+      headers?: HttpHeaders;
+      context?: HttpContext;
+      reportProgress?: boolean;
+      params?: HttpParams;
+      responseType?: 'arraybuffer' | 'blob' | 'json' | 'text';
+      withCredentials?: boolean;
+      credentials?: RequestCredentials;
+      keepalive?: boolean;
+      priority?: RequestPriority;
+      cache?: RequestCache;
+      mode?: RequestMode;
+      redirect?: RequestRedirect;
+      referrer?: string;
+      integrity?: string;
+      transferCache?: {includeHeaders?: string[]} | boolean;
+      timeout?: number;
       body?: any | null;
       method?: string;
       url?: string;
@@ -555,10 +713,8 @@ export class HttpRequest<T> implements HttpRequestOptions {
     const mode = update.mode || this.mode;
     const redirect = update.redirect || this.redirect;
     const credentials = update.credentials || this.credentials;
-
-    const referrer = update.referrer ?? this.referrer;
+    const referrer = update.referrer || this.referrer;
     const integrity = update.integrity || this.integrity;
-    const referrerPolicy = update.referrerPolicy || this.referrerPolicy;
     // Carefully handle the transferCache to differentiate between
     // `false` and `undefined` in the update args.
     const transferCache = update.transferCache ?? this.transferCache;
@@ -575,8 +731,6 @@ export class HttpRequest<T> implements HttpRequestOptions {
     // `false` and `undefined` in the update args.
     const withCredentials = update.withCredentials ?? this.withCredentials;
     const reportProgress = update.reportProgress ?? this.reportProgress;
-    const reportUploadProgress = update.reportUploadProgress ?? this.reportUploadProgress;
-    const reportDownloadProgress = update.reportDownloadProgress ?? this.reportDownloadProgress;
 
     // Headers and params may be appended to if `setHeaders` or
     // `setParams` are used.
@@ -610,8 +764,6 @@ export class HttpRequest<T> implements HttpRequestOptions {
       headers,
       context,
       reportProgress,
-      reportUploadProgress,
-      reportDownloadProgress,
       responseType,
       withCredentials,
       transferCache,
@@ -624,7 +776,6 @@ export class HttpRequest<T> implements HttpRequestOptions {
       credentials,
       referrer,
       integrity,
-      referrerPolicy,
     });
   }
 }

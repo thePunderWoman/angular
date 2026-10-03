@@ -153,6 +153,96 @@ declare global {
     __Zone_disable_crypto?: boolean;
 
     /**
+     * Disable the monkey patch of the `Object.defineProperty()` API.
+     *
+     * Note: This configuration is available only in the legacy bundle (dist/zone.js). This module
+     * is not available in the evergreen bundle (zone-evergreen.js).
+     *
+     * In the legacy browser, the default behavior of `zone.js` is to monkey patch
+     * `Object.defineProperty()` and `Object.create()` to try to ensure PropertyDescriptor
+     * parameter's configurable property to be true. This patch is only needed in some old mobile
+     * browsers.
+     *
+     * If you set `__Zone_disable_defineProperty = true` before importing `zone.js`,
+     * `zone.js` does not monkey patch the `Object.defineProperty()` API and does not
+     * modify desc.configurable to true.
+     *
+     */
+    __Zone_disable_defineProperty?: boolean;
+
+    /**
+     * Disable the monkey patch of the browser `registerElement()` API.
+     *
+     * NOTE: This configuration is only available in the legacy bundle (dist/zone.js), this
+     * module is not available in the evergreen bundle (zone-evergreen.js).
+     *
+     * In the legacy browser, the default behavior of `zone.js` is to monkey patch the
+     * `registerElement()` API to make asynchronous callbacks of the API in the same zone when
+     * `registerElement()` is called.
+     *
+     * Consider the following example:
+     *
+     * ```ts
+     * const proto = Object.create(HTMLElement.prototype);
+     * proto.createdCallback = function() {
+     *   console.log('createdCallback is invoked in the zone', Zone.current.name);
+     * };
+     * proto.attachedCallback = function() {
+     *   console.log('attachedCallback is invoked in the zone', Zone.current.name);
+     * };
+     * proto.detachedCallback = function() {
+     *   console.log('detachedCallback is invoked in the zone', Zone.current.name);
+     * };
+     * proto.attributeChangedCallback = function() {
+     *   console.log('attributeChangedCallback is invoked in the zone', Zone.current.name);
+     * };
+     *
+     * const zone = Zone.current.fork({name: 'myZone'});
+     * zone.run(() => {
+     *   document.registerElement('x-elem', {prototype: proto});
+     * });
+     * ```
+     *
+     * When these callbacks are invoked, those callbacks will be in the zone when
+     * `registerElement()` is called.
+     *
+     * If you set `__Zone_disable_registerElement = true` before importing `zone.js`,
+     * `zone.js` does not monkey patch `registerElement()` API and the above code
+     * outputs '<root>'.
+     */
+    __Zone_disable_registerElement?: boolean;
+
+    /**
+     * Disable the monkey patch of the browser legacy `EventTarget` API.
+     *
+     * NOTE: This configuration is only available in the legacy bundle (dist/zone.js), this module
+     * is not available in the evergreen bundle (zone-evergreen.js).
+     *
+     * In some old browsers, the `EventTarget` is not available, so `zone.js` cannot directly monkey
+     * patch the `EventTarget`. Instead, `zone.js` patches all known HTML elements' prototypes (such
+     * as `HtmlDivElement`). The callback of the `addEventListener()` will be in the same zone when
+     * the `addEventListener()` is called.
+     *
+     * Consider the following example:
+     *
+     * ```ts
+     * const zone = Zone.current.fork({name: 'myZone'});
+     * zone.run(() => {
+     *   div.addEventListener('click', () => {
+     *     console.log('div click event listener is invoked in the zone', Zone.current.name);
+     *     // the output is 'div click event listener is invoked in the zone myZone'.
+     *   });
+     * });
+     * ```
+     *
+     * If you set `__Zone_disable_EventTargetLegacy = true` before importing `zone.js`
+     * In some old browsers, where `EventTarget` is not available, if you set
+     * `__Zone_disable_EventTargetLegacy = true` before importing `zone.js`, `zone.js` does not
+     * monkey patch all HTML element APIs and the above code outputs 'clicked <root>'.
+     */
+    __Zone_disable_EventTargetLegacy?: boolean;
+
+    /**
      * Disable the monkey patch of the browser `timer` APIs.
      *
      * By default, `zone.js` monkey patches browser timer
@@ -555,59 +645,6 @@ declare global {
      * the user with a string returned from the event handler.
      */
     __zone_symbol__enable_beforeunload?: boolean;
-
-    /**
-     * https://github.com/angular/angular/issues/41506
-     * https://github.com/angular/angular/issues/44446
-     *
-     * By default, `zone.js` maintains a microtask queue manually, which means the microtask
-     * queue is drained whenever `zone.js` decides to do so under certain circumstances.
-     * Typically, `zone.js` invokes a task (e.g., an event task) and, after invoking the task,
-     * checks whether the number of nested task frames is equal to 1 before calling the microtask
-     * queue draining.
-     * As thus, there are cases when the microtask queue may be drained synchronously after an
-     * event task is invoked (if it’s the very first task in the call stack).
-     * Tasks may actually schedule other tasks, thereby incrementing the stack frame.
-     * In that case, the microtask queue might be drained after the last task is invoked.
-     *
-     * Given that code:
-     * ```js
-     * Zone.current.fork({name: 'child'}).run(() => {
-     *   const div = document.createElement('div');
-     *   div.style.height = '200px';
-     *   div.style.width = '200px';
-     *   div.style.backgroundColor = 'red';
-     *   document.body.appendChild(div);
-     *
-     *   function listener() {
-     *     Promise.resolve().then(() => {
-     *       div.style.height = '400px';
-     *     });
-     *   }
-     *
-     *   div.addEventListener('fakeEvent', listener);
-     *   div.dispatchEvent(new Event('fakeEvent'));
-     *   console.log(div.getBoundingClientRect().height); // 400
-     * });
-     * ```
-     *
-     * We would assume that "200" would be logged. However, with `zone.js`, "400" will
-     * be logged first because it drains the microtask queue too early, as the `fakeEvent`
-     * event task is the very top task on the stack.
-     *
-     * https://promisesaplus.com/#the-then-method
-     * According to the spec: `onFulfilled` or `onRejected` must not be called until the
-     * execution context stack contains only platform code.
-     *
-     * You may consider enabling the flag below. This will ensure that microtask draining
-     * does not happen synchronously and always occurs within a browser microtask.
-     *
-     * This is critically important for our code and other third-party code, which is
-     * beyond our control, to work properly. If a microtask is scheduled within an event
-     * listener to be executed "later", it should indeed be executed later and not synchronously,
-     * as this would break the expected flow of code execution.
-     */
-    __zone_symbol__enable_native_microtask_draining?: boolean;
   }
 
   /**

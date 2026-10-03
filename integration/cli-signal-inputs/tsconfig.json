@@ -1,18 +1,21 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
+    "baseUrl": "./",
     "outDir": "./dist/out-tsc",
     "sourceMap": true,
     "esModuleInterop": true,
+    "strict": true,
     "declaration": false,
     "experimentalDecorators": true,
     "module": "es2022",
     "moduleResolution": "bundler",
     "importHelpers": true,
     "target": "es2022",
-    "skipLibCheck": true,
     "typeRoots": ["node_modules/@types"],
     "lib": ["es2018", "dom"]
   },
-  "angularCompilerOptions": {}
+  "angularCompilerOptions": {
+    "strictTemplates": true
+  }
 }

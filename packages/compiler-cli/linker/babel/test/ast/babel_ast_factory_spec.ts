@@ -7,9 +7,13 @@
  */
 import {leadingComment} from '@angular/compiler';
 import {types as t, template} from '@babel/core';
-import generate from '@babel/generator';
+import _generate from '@babel/generator';
 
 import {BabelAstFactory} from '../../src/ast/babel_ast_factory';
+
+// Babel is a CJS package and misuses the `default` named binding:
+// https://github.com/babel/babel/issues/15269.
+const generate = (_generate as any)['default'] as typeof _generate;
 
 // Exposes shorthands for the `expression` and `statement`
 // methods exposed by `@babel/template`.
@@ -21,7 +25,7 @@ describe('BabelAstFactory', () => {
   beforeEach(() => (factory = new BabelAstFactory('/original.ts')));
 
   describe('attachComments()', () => {
-    it('should add the comments to the given statement (assignment)', () => {
+    it('should add the comments to the given statement', () => {
       const stmt = statement.ast`x = 10;`;
       factory.attachComments(stmt, [
         leadingComment('comment 1', true),
@@ -145,33 +149,9 @@ describe('BabelAstFactory', () => {
   describe('createFunctionDeclaration()', () => {
     it('should create a function declaration node with the given name, parameters and body statements', () => {
       const stmts = statement.ast`{x = 10; y = 20;}`;
-      const fn = factory.createFunctionDeclaration(
-        'foo',
-        [
-          {name: 'arg1', type: null},
-          {name: 'arg2', type: factory.createBuiltInType('number')},
-        ],
-        stmts,
-        null,
-      );
+      const fn = factory.createFunctionDeclaration('foo', ['arg1', 'arg2'], stmts);
       expect(generate(fn).code).toEqual(
-        ['function foo(arg1, arg2: number) {', '  x = 10;', '  y = 20;', '}'].join('\n'),
-      );
-    });
-
-    it('should create a function declaration with a return type', () => {
-      const stmts = statement.ast`{x = 10; y = 20;}`;
-      const fn = factory.createFunctionDeclaration(
-        'foo',
-        [
-          {name: 'arg1', type: null},
-          {name: 'arg2', type: factory.createBuiltInType('number')},
-        ],
-        stmts,
-        factory.createBuiltInType('boolean'),
-      );
-      expect(generate(fn).code).toEqual(
-        ['function foo(arg1, arg2: number): boolean {', '  x = 10;', '  y = 20;', '}'].join('\n'),
+        ['function foo(arg1, arg2) {', '  x = 10;', '  y = 20;', '}'].join('\n'),
       );
     });
   });
@@ -179,50 +159,18 @@ describe('BabelAstFactory', () => {
   describe('createFunctionExpression()', () => {
     it('should create a function expression node with the given name, parameters and body statements', () => {
       const stmts = statement.ast`{x = 10; y = 20;}`;
-      const fn = factory.createFunctionExpression(
-        'foo',
-        [
-          {name: 'arg1', type: null},
-          {name: 'arg2', type: factory.createBuiltInType('number')},
-        ],
-        stmts,
-        null,
-      );
+      const fn = factory.createFunctionExpression('foo', ['arg1', 'arg2'], stmts);
       expect(t.isStatement(fn)).toBe(false);
       expect(generate(fn).code).toEqual(
-        ['function foo(arg1, arg2: number) {', '  x = 10;', '  y = 20;', '}'].join('\n'),
-      );
-    });
-
-    it('should create a function expression with a return type', () => {
-      const stmts = statement.ast`{x = 10; y = 20;}`;
-      const fn = factory.createFunctionExpression(
-        'foo',
-        [
-          {name: 'arg1', type: null},
-          {name: 'arg2', type: factory.createBuiltInType('number')},
-        ],
-        stmts,
-        factory.createBuiltInType('boolean'),
-      );
-      expect(generate(fn).code).toEqual(
-        ['function foo(arg1, arg2: number): boolean {', '  x = 10;', '  y = 20;', '}'].join('\n'),
+        ['function foo(arg1, arg2) {', '  x = 10;', '  y = 20;', '}'].join('\n'),
       );
     });
 
     it('should create an anonymous function expression node if the name is null', () => {
       const stmts = statement.ast`{x = 10; y = 20;}`;
-      const fn = factory.createFunctionExpression(
-        null,
-        [
-          {name: 'arg1', type: null},
-          {name: 'arg2', type: factory.createBuiltInType('number')},
-        ],
-        stmts,
-        null,
-      );
+      const fn = factory.createFunctionExpression(null, ['arg1', 'arg2'], stmts);
       expect(generate(fn).code).toEqual(
-        ['function (arg1, arg2: number) {', '  x = 10;', '  y = 20;', '}'].join('\n'),
+        ['function (arg1, arg2) {', '  x = 10;', '  y = 20;', '}'].join('\n'),
       );
     });
   });
@@ -230,48 +178,21 @@ describe('BabelAstFactory', () => {
   describe('createArrowFunctionExpression()', () => {
     it('should create an arrow function with an implicit return if a single statement is provided', () => {
       const expr = expression.ast`arg2 + arg1`;
-      const fn = factory.createArrowFunctionExpression(
-        [
-          {name: 'arg1', type: null},
-          {name: 'arg2', type: factory.createBuiltInType('number')},
-        ],
-        expr,
-        null,
-      );
-      expect(generate(fn).code).toEqual('(arg1, arg2: number) => arg2 + arg1');
-    });
-
-    it('should create an arrow function with a return type', () => {
-      const expr = expression.ast`arg2 + arg1`;
-      const fn = factory.createArrowFunctionExpression(
-        [
-          {name: 'arg1', type: null},
-          {name: 'arg2', type: factory.createBuiltInType('number')},
-        ],
-        expr,
-        factory.createBuiltInType('number'),
-      );
-      expect(generate(fn).code).toEqual('(arg1, arg2: number): number => arg2 + arg1');
+      const fn = factory.createArrowFunctionExpression(['arg1', 'arg2'], expr);
+      expect(generate(fn).code).toEqual('(arg1, arg2) => arg2 + arg1');
     });
 
     it('should create an arrow function with an implicit return object literal', () => {
       const expr = expression.ast`{a: 1, b: 2}`;
-      const fn = factory.createArrowFunctionExpression([], expr, null);
+      const fn = factory.createArrowFunctionExpression([], expr);
       expect(generate(fn).code).toEqual(['() => ({', '  a: 1,', '  b: 2', '})'].join('\n'));
     });
 
     it('should create an arrow function with a body when an array of statements is provided', () => {
       const stmts = statement.ast`{x = 10; y = 20; return x + y;}`;
-      const fn = factory.createArrowFunctionExpression(
-        [
-          {name: 'arg1', type: null},
-          {name: 'arg2', type: factory.createBuiltInType('number')},
-        ],
-        stmts,
-        null,
-      );
+      const fn = factory.createArrowFunctionExpression(['arg1', 'arg2'], stmts);
       expect(generate(fn).code).toEqual(
-        ['(arg1, arg2: number) => {', '  x = 10;', '  y = 20;', '  return x + y;', '}'].join('\n'),
+        ['(arg1, arg2) => {', '  x = 10;', '  y = 20;', '  return x + y;', '}'].join('\n'),
       );
     });
   });
@@ -328,9 +249,9 @@ describe('BabelAstFactory', () => {
       expect(generate(literal).code).toEqual('42');
     });
 
-    it('should create an identifier for `NaN`', () => {
+    it('should create a number literal for `NaN`', () => {
       const literal = factory.createLiteral(NaN);
-      expect(t.isIdentifier(literal)).toBe(true);
+      expect(t.isNumericLiteral(literal)).toBe(true);
       expect(generate(literal).code).toEqual('NaN');
     });
 
@@ -367,29 +288,11 @@ describe('BabelAstFactory', () => {
     it('should create an object literal node, with the given properties', () => {
       const prop1 = expression.ast`42`;
       const prop2 = expression.ast`"moo"`;
-      const prop3 = expression.ast`foo`;
       const obj = factory.createObjectLiteral([
-        {propertyName: 'prop1', value: prop1, kind: 'property', quoted: false},
-        {propertyName: 'prop2', value: prop2, kind: 'property', quoted: true},
-        {expression: prop3, kind: 'spread'},
+        {propertyName: 'prop1', value: prop1, quoted: false},
+        {propertyName: 'prop2', value: prop2, quoted: true},
       ]);
-      expect(generate(obj).code).toEqual(
-        ['{', '  prop1: 42,', '  "prop2": "moo",', '  ...foo', '}'].join('\n'),
-      );
-    });
-
-    it('should attach leading comments to object literal properties', () => {
-      const prop1 = expression.ast`42`;
-      const obj = factory.createObjectLiteral([
-        {
-          propertyName: 'prop1',
-          value: prop1,
-          kind: 'property',
-          quoted: false,
-          leadingComments: [leadingComment('@ts-ignore', true, true)],
-        },
-      ]);
-      expect(generate(obj).code).toEqual(['{', '  /* @ts-ignore */prop1: 42', '}'].join('\n'));
+      expect(generate(obj).code).toEqual(['{', '  prop1: 42,', '  "prop2": "moo"', '}'].join('\n'));
     });
   });
 
@@ -471,36 +374,25 @@ describe('BabelAstFactory', () => {
   describe('createVariableDeclaration()', () => {
     it('should create a variable declaration statement node for the given variable name and initializer', () => {
       const initializer = expression.ast`42`;
-      const varDecl = factory.createVariableDeclaration('foo', initializer, 'let', null);
+      const varDecl = factory.createVariableDeclaration('foo', initializer, 'let');
       expect(generate(varDecl).code).toEqual('let foo = 42;');
     });
 
     it('should create a constant declaration statement node for the given variable name and initializer', () => {
       const initializer = expression.ast`42`;
-      const varDecl = factory.createVariableDeclaration('foo', initializer, 'const', null);
+      const varDecl = factory.createVariableDeclaration('foo', initializer, 'const');
       expect(generate(varDecl).code).toEqual('const foo = 42;');
     });
 
     it('should create a downleveled variable declaration statement node for the given variable name and initializer', () => {
       const initializer = expression.ast`42`;
-      const varDecl = factory.createVariableDeclaration('foo', initializer, 'var', null);
+      const varDecl = factory.createVariableDeclaration('foo', initializer, 'var');
       expect(generate(varDecl).code).toEqual('var foo = 42;');
     });
 
     it('should create an uninitialized variable declaration statement node for the given variable name and a null initializer', () => {
-      const varDecl = factory.createVariableDeclaration('foo', null, 'let', null);
+      const varDecl = factory.createVariableDeclaration('foo', null, 'let');
       expect(generate(varDecl).code).toEqual('let foo;');
-    });
-
-    it('should create a variable declaration with a type', () => {
-      const initializer = expression.ast`42`;
-      const varDecl = factory.createVariableDeclaration(
-        'foo',
-        initializer,
-        'let',
-        factory.createBuiltInType('number'),
-      );
-      expect(generate(varDecl).code).toEqual('let foo: number = 42;');
     });
   });
 
@@ -513,72 +405,6 @@ describe('BabelAstFactory', () => {
     it('should create a regular expressions with flags', () => {
       const regex = factory.createRegularExpressionLiteral('^\\d+-foo$', 'gi');
       expect(generate(regex).code).toEqual('/^\\d+-foo$/gi');
-    });
-  });
-
-  describe('createSpreadElement()', () => {
-    it('should create a spread element in an array', () => {
-      const before = factory.createIdentifier('a');
-      const spread = factory.createSpreadElement(factory.createIdentifier('b'));
-      const array = factory.createArrayLiteral([before, spread]);
-      expect(generate(array).code).toEqual('[a, ...b]');
-    });
-
-    it('should create a spread in a call expression', () => {
-      const fn = factory.createIdentifier('fn');
-      const before = factory.createIdentifier('a');
-      const spread = factory.createSpreadElement(factory.createIdentifier('b'));
-      const call = factory.createCallExpression(fn, [before, spread], false);
-      expect(generate(call).code).toEqual('fn(a, ...b)');
-    });
-  });
-
-  describe('createBuiltInType()', () => {
-    it('should create type annotations for built in types', () => {
-      expect(generate(factory.createBuiltInType('any')).code).toEqual('any');
-      expect(generate(factory.createBuiltInType('boolean')).code).toEqual('boolean');
-      expect(generate(factory.createBuiltInType('number')).code).toEqual('number');
-      expect(generate(factory.createBuiltInType('string')).code).toEqual('string');
-      expect(generate(factory.createBuiltInType('never')).code).toEqual('never');
-      expect(generate(factory.createBuiltInType('unknown')).code).toEqual('unknown');
-      expect(generate(factory.createBuiltInType('function')).code).toEqual('Function');
-    });
-  });
-
-  describe('createExpressionType()', () => {
-    it('should create a generic type annotation for an identifier', () => {
-      const id = factory.createIdentifier('MyType');
-      const type = factory.createExpressionType(id, null);
-      expect(generate(type).code).toEqual('MyType');
-    });
-
-    it('should create a generic type annotation for property access', () => {
-      const expr = factory.createPropertyAccess(factory.createIdentifier('ns'), 'MyType');
-      const type = factory.createExpressionType(expr, null);
-      expect(generate(type).code).toEqual('ns.MyType');
-    });
-
-    it('should create a generic type annotation with type parameters', () => {
-      const id = factory.createIdentifier('MyType');
-      const typeParam = factory.createBuiltInType('string');
-      const type = factory.createExpressionType(id, [typeParam]);
-      expect(generate(type).code).toEqual('MyType<string>');
-    });
-  });
-
-  describe('createArrayType()', () => {
-    it('should create an array type annotation', () => {
-      const elementType = factory.createBuiltInType('string');
-      const type = factory.createArrayType(elementType);
-      expect(generate(type).code).toEqual('string[]');
-    });
-  });
-
-  describe('createMapType()', () => {
-    it('should create an object type with an indexer', () => {
-      const valueType = factory.createBuiltInType('number');
-      const type = factory.createMapType(valueType);
-      expect(generate(type).code).toEqual('{\n  [key: string]: number;\n}');
     });
   });
 

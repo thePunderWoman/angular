@@ -15,7 +15,6 @@ import {
   EnvironmentInjector,
   inject,
   provideZoneChangeDetection,
-  ChangeDetectionStrategy,
 } from '../../src/core';
 import {TestBed} from '../../testing';
 
@@ -74,7 +73,7 @@ describe('DestroyRef', () => {
 
       expect(() => {
         destroyRef.onDestroy(() => {});
-      }).toThrowError(/NG0205: Injector has already been destroyed./);
+      }).toThrowError('NG0205: Injector has already been destroyed.');
     });
   });
 
@@ -90,8 +89,6 @@ describe('DestroyRef', () => {
       @Component({
         selector: 'test',
         template: ``,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         constructor(destroyCtx: DestroyRef) {
@@ -123,10 +120,7 @@ describe('DestroyRef', () => {
         imports: [WithCleanupDirective],
         // note: we are trying to register a LView-level cleanup _before_ TView-level one (event
         // listener)
-        template: `<div withCleanup></div>
-          <button (click)="noop()"></button>`,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
+        template: `<div withCleanup></div><button (click)="noop()"></button>`,
       })
       class TestCmp {
         noop() {}
@@ -156,8 +150,6 @@ describe('DestroyRef', () => {
         selector: 'test',
         imports: [WithCleanupDirective, NgIf],
         template: `<ng-template [ngIf]="show"><div withCleanup></div></ng-template>`,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestCmp {
         show = true;
@@ -177,8 +169,6 @@ describe('DestroyRef', () => {
       @Component({
         selector: 'child',
         template: '',
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Child {
         constructor() {
@@ -188,8 +178,6 @@ describe('DestroyRef', () => {
       @Component({
         imports: [Child, NgIf],
         template: '<child *ngIf="showChild"></child>',
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Parent {
         showChild = true;
@@ -209,8 +197,6 @@ describe('DestroyRef', () => {
     @Component({
       selector: 'test',
       template: ``,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class TestCmp {
       unRegFn: () => void;
@@ -236,8 +222,6 @@ describe('DestroyRef', () => {
     @Component({
       selector: 'test',
       template: ``,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class TestCmp {
       unRegFn: () => void;
@@ -265,8 +249,6 @@ describe('DestroyRef', () => {
     @Component({
       selector: 'test',
       template: ``,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class TestCmp {
       constructor(public destroyRef: DestroyRef) {}
@@ -287,8 +269,6 @@ describe('DestroyRef', () => {
     @Component({
       selector: 'test',
       template: ``,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class TestCmp {
       constructor(destroyCtx: DestroyRef) {

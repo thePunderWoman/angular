@@ -79,6 +79,7 @@ export class RoutesOneComponent {}
 export class RoutesTwoComponent {}
 
 @Component({
+  standalone: true,
   selector: 'app-routes-standalone',
   template: '<h1>Standalone Route</h1>',
 })

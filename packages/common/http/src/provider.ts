@@ -16,7 +16,7 @@ import {
 
 import {HttpBackend, HttpHandler, HttpInterceptorHandler} from './backend';
 import {HttpClient} from './client';
-import {FetchBackend} from './fetch';
+import {FETCH_BACKEND, FetchBackend} from './fetch';
 import {HTTP_INTERCEPTOR_FNS, HttpInterceptorFn, legacyInterceptorFnFactory} from './interceptor';
 import {
   jsonpCallbackContext,
@@ -40,7 +40,6 @@ export enum HttpFeatureKind {
   JsonpSupport,
   RequestsMadeViaParent,
   Fetch,
-  Xhr,
 }
 
 /**
@@ -66,8 +65,6 @@ function makeHttpFeature<KindT extends HttpFeatureKind>(
 /**
  * Configures Angular's `HttpClient` service to be available for injection.
  *
- * The `HttpClient` service is provided in the root by default.
- *
  * By default, `HttpClient` will be configured for injection with its default options for XSRF
  * protection of outgoing requests. Additional configuration options can be provided by passing
  * feature functions to `provideHttpClient`. For example, HTTP interceptors can be added using the
@@ -75,26 +72,24 @@ function makeHttpFeature<KindT extends HttpFeatureKind>(
  *
  * <div class="docs-alert docs-alert-helpful">
  *
- * By default, `HttpClient` uses the
- * [`fetch` API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) to make requests.
- * This is strongly recommended for applications that use
- * Server-Side Rendering for better performance and compatibility.
- * To use the `XMLHttpRequest` API instead, add the {@link withXhr} feature:
+ * It's strongly recommended to enable
+ * [`fetch`](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) for applications that use
+ * Server-Side Rendering for better performance and compatibility. To enable `fetch`, add
+ * `withFetch()` feature to the `provideHttpClient()` call at the root of the application:
  *
  * ```ts
- * provideHttpClient(withXhr());
+ * provideHttpClient(withFetch());
  * ```
  *
  * </div>
  *
- * @see [HTTP Client](guide/http/setup)
  * @see {@link withInterceptors}
  * @see {@link withInterceptorsFromDi}
  * @see {@link withXsrfConfiguration}
  * @see {@link withNoXsrfProtection}
  * @see {@link withJsonpSupport}
  * @see {@link withRequestsMadeViaParent}
- * @see {@link withXhr}
+ * @see {@link withFetch}
  */
 export function provideHttpClient(
   ...features: HttpFeature<HttpFeatureKind>[]
@@ -106,28 +101,21 @@ export function provideHttpClient(
       featureKinds.has(HttpFeatureKind.CustomXsrfConfiguration)
     ) {
       throw new Error(
-        `Configuration error: found both withXsrfConfiguration() and withNoXsrfProtection() in the same call to provideHttpClient(), which is a contradiction.`,
-      );
-    }
-
-    const hasBackendOverride =
-      featureKinds.has(HttpFeatureKind.Fetch) || featureKinds.has(HttpFeatureKind.Xhr);
-    if (featureKinds.has(HttpFeatureKind.RequestsMadeViaParent) && hasBackendOverride) {
-      throw new Error(
-        `Configuration error: withRequestsMadeViaParent() cannot be combined with withFetch() or withXhr() in the same call to provideHttpClient().`,
+        ngDevMode
+          ? `Configuration error: found both withXsrfConfiguration() and withNoXsrfProtection() in the same call to provideHttpClient(), which is a contradiction.`
+          : '',
       );
     }
   }
 
   const providers: Provider[] = [
     HttpClient,
-    FetchBackend,
     HttpInterceptorHandler,
     {provide: HttpHandler, useExisting: HttpInterceptorHandler},
     {
       provide: HttpBackend,
       useFactory: () => {
-        return inject(FetchBackend);
+        return inject(FETCH_BACKEND, {optional: true}) ?? inject(HttpXhrBackend);
       },
     },
     {
@@ -168,7 +156,7 @@ export function withInterceptors(
 }
 
 const LEGACY_INTERCEPTOR_FN = new InjectionToken<HttpInterceptorFn>(
-  typeof ngDevMode !== 'undefined' && ngDevMode ? 'LEGACY_INTERCEPTOR_FN' : '',
+  typeof ngDevMode !== undefined && ngDevMode ? 'LEGACY_INTERCEPTOR_FN' : '',
 );
 
 /**
@@ -246,7 +234,6 @@ export function withNoXsrfProtection(): HttpFeature<HttpFeatureKind.NoXsrfProtec
  * Add JSONP support to the configuration of the current `HttpClient` instance.
  *
  * @see {@link provideHttpClient}
- * @deprecated 22.1 JSONP is deprecated as it can cause XSS vulnerabilities. Use standard HTTP requests instead. Intent to remove in future versions of Angular.
  */
 export function withJsonpSupport(): HttpFeature<HttpFeatureKind.JsonpSupport> {
   return makeHttpFeature(HttpFeatureKind.JsonpSupport, [
@@ -273,10 +260,6 @@ export function withJsonpSupport(): HttpFeature<HttpFeatureKind.JsonpSupport> {
  * "bubble up" until either reaching the root level or an `HttpClient` which was not configured with
  * this option.
  *
- * This feature cannot be combined with `withFetch` or `withXhr` in the same
- * `provideHttpClient()` call.
- *
- * @see [HTTP client setup](guide/http/setup#withrequestsmadeviaparent)
  * @see {@link provideHttpClient}
  * @publicApi 19.0
  */
@@ -302,38 +285,12 @@ export function withRequestsMadeViaParent(): HttpFeature<HttpFeatureKind.Request
  *
  * Note: The Fetch API doesn't support progress report on uploads.
  *
- * @see [Advanced fetch Options](guide/http/making-requests#advanced-fetch-options)
- *
  * @publicApi
- * @deprecated `withFetch` is not required anymore. `FetchBackend` is the default `HttpBackend`.
  */
 export function withFetch(): HttpFeature<HttpFeatureKind.Fetch> {
   return makeHttpFeature(HttpFeatureKind.Fetch, [
     FetchBackend,
+    {provide: FETCH_BACKEND, useExisting: FetchBackend},
     {provide: HttpBackend, useExisting: FetchBackend},
-  ]);
-}
-
-/**
- * Configures the current `HttpClient` instance to make requests using the Xhr API.
- *
- * Use this feature if you want to report progress on uploads as the Xhr API supports it.
- *
- * <div class="docs-alert docs-alert-critical">
- *
- * Do not use {@link withXhr} in server-side rendering (SSR) environments. XHR support on the
- * server is **deprecated** and is intended to be removed in Angular 23 because the underlying `xhr2`
- * library does not safely handle redirects (e.g. it can forward `Authorization` headers on
- * cross-origin redirects and is susceptible to denial-of-service via redirect loops).
- *
- * </div>
- *
- * @see {@link provideHttpClient}
- * @publicApi
- */
-export function withXhr(): HttpFeature<HttpFeatureKind.Xhr> {
-  return makeHttpFeature(HttpFeatureKind.Xhr, [
-    HttpXhrBackend,
-    {provide: HttpBackend, useExisting: HttpXhrBackend},
   ]);
 }

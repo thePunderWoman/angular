@@ -9,61 +9,9 @@
 import {Injector, signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {form, required} from '../../../../public_api';
-import {requiredError} from '../../../../src/api/rules/validation/validation_errors';
+import {customError, requiredError} from '../../../../src/api/validation_errors';
 
 describe('required validator', () => {
-  // Documented on `required()` and in guide/forms/signals/validation#required. `false` follows the
-  // native semantics of `required` on `<input type="checkbox">`; `NaN` is not a valid number.
-  describe('emptiness', () => {
-    it('treats null, empty string, false and NaN as empty', () => {
-      const model = signal<{
-        nullable: string | null;
-        text: string;
-        checkbox: boolean;
-        num: number;
-      }>({nullable: null, text: '', checkbox: false, num: Number.NaN});
-      const f = form(
-        model,
-        (p) => {
-          required(p.nullable);
-          required(p.text);
-          required(p.checkbox);
-          required(p.num);
-        },
-        {injector: TestBed.inject(Injector)},
-      );
-
-      expect(f.nullable().errors()).toEqual([requiredError({fieldTree: f.nullable})]);
-      expect(f.text().errors()).toEqual([requiredError({fieldTree: f.text})]);
-      expect(f.checkbox().errors()).toEqual([requiredError({fieldTree: f.checkbox})]);
-      expect(f.num().errors()).toEqual([requiredError({fieldTree: f.num})]);
-    });
-
-    it('treats 0, an empty array and other filled values as non-empty', () => {
-      const model = signal<{
-        zero: number;
-        list: string[];
-        checkbox: boolean;
-        text: string;
-      }>({zero: 0, list: [], checkbox: true, text: 'a'});
-      const f = form(
-        model,
-        (p) => {
-          required(p.zero);
-          required(p.list);
-          required(p.checkbox);
-          required(p.text);
-        },
-        {injector: TestBed.inject(Injector)},
-      );
-
-      expect(f.zero().errors()).toEqual([]);
-      expect(f.list().errors()).toEqual([]);
-      expect(f.checkbox().errors()).toEqual([]);
-      expect(f.text().errors()).toEqual([]);
-    });
-  });
-
   it('returns required Error when the value is not present', () => {
     const cat = signal({name: ''});
     const f = form(
@@ -76,7 +24,7 @@ describe('required validator', () => {
       },
     );
 
-    expect(f.name().errors()).toEqual([requiredError({fieldTree: f.name})]);
+    expect(f.name().errors()).toEqual([requiredError({field: f.name})]);
     f.name().value.set('pirojok-the-cat');
     expect(f.name().errors()).toEqual([]);
   });
@@ -87,7 +35,7 @@ describe('required validator', () => {
       cat,
       (p) => {
         required(p.name, {
-          error: (ctx) => ({kind: `required-${ctx.valueOf(p.age)}`}),
+          error: (ctx) => customError({kind: `required-${ctx.valueOf(p.age)}`}),
         });
       },
       {
@@ -95,7 +43,7 @@ describe('required validator', () => {
       },
     );
 
-    expect(f.name().errors()).toEqual([{kind: 'required-5', fieldTree: f.name}]);
+    expect(f.name().errors()).toEqual([customError({kind: 'required-5', field: f.name})]);
     f.name().value.set('pirojok-the-cat');
     expect(f.name().errors()).toEqual([]);
   });
@@ -114,9 +62,7 @@ describe('required validator', () => {
       },
     );
 
-    expect(f.name().errors()).toEqual([
-      requiredError({message: 'required error', fieldTree: f.name}),
-    ]);
+    expect(f.name().errors()).toEqual([requiredError({message: 'required error', field: f.name})]);
     f.name().value.set('pirojok-the-cat');
     expect(f.name().errors()).toEqual([]);
   });
@@ -139,27 +85,6 @@ describe('required validator', () => {
 
     expect(f.name().errors()).toEqual([]);
     f.age().value.set(15);
-    expect(f.name().errors()).toEqual([requiredError({fieldTree: f.name})]);
-  });
-
-  it('supports returning custom plain error, and wraps it as custom', () => {
-    const cat = signal({name: 'meow', age: 5});
-    const f = form(
-      cat,
-      (p) => {
-        required(p.name, {
-          error: () => {
-            return {kind: 'pirojok-the-error'};
-          },
-        });
-      },
-      {
-        injector: TestBed.inject(Injector),
-      },
-    );
-
-    expect(f.name().errors()).toEqual([]);
-    f.name().value.set('');
-    expect(f.name().errors()).toEqual([{kind: 'pirojok-the-error', fieldTree: f.name}]);
+    expect(f.name().errors()).toEqual([requiredError({field: f.name})]);
   });
 });

@@ -7,9 +7,6 @@
  */
 
 import {ResourceLoader} from '@angular/compiler';
-import {By} from '@angular/platform-browser';
-import {isTextNode} from '@angular/private/testing';
-import {expect} from '@angular/private/testing/matchers';
 import {
   AfterContentChecked,
   AfterContentInit,
@@ -43,10 +40,13 @@ import {
   ViewChild,
   ViewContainerRef,
 } from '../../src/core';
-import {ComponentFixture, TestBed} from '../../testing';
+import {ComponentFixture, fakeAsync, TestBed} from '../../testing';
+import {By} from '@angular/platform-browser';
+import {isTextNode} from '@angular/private/testing';
+import {expect} from '@angular/private/testing/matchers';
 
-import {NoopAnimationsModule} from '@angular/platform-browser/animations';
 import {MockResourceLoader} from './resource_loader_mock';
+import {NoopAnimationsModule} from '@angular/platform-browser/animations';
 
 const TEST_COMPILER_PROVIDERS: Provider[] = [
   {provide: ResourceLoader, useClass: MockResourceLoader, deps: []},
@@ -62,9 +62,7 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
     template: string,
     compType: Type<T> = <any>TestComponent,
   ): ComponentFixture<T> {
-    TestBed.overrideComponent(compType, {
-      set: new Component({template, changeDetection: ChangeDetectionStrategy.Eager}),
-    });
+    TestBed.overrideComponent(compType, {set: new Component({template})});
 
     initHelpers();
 
@@ -145,217 +143,217 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
     });
 
     describe('expressions', () => {
-      it('should support literals', () => {
+      it('should support literals', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue(10)).toEqual(['id=10']);
-      });
+      }));
 
-      it('should strip quotes from literals', () => {
+      it('should strip quotes from literals', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('"str"')).toEqual(['id=str']);
-      });
+      }));
 
-      it('should support newlines in literals', () => {
+      it('should support newlines in literals', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('"a\n\nb"')).toEqual(['id=a\n\nb']);
-      });
+      }));
 
-      it('should support + operations', () => {
+      it('should support + operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('10 + 2')).toEqual(['id=12']);
-      });
+      }));
 
-      it('should support - operations', () => {
+      it('should support - operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('10 - 2')).toEqual(['id=8']);
-      });
+      }));
 
-      it('should support * operations', () => {
+      it('should support * operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('10 * 2')).toEqual(['id=20']);
-      });
+      }));
 
-      it('should support / operations', () => {
+      it('should support / operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('10 / 2')).toEqual([`id=5`]);
-      });
+      }));
 
-      it('should support % operations', () => {
+      it('should support % operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('11 % 2')).toEqual(['id=1']);
-      });
+      }));
 
-      it('should support == operations on identical', () => {
+      it('should support == operations on identical', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('1 == 1')).toEqual(['id=true']);
-      });
+      }));
 
-      it('should support != operations', () => {
+      it('should support != operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('1 != 1')).toEqual(['id=false']);
-      });
+      }));
 
-      it('should support == operations on coerceible', () => {
+      it('should support == operations on coerceible', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('1 == true')).toEqual([`id=true`]);
-      });
+      }));
 
-      it('should support === operations on identical', () => {
+      it('should support === operations on identical', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('1 === 1')).toEqual(['id=true']);
-      });
+      }));
 
-      it('should support !== operations', () => {
+      it('should support !== operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('1 !== 1')).toEqual(['id=false']);
-      });
+      }));
 
-      it('should support === operations on coerceible', () => {
+      it('should support === operations on coerceible', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('1 === true')).toEqual(['id=false']);
-      });
+      }));
 
-      it('should support true < operations', () => {
+      it('should support true < operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('1 < 2')).toEqual(['id=true']);
-      });
+      }));
 
-      it('should support false < operations', () => {
+      it('should support false < operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('2 < 1')).toEqual(['id=false']);
-      });
+      }));
 
-      it('should support false > operations', () => {
+      it('should support false > operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('1 > 2')).toEqual(['id=false']);
-      });
+      }));
 
-      it('should support true > operations', () => {
+      it('should support true > operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('2 > 1')).toEqual(['id=true']);
-      });
+      }));
 
-      it('should support true <= operations', () => {
+      it('should support true <= operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('1 <= 2')).toEqual(['id=true']);
-      });
+      }));
 
-      it('should support equal <= operations', () => {
+      it('should support equal <= operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('2 <= 2')).toEqual(['id=true']);
-      });
+      }));
 
-      it('should support false <= operations', () => {
+      it('should support false <= operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('2 <= 1')).toEqual(['id=false']);
-      });
+      }));
 
-      it('should support true >= operations', () => {
+      it('should support true >= operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('2 >= 1')).toEqual(['id=true']);
-      });
+      }));
 
-      it('should support equal >= operations', () => {
+      it('should support equal >= operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('2 >= 2')).toEqual(['id=true']);
-      });
+      }));
 
-      it('should support false >= operations', () => {
+      it('should support false >= operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('1 >= 2')).toEqual(['id=false']);
-      });
+      }));
 
-      it('should support true && operations', () => {
+      it('should support true && operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('true && true')).toEqual(['id=true']);
-      });
+      }));
 
-      it('should support false && operations', () => {
+      it('should support false && operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('true && false')).toEqual(['id=false']);
-      });
+      }));
 
-      it('should support true || operations', () => {
+      it('should support true || operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('true || false')).toEqual(['id=true']);
-      });
+      }));
 
-      it('should support false || operations', () => {
+      it('should support false || operations', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('false || false')).toEqual(['id=false']);
-      });
+      }));
 
-      it('should support negate', () => {
+      it('should support negate', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('!true')).toEqual(['id=false']);
-      });
+      }));
 
-      it('should support double negate', () => {
+      it('should support double negate', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('!!true')).toEqual(['id=true']);
-      });
+      }));
 
-      it('should support true conditionals', () => {
+      it('should support true conditionals', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('1 < 2 ? 1 : 2')).toEqual(['id=1']);
-      });
+      }));
 
-      it('should support false conditionals', () => {
+      it('should support false conditionals', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('1 > 2 ? 1 : 2')).toEqual(['id=2']);
-      });
+      }));
 
-      it('should support keyed access to a list item', () => {
+      it('should support keyed access to a list item', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('["foo", "bar"][0]')).toEqual(['id=foo']);
-      });
+      }));
 
-      it('should support keyed access to a map item', () => {
+      it('should support keyed access to a map item', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('{"foo": "bar"}["foo"]')).toEqual(['id=bar']);
-      });
+      }));
 
-      it('should report all changes on the first run including uninitialized values', () => {
+      it('should report all changes on the first run including uninitialized values', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('value', Uninitialized)).toEqual(['id=null']);
-      });
+      }));
 
-      it('should report all changes on the first run including null values', () => {
+      it('should report all changes on the first run including null values', fakeAsync(() => {
         const ctx = _bindSimpleValue('a', TestData);
         ctx.componentInstance.a = null;
         ctx.detectChanges(false);
         expect(renderLog.log).toEqual(['id=null']);
-      });
+      }));
 
-      it('should support simple chained property access', () => {
+      it('should support simple chained property access', fakeAsync(() => {
         const ctx = _bindSimpleValue('address.city', Person);
         ctx.componentInstance.name = 'Victor';
         ctx.componentInstance.address = new Address('Grenoble');
         ctx.detectChanges(false);
         expect(renderLog.log).toEqual(['id=Grenoble']);
-      });
+      }));
 
       describe('safe navigation operator', () => {
-        it('should support reading properties of nulls', () => {
+        it('should support reading properties of nulls', fakeAsync(() => {
           const ctx = _bindSimpleValue('address?.city', Person);
           ctx.componentInstance.address = null!;
           ctx.detectChanges(false);
-          expect(renderLog.log).toEqual(['id=undefined']);
-        });
+          expect(renderLog.log).toEqual(['id=null']);
+        }));
 
-        it('should support calling methods on nulls', () => {
+        it('should support calling methods on nulls', fakeAsync(() => {
           const ctx = _bindSimpleValue('address?.toString()', Person);
           ctx.componentInstance.address = null!;
           ctx.detectChanges(false);
-          expect(renderLog.log).toEqual(['id=undefined']);
-        });
+          expect(renderLog.log).toEqual(['id=null']);
+        }));
 
-        it('should support reading properties on non nulls', () => {
+        it('should support reading properties on non nulls', fakeAsync(() => {
           const ctx = _bindSimpleValue('address?.city', Person);
           ctx.componentInstance.address = new Address('MTV');
           ctx.detectChanges(false);
           expect(renderLog.log).toEqual(['id=MTV']);
-        });
+        }));
 
-        it('should support calling methods on non nulls', () => {
+        it('should support calling methods on non nulls', fakeAsync(() => {
           const ctx = _bindSimpleValue('address?.toString()', Person);
           ctx.componentInstance.address = new Address('MTV');
           ctx.detectChanges(false);
           expect(renderLog.log).toEqual(['id=MTV']);
-        });
+        }));
 
-        it('should support short-circuting safe navigation', () => {
+        it('should support short-circuting safe navigation', fakeAsync(() => {
           const ctx = _bindSimpleValue('value?.address.city', PersonHolder);
           ctx.componentInstance.value = null!;
           ctx.detectChanges(false);
-          expect(renderLog.log).toEqual(['id=undefined']);
-        });
+          expect(renderLog.log).toEqual(['id=null']);
+        }));
 
-        it('should support nested short-circuting safe navigation', () => {
+        it('should support nested short-circuting safe navigation', fakeAsync(() => {
           const ctx = _bindSimpleValue('value.value?.address.city', PersonHolderHolder);
           ctx.componentInstance.value = new PersonHolder();
           ctx.detectChanges(false);
-          expect(renderLog.log).toEqual(['id=undefined']);
-        });
+          expect(renderLog.log).toEqual(['id=null']);
+        }));
 
-        it('should support chained short-circuting safe navigation', () => {
+        it('should support chained short-circuting safe navigation', fakeAsync(() => {
           const ctx = _bindSimpleValue('value?.value?.address.city', PersonHolderHolder);
           ctx.detectChanges(false);
-          expect(renderLog.log).toEqual(['id=undefined']);
-        });
+          expect(renderLog.log).toEqual(['id=null']);
+        }));
 
-        it('should support short-circuting array index operations', () => {
+        it('should support short-circuting array index operations', fakeAsync(() => {
           const ctx = _bindSimpleValue('value?.phones[0]', PersonHolder);
           ctx.detectChanges(false);
-          expect(renderLog.log).toEqual(['id=undefined']);
-        });
+          expect(renderLog.log).toEqual(['id=null']);
+        }));
 
-        it('should still throw if right-side would throw', () => {
+        it('should still throw if right-side would throw', fakeAsync(() => {
           expect(() => {
             const ctx = _bindSimpleValue('value?.address.city', PersonHolder);
             const person = new Person();
@@ -363,30 +361,30 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             ctx.componentInstance.value = person;
             ctx.detectChanges(false);
           }).toThrow();
-        });
+        }));
       });
 
-      it('should support method calls', () => {
+      it('should support method calls', fakeAsync(() => {
         const ctx = _bindSimpleValue('sayHi("Jim")', Person);
         ctx.detectChanges(false);
         expect(renderLog.log).toEqual(['id=Hi, Jim']);
-      });
+      }));
 
-      it('should support function calls', () => {
+      it('should support function calls', fakeAsync(() => {
         const ctx = _bindSimpleValue('a()(99)', TestData);
         ctx.componentInstance.a = () => (a: any) => a;
         ctx.detectChanges(false);
         expect(renderLog.log).toEqual(['id=99']);
-      });
+      }));
 
-      it('should support chained method calls', () => {
+      it('should support chained method calls', fakeAsync(() => {
         const ctx = _bindSimpleValue('address.toString()', Person);
         ctx.componentInstance.address = new Address('MTV');
         ctx.detectChanges(false);
         expect(renderLog.log).toEqual(['id=MTV']);
-      });
+      }));
 
-      it('should support NaN', () => {
+      it('should support NaN', fakeAsync(() => {
         const ctx = _bindSimpleValue('age', Person);
         ctx.componentInstance.age = NaN;
         ctx.detectChanges(false);
@@ -396,9 +394,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
 
         ctx.detectChanges(false);
         expect(renderLog.log).toEqual([]);
-      });
+      }));
 
-      it('should do simple watching', () => {
+      it('should do simple watching', fakeAsync(() => {
         const ctx = _bindSimpleValue('name', Person);
         ctx.componentInstance.name = 'misko';
 
@@ -413,28 +411,28 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
         ctx.componentInstance.name = 'Misko';
         ctx.detectChanges(false);
         expect(renderLog.log).toEqual(['id=Misko']);
-      });
+      }));
 
-      it('should support literal array made of literals', () => {
+      it('should support literal array made of literals', fakeAsync(() => {
         const ctx = _bindSimpleValue('[1, 2]');
         ctx.detectChanges(false);
         expect(renderLog.loggedValues).toEqual([[1, 2]]);
-      });
+      }));
 
-      it('should support empty literal array', () => {
+      it('should support empty literal array', fakeAsync(() => {
         const ctx = _bindSimpleValue('[]');
         ctx.detectChanges(false);
         expect(renderLog.loggedValues).toEqual([[]]);
-      });
+      }));
 
-      it('should support literal array made of expressions', () => {
+      it('should support literal array made of expressions', fakeAsync(() => {
         const ctx = _bindSimpleValue('[1, a]', TestData);
         ctx.componentInstance.a = 2;
         ctx.detectChanges(false);
         expect(renderLog.loggedValues).toEqual([[1, 2]]);
-      });
+      }));
 
-      it('should not recreate literal arrays unless their content changed', () => {
+      it('should not recreate literal arrays unless their content changed', fakeAsync(() => {
         const ctx = _bindSimpleValue('[1, a]', TestData);
         ctx.componentInstance.a = 2;
         ctx.detectChanges(false);
@@ -446,28 +444,28 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
           [1, 2],
           [1, 3],
         ]);
-      });
+      }));
 
-      it('should support literal maps made of literals', () => {
+      it('should support literal maps made of literals', fakeAsync(() => {
         const ctx = _bindSimpleValue('{z: 1}');
         ctx.detectChanges(false);
         expect(renderLog.loggedValues[0]['z']).toEqual(1);
-      });
+      }));
 
-      it('should support empty literal map', () => {
+      it('should support empty literal map', fakeAsync(() => {
         const ctx = _bindSimpleValue('{}');
         ctx.detectChanges(false);
         expect(renderLog.loggedValues).toEqual([{}]);
-      });
+      }));
 
-      it('should support literal maps made of expressions', () => {
+      it('should support literal maps made of expressions', fakeAsync(() => {
         const ctx = _bindSimpleValue('{z: a}');
         ctx.componentInstance.a = 1;
         ctx.detectChanges(false);
         expect(renderLog.loggedValues[0]['z']).toEqual(1);
-      });
+      }));
 
-      it('should not recreate literal maps unless their content changed', () => {
+      it('should not recreate literal maps unless their content changed', fakeAsync(() => {
         const ctx = _bindSimpleValue('{z: a}');
         ctx.componentInstance.a = 1;
         ctx.detectChanges(false);
@@ -478,76 +476,76 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
         expect(renderLog.loggedValues.length).toBe(2);
         expect(renderLog.loggedValues[0]['z']).toEqual(1);
         expect(renderLog.loggedValues[1]['z']).toEqual(2);
-      });
+      }));
 
-      it('should ignore empty bindings', () => {
+      it('should ignore empty bindings', fakeAsync(() => {
         const ctx = _bindSimpleProp('[id]', TestData);
         ctx.componentInstance.a = 'value';
         ctx.detectChanges(false);
 
         expect(renderLog.log).toEqual([]);
-      });
+      }));
 
-      it('should support interpolation', () => {
+      it('should support interpolation', fakeAsync(() => {
         const ctx = _bindSimpleProp('id="B{{a}}A"', TestData);
         ctx.componentInstance.a = 'value';
         ctx.detectChanges(false);
 
         expect(renderLog.log).toEqual(['id=BvalueA']);
-      });
+      }));
 
-      it('should output empty strings for null values in interpolation', () => {
+      it('should output empty strings for null values in interpolation', fakeAsync(() => {
         const ctx = _bindSimpleProp('id="B{{a}}A"', TestData);
         ctx.componentInstance.a = null;
         ctx.detectChanges(false);
 
         expect(renderLog.log).toEqual(['id=BA']);
-      });
+      }));
 
-      it('should escape values in literals that indicate interpolation', () => {
+      it('should escape values in literals that indicate interpolation', fakeAsync(() => {
         expect(_bindAndCheckSimpleValue('"$"')).toEqual(['id=$']);
-      });
+      }));
 
-      it('should read locals', () => {
+      it('should read locals', fakeAsync(() => {
         const ctx = createCompFixture(
           '<ng-template testLocals let-local="someLocal">{{local}}</ng-template>',
         );
         ctx.detectChanges(false);
 
         expect(renderLog.log).toEqual(['{{someLocalValue}}']);
-      });
+      }));
 
       describe('pipes', () => {
-        it('should use the return value of the pipe', () => {
+        it('should use the return value of the pipe', fakeAsync(() => {
           const ctx = _bindSimpleValue('name | countingPipe', Person);
           ctx.componentInstance.name = 'bob';
           ctx.detectChanges(false);
           expect(renderLog.loggedValues).toEqual(['bob state:0']);
-        });
+        }));
 
-        it('should support arguments in pipes', () => {
+        it('should support arguments in pipes', fakeAsync(() => {
           const ctx = _bindSimpleValue('name | multiArgPipe:"one":address.city', Person);
           ctx.componentInstance.name = 'value';
           ctx.componentInstance.address = new Address('two');
           ctx.detectChanges(false);
           expect(renderLog.loggedValues).toEqual(['value one two default']);
-        });
+        }));
 
-        it('should associate pipes right-to-left', () => {
+        it('should associate pipes right-to-left', fakeAsync(() => {
           const ctx = _bindSimpleValue('name | multiArgPipe:"a":"b" | multiArgPipe:0:1', Person);
           ctx.componentInstance.name = 'value';
           ctx.detectChanges(false);
           expect(renderLog.loggedValues).toEqual(['value a b default 0 1 default']);
-        });
+        }));
 
-        it('should support calling pure pipes with different number of arguments', () => {
+        it('should support calling pure pipes with different number of arguments', fakeAsync(() => {
           const ctx = _bindSimpleValue('name | multiArgPipe:"a":"b" | multiArgPipe:0:1:2', Person);
           ctx.componentInstance.name = 'value';
           ctx.detectChanges(false);
           expect(renderLog.loggedValues).toEqual(['value a b default 0 1 2']);
-        });
+        }));
 
-        it('should do nothing when no change', () => {
+        it('should do nothing when no change', fakeAsync(() => {
           const ctx = _bindSimpleValue('"Megatron" | identityPipe', Person);
 
           ctx.detectChanges(false);
@@ -558,9 +556,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
           ctx.detectChanges(false);
 
           expect(renderLog.log).toEqual([]);
-        });
+        }));
 
-        it('should call pure pipes only if the arguments change', () => {
+        it('should call pure pipes only if the arguments change', fakeAsync(() => {
           const ctx = _bindSimpleValue('name | countingPipe', Person);
           // change from undefined -> null
           ctx.componentInstance.name = null!;
@@ -582,9 +580,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
           expect(renderLog.loggedValues).toEqual(['null state:0', 'bob state:1', 'bart state:2']);
           ctx.detectChanges(false);
           expect(renderLog.loggedValues).toEqual(['null state:0', 'bob state:1', 'bart state:2']);
-        });
+        }));
 
-        it('should call pure pipes that are used multiple times only when the arguments change', () => {
+        it('should call pure pipes that are used multiple times only when the arguments change', fakeAsync(() => {
           const ctx = createCompFixture(
             `<div [id]="name | countingPipe"></div><div [id]="age | countingPipe"></div>` +
               '<div *ngFor="let x of [1,2]" [id]="address.city | countingPipe"></div>',
@@ -616,20 +614,20 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             'mtv state:0',
             '11 state:1',
           ]);
-        });
+        }));
 
-        it('should call impure pipes on each change detection run', () => {
+        it('should call impure pipes on each change detection run', fakeAsync(() => {
           const ctx = _bindSimpleValue('name | countingImpurePipe', Person);
           ctx.componentInstance.name = 'bob';
           ctx.detectChanges(false);
           expect(renderLog.loggedValues).toEqual(['bob state:0']);
           ctx.detectChanges(false);
           expect(renderLog.loggedValues).toEqual(['bob state:0', 'bob state:1']);
-        });
+        }));
       });
 
       describe('event expressions', () => {
-        it('should support field assignments', () => {
+        it('should support field assignments', fakeAsync(() => {
           const ctx = _bindSimpleProp('(event)="b=a=$event"');
           const childEl = ctx.debugElement.children[0];
           const evt = 'EVENT';
@@ -637,34 +635,34 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
 
           expect(ctx.componentInstance.a).toEqual(evt);
           expect(ctx.componentInstance.b).toEqual(evt);
-        });
+        }));
 
-        it('should support keyed assignments', () => {
+        it('should support keyed assignments', fakeAsync(() => {
           const ctx = _bindSimpleProp('(event)="a[0]=$event"');
           const childEl = ctx.debugElement.children[0];
           ctx.componentInstance.a = ['OLD'];
           const evt = 'EVENT';
           childEl.triggerEventHandler('event', evt);
           expect(ctx.componentInstance.a).toEqual([evt]);
-        });
+        }));
 
-        it('should support chains', () => {
+        it('should support chains', fakeAsync(() => {
           const ctx = _bindSimpleProp('(event)="a=a+1; a=a+1;"');
           const childEl = ctx.debugElement.children[0];
           ctx.componentInstance.a = 0;
           childEl.triggerEventHandler('event', 'EVENT');
           expect(ctx.componentInstance.a).toEqual(2);
-        });
+        }));
 
-        it('should support empty literals', () => {
+        it('should support empty literals', fakeAsync(() => {
           const ctx = _bindSimpleProp('(event)="a=[{},[]]"');
           const childEl = ctx.debugElement.children[0];
           childEl.triggerEventHandler('event', 'EVENT');
 
           expect(ctx.componentInstance.a).toEqual([{}, []]);
-        });
+        }));
 
-        xit('should throw when trying to assign to a local', () => {
+        xit('should throw when trying to assign to a local', fakeAsync(() => {
           expect(() => {
             _bindSimpleProp('(event)="$event=1"');
           }).toThrowError(
@@ -672,20 +670,20 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
               'Cannot assign value (.*) to template variable (.*). Template variables are read-only.',
             ),
           );
-        });
+        }));
 
-        it('should support short-circuiting', () => {
+        it('should support short-circuiting', fakeAsync(() => {
           const ctx = _bindSimpleProp('(event)="true ? a = a + 1 : a = a + 1"');
           const childEl = ctx.debugElement.children[0];
           ctx.componentInstance.a = 0;
           childEl.triggerEventHandler('event', 'EVENT');
           expect(ctx.componentInstance.a).toEqual(1);
-        });
+        }));
       });
     });
 
     describe('RendererFactory', () => {
-      it('should call the begin and end methods on the renderer factory when change detection is called', () => {
+      it('should call the begin and end methods on the renderer factory when change detection is called', fakeAsync(() => {
         const ctx = createCompFixture('<div testDirective [a]="42"></div>');
         const rf = TestBed.inject(RendererFactory2);
         // TODO: @JiaLiPassion, need to wait @types/jasmine to fix the
@@ -699,31 +697,31 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
         ctx.detectChanges(false);
         expect(rf.begin).toHaveBeenCalled();
         expect(rf.end).toHaveBeenCalled();
-      });
+      }));
     });
 
     describe('change notification', () => {
       describe('updating directives', () => {
-        it('should happen without invoking the renderer', () => {
+        it('should happen without invoking the renderer', fakeAsync(() => {
           const ctx = createCompFixture('<div testDirective [a]="42"></div>');
           ctx.detectChanges(false);
           expect(renderLog.log).toEqual([]);
           expect(queryDirs(ctx.debugElement, TestDirective)[0].a).toEqual(42);
-        });
+        }));
       });
 
       describe('reading directives', () => {
-        it('should read directive properties', () => {
+        it('should read directive properties', fakeAsync(() => {
           const ctx = createCompFixture(
             '<div testDirective [a]="42" ref-dir="testDirective" [id]="dir.a"></div>',
           );
           ctx.detectChanges(false);
           expect(renderLog.loggedValues).toEqual([42]);
-        });
+        }));
       });
 
       describe('ngOnChanges', () => {
-        it('should notify the directive when a group of records changes', () => {
+        it('should notify the directive when a group of records changes', fakeAsync(() => {
           const ctx = createCompFixture(
             '<div [testDirective]="\'aName\'" [a]="1" [b]="2"></div><div [testDirective]="\'bName\'" [a]="4"></div>',
           );
@@ -739,7 +737,7 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             'a': new SimpleChange(undefined, 4, true),
             'name': new SimpleChange(undefined, 'bName', true),
           });
-        });
+        }));
       });
     });
 
@@ -759,7 +757,7 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
       }
 
       describe('ngOnInit', () => {
-        it('should be called after ngOnChanges', () => {
+        it('should be called after ngOnChanges', fakeAsync(() => {
           const ctx = createCompFixture('<div testDirective="dir"></div>');
           expect(directiveLog.filter(['ngOnInit', 'ngOnChanges'])).toEqual([]);
 
@@ -774,9 +772,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
           ctx.detectChanges(false);
 
           expect(directiveLog.filter(['ngOnInit'])).toEqual([]);
-        });
+        }));
 
-        it('should only be called only once', () => {
+        it('should only be called only once', fakeAsync(() => {
           const ctx = createCompFixture('<div testDirective="dir"></div>');
 
           ctx.detectChanges(false);
@@ -795,9 +793,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
           ctx.detectChanges(false);
 
           expect(directiveLog.filter(['ngOnInit'])).toEqual([]);
-        });
+        }));
 
-        it('should not call ngOnInit again if it throws', () => {
+        it('should not call ngOnInit again if it throws', fakeAsync(() => {
           const ctx = createCompFixture('<div testDirective="dir" throwOn="ngOnInit"></div>');
 
           let errored = false;
@@ -821,11 +819,11 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             throw new Error('Second detectChanges() should not have called ngOnInit.');
           }
           expect(directiveLog.filter(['ngOnInit'])).toEqual([]);
-        });
+        }));
       });
 
       describe('ngDoCheck', () => {
-        it('should be called after ngOnInit', () => {
+        it('should be called after ngOnInit', fakeAsync(() => {
           const ctx = createCompFixture('<div testDirective="dir"></div>');
 
           ctx.detectChanges(false);
@@ -833,9 +831,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             'dir.ngOnInit',
             'dir.ngDoCheck',
           ]);
-        });
+        }));
 
-        it('should be called on every detectChanges run, except for checkNoChanges', () => {
+        it('should be called on every detectChanges run, except for checkNoChanges', fakeAsync(() => {
           const ctx = createCompFixture('<div testDirective="dir"></div>');
 
           ctx.detectChanges(false);
@@ -854,11 +852,11 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
           ctx.detectChanges(false);
 
           expect(directiveLog.filter(['ngDoCheck'])).toEqual(['dir.ngDoCheck']);
-        });
+        }));
       });
 
       describe('ngAfterContentInit', () => {
-        it('should be called after processing the content children but before the view children', () => {
+        it('should be called after processing the content children but before the view children', fakeAsync(() => {
           const ctx = createCompWithContentAndViewChild();
           ctx.detectChanges(false);
 
@@ -870,9 +868,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             'viewChild.ngDoCheck',
             'viewChild.ngAfterContentInit',
           ]);
-        });
+        }));
 
-        it('should only be called only once', () => {
+        it('should only be called only once', fakeAsync(() => {
           const ctx = createCompFixture('<div testDirective="dir"></div>');
 
           ctx.detectChanges(false);
@@ -891,9 +889,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
           ctx.detectChanges(false);
 
           expect(directiveLog.filter(['ngAfterContentInit'])).toEqual([]);
-        });
+        }));
 
-        it('should not call ngAfterContentInit again if it throws', () => {
+        it('should not call ngAfterContentInit again if it throws', fakeAsync(() => {
           const ctx = createCompFixture(
             '<div testDirective="dir" throwOn="ngAfterContentInit"></div>',
           );
@@ -918,11 +916,11 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             throw new Error('Second detectChanges() should not have run detection.');
           }
           expect(directiveLog.filter(['ngAfterContentInit'])).toEqual([]);
-        });
+        }));
       });
 
       describe('ngAfterContentChecked', () => {
-        it('should be called after the content children but before the view children', () => {
+        it('should be called after the content children but before the view children', fakeAsync(() => {
           const ctx = createCompWithContentAndViewChild();
 
           ctx.detectChanges(false);
@@ -935,9 +933,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             'viewChild.ngDoCheck',
             'viewChild.ngAfterContentChecked',
           ]);
-        });
+        }));
 
-        it('should be called on every detectChanges run, except for checkNoChanges', () => {
+        it('should be called on every detectChanges run, except for checkNoChanges', fakeAsync(() => {
           const ctx = createCompFixture('<div testDirective="dir"></div>');
 
           ctx.detectChanges(false);
@@ -960,9 +958,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
           expect(directiveLog.filter(['ngAfterContentChecked'])).toEqual([
             'dir.ngAfterContentChecked',
           ]);
-        });
+        }));
 
-        it('should be called in reverse order so the child is always notified before the parent', () => {
+        it('should be called in reverse order so the child is always notified before the parent', fakeAsync(() => {
           const ctx = createCompFixture(
             '<div testDirective="parent"><div testDirective="child"></div></div><div testDirective="sibling"></div>',
           );
@@ -974,11 +972,11 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             'parent.ngAfterContentChecked',
             'sibling.ngAfterContentChecked',
           ]);
-        });
+        }));
       });
 
       describe('ngAfterViewInit', () => {
-        it('should be called after processing the view children', () => {
+        it('should be called after processing the view children', fakeAsync(() => {
           const ctx = createCompWithContentAndViewChild();
 
           ctx.detectChanges(false);
@@ -991,9 +989,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             'viewChild.ngAfterViewInit',
             'parent.ngAfterViewInit',
           ]);
-        });
+        }));
 
-        it('should only be called only once', () => {
+        it('should only be called only once', fakeAsync(() => {
           const ctx = createCompFixture('<div testDirective="dir"></div>');
 
           ctx.detectChanges(false);
@@ -1012,9 +1010,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
           ctx.detectChanges(false);
 
           expect(directiveLog.filter(['ngAfterViewInit'])).toEqual([]);
-        });
+        }));
 
-        it('should not call ngAfterViewInit again if it throws', () => {
+        it('should not call ngAfterViewInit again if it throws', fakeAsync(() => {
           const ctx = createCompFixture(
             '<div testDirective="dir" throwOn="ngAfterViewInit"></div>',
           );
@@ -1039,11 +1037,11 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             throw new Error('Second detectChanges() should not have run detection.');
           }
           expect(directiveLog.filter(['ngAfterViewInit'])).toEqual([]);
-        });
+        }));
       });
 
       describe('ngAfterViewChecked', () => {
-        it('should be called after processing the view children', () => {
+        it('should be called after processing the view children', fakeAsync(() => {
           const ctx = createCompWithContentAndViewChild();
 
           ctx.detectChanges(false);
@@ -1056,9 +1054,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             'viewChild.ngAfterViewChecked',
             'parent.ngAfterViewChecked',
           ]);
-        });
+        }));
 
-        it('should be called on every detectChanges run, except for checkNoChanges', () => {
+        it('should be called on every detectChanges run, except for checkNoChanges', fakeAsync(() => {
           const ctx = createCompFixture('<div testDirective="dir"></div>');
 
           ctx.detectChanges(false);
@@ -1077,9 +1075,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
           ctx.detectChanges(false);
 
           expect(directiveLog.filter(['ngAfterViewChecked'])).toEqual(['dir.ngAfterViewChecked']);
-        });
+        }));
 
-        it('should be called in reverse order so the child is always notified before the parent', () => {
+        it('should be called in reverse order so the child is always notified before the parent', fakeAsync(() => {
           const ctx = createCompFixture(
             '<div testDirective="parent"><div testDirective="child"></div></div><div testDirective="sibling"></div>',
           );
@@ -1091,20 +1089,20 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             'parent.ngAfterViewChecked',
             'sibling.ngAfterViewChecked',
           ]);
-        });
+        }));
       });
 
       describe('ngOnDestroy', () => {
-        it('should be called on view destruction', () => {
+        it('should be called on view destruction', fakeAsync(() => {
           const ctx = createCompFixture('<div testDirective="dir"></div>');
           ctx.detectChanges(false);
 
           ctx.destroy();
 
           expect(directiveLog.filter(['ngOnDestroy'])).toEqual(['dir.ngOnDestroy']);
-        });
+        }));
 
-        it('should be called after processing the content and view children', () => {
+        it('should be called after processing the content and view children', fakeAsync(() => {
           TestBed.overrideComponent(AnotherComponent, {
             set: new Component({
               selector: 'other-cmp',
@@ -1127,9 +1125,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             'viewChild.ngOnDestroy',
             'parent.ngOnDestroy',
           ]);
-        });
+        }));
 
-        it('should be called in reverse order so the child is always notified before the parent', () => {
+        it('should be called in reverse order so the child is always notified before the parent', fakeAsync(() => {
           const ctx = createCompFixture(
             '<div testDirective="parent"><div testDirective="child"></div></div><div testDirective="sibling"></div>',
           );
@@ -1142,27 +1140,27 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             'parent.ngOnDestroy',
             'sibling.ngOnDestroy',
           ]);
-        });
+        }));
 
-        it('should deliver synchronous events to parent', () => {
+        it('should deliver synchronous events to parent', fakeAsync(() => {
           const ctx = createCompFixture('<div (destroy)="a=$event" onDestroyDirective></div>');
 
           ctx.detectChanges(false);
           ctx.destroy();
 
           expect(ctx.componentInstance.a).toEqual('destroyed');
-        });
+        }));
 
-        it('should call ngOnDestroy on pipes', () => {
+        it('should call ngOnDestroy on pipes', fakeAsync(() => {
           const ctx = createCompFixture('{{true | pipeWithOnDestroy }}');
 
           ctx.detectChanges(false);
           ctx.destroy();
 
           expect(directiveLog.filter(['ngOnDestroy'])).toEqual(['pipeWithOnDestroy.ngOnDestroy']);
-        });
+        }));
 
-        it('should call ngOnDestroy on an injectable class', () => {
+        it('should call ngOnDestroy on an injectable class', fakeAsync(() => {
           TestBed.overrideDirective(TestDirective, {set: {providers: [InjectableWithLifecycle]}});
 
           const ctx = createCompFixture('<div testDirective="dir"></div>', TestComponent);
@@ -1177,12 +1175,12 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
             'dir.ngOnDestroy',
             'injectable.ngOnDestroy',
           ]);
-        });
+        }));
       });
     });
 
     describe('enforce no new changes', () => {
-      it('should throw when a record gets changed after it has been checked', () => {
+      it('should throw when a record gets changed after it has been checked', fakeAsync(() => {
         @Directive({
           selector: '[changed]',
           standalone: false,
@@ -1198,9 +1196,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
         ctx.componentInstance.b = 1;
         const errMsgRegExp = /Previous value: 'undefined'\. Current value: '1'/g;
         expect(() => ctx.checkNoChanges()).toThrowError(errMsgRegExp);
-      });
+      }));
 
-      it('should throw when a record gets changed after the first change detection pass', () => {
+      it('should throw when a record gets changed after the first change detection pass', fakeAsync(() => {
         @Directive({
           selector: '[changed]',
           standalone: false,
@@ -1219,7 +1217,7 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
         ctx.componentInstance.b = 2;
         const errMsgRegExp = /Previous value: '1'\. Current value: '2'/g;
         expect(() => ctx.checkNoChanges()).toThrowError(errMsgRegExp);
-      });
+      }));
 
       it('should allow view to be created in a cd hook', () => {
         const ctx = createCompFixture('<div *gh9882>{{ a }}</div>', TestData);
@@ -1228,24 +1226,24 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
         expect(ctx.nativeElement.innerText).toEqual('1');
       });
 
-      it('should not throw when two arrays are structurally the same', () => {
+      it('should not throw when two arrays are structurally the same', fakeAsync(() => {
         const ctx = _bindSimpleValue('a', TestData);
         ctx.componentInstance.a = ['value'];
         ctx.detectChanges(false);
         ctx.componentInstance.a = ['value'];
         expect(() => ctx.checkNoChanges()).not.toThrow();
-      });
+      }));
 
-      it('should not break the next run', () => {
+      it('should not break the next run', fakeAsync(() => {
         const ctx = _bindSimpleValue('a', TestData);
         ctx.componentInstance.a = 'value';
         expect(() => ctx.checkNoChanges()).toThrow();
 
         ctx.detectChanges();
         expect(renderLog.loggedValues).toEqual(['value']);
-      });
+      }));
 
-      it('should not break the next run (view engine and ivy)', () => {
+      it('should not break the next run (view engine and ivy)', fakeAsync(() => {
         const ctx = _bindSimpleValue('a', TestData);
 
         ctx.detectChanges();
@@ -1256,11 +1254,11 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
 
         ctx.detectChanges();
         expect(renderLog.loggedValues).toEqual(['value']);
-      });
+      }));
     });
 
     describe('mode', () => {
-      it('Detached', () => {
+      it('Detached', fakeAsync(() => {
         const ctx = createCompFixture('<comp-with-ref></comp-with-ref>');
         const cmp: CompWithRef = queryDirs(ctx.debugElement, CompWithRef)[0];
         cmp.value = 'hello';
@@ -1269,9 +1267,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
         ctx.detectChanges();
 
         expect(renderLog.log).toEqual([]);
-      });
+      }));
 
-      it('Detached should disable OnPush', () => {
+      it('Detached should disable OnPush', fakeAsync(() => {
         const ctx = createCompFixture('<push-cmp [value]="value"></push-cmp>');
         ctx.componentInstance.value = 0;
         ctx.detectChanges();
@@ -1284,9 +1282,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
         ctx.detectChanges();
 
         expect(renderLog.log).toEqual([]);
-      });
+      }));
 
-      it('Detached view can be checked locally', () => {
+      it('Detached view can be checked locally', fakeAsync(() => {
         const ctx = createCompFixture('<wrap-comp-with-ref></wrap-comp-with-ref>');
         const cmp: CompWithRef = queryDirs(ctx.debugElement, CompWithRef)[0];
         cmp.value = 'hello';
@@ -1300,9 +1298,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
         cmp.changeDetectorRef.detectChanges();
 
         expect(renderLog.log).toEqual(['{{hello}}']);
-      });
+      }));
 
-      it('Reattaches', () => {
+      it('Reattaches', fakeAsync(() => {
         const ctx = createCompFixture('<comp-with-ref></comp-with-ref>');
         const cmp: CompWithRef = queryDirs(ctx.debugElement, CompWithRef)[0];
 
@@ -1318,9 +1316,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
         ctx.detectChanges();
 
         expect(renderLog.log).toEqual(['{{hello}}']);
-      });
+      }));
 
-      it('Reattaches in the original cd mode', () => {
+      it('Reattaches in the original cd mode', fakeAsync(() => {
         const ctx = createCompFixture('<push-cmp></push-cmp>');
         const cmp: PushComp = queryDirs(ctx.debugElement, PushComp)[0];
         cmp.changeDetectorRef.detach();
@@ -1335,7 +1333,7 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
 
         ctx.detectChanges();
         expect(cmp.renderCount).toBe(count);
-      });
+      }));
     });
 
     describe('nested view recursion', () => {
@@ -1392,12 +1390,8 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
 
         @Component({
           selector: 'main-cmp',
-          template: `<span [i]="log('start')"></span
-            ><outer-cmp
-              ><ng-template><span [i]="log('tpl')"></span></ng-template
-            ></outer-cmp>`,
+          template: `<span [i]="log('start')"></span><outer-cmp><ng-template><span [i]="log('tpl')"></span></ng-template></outer-cmp>`,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class MainComp {
           constructor(public cdRef: ChangeDetectorRef) {}
@@ -1408,12 +1402,8 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
 
         @Component({
           selector: 'outer-cmp',
-          template: `<span [i]="log('start')"></span
-            ><inner-cmp [outerTpl]="tpl"
-              ><ng-template><span [i]="log('tpl')"></span></ng-template
-            ></inner-cmp>`,
+          template: `<span [i]="log('start')"></span><inner-cmp [outerTpl]="tpl"><ng-template><span [i]="log('tpl')"></span></ng-template></inner-cmp>`,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class OuterComp {
           @ContentChild(TemplateRef, {static: true}) tpl!: TemplateRef<any>;
@@ -1426,12 +1416,8 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
 
         @Component({
           selector: 'inner-cmp',
-          template: `<span [i]="log('start')"></span>><ng-container
-              [ngTemplateOutlet]="outerTpl"
-            ></ng-container
-            ><ng-container [ngTemplateOutlet]="tpl"></ng-container>`,
+          template: `<span [i]="log('start')"></span>><ng-container [ngTemplateOutlet]="outerTpl"></ng-container><ng-container [ngTemplateOutlet]="tpl"></ng-container>`,
           standalone: false,
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class InnerComp {
           @ContentChild(TemplateRef, {static: true}) tpl!: TemplateRef<any>;
@@ -1521,7 +1507,7 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
     describe('class binding', () => {
       it('should coordinate class attribute and class host binding', () => {
         @Component({
-          template: `<div class="{{ initClasses }}" someDir></div>`,
+          template: `<div class="{{initClasses}}" someDir></div>`,
           standalone: false,
         })
         class Comp {
@@ -1649,7 +1635,7 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
 
           @Component({
             selector: 'my-component',
-            template: `<my-child [inp]="true" (outp)="onOutp()"></my-child>`,
+            template: `<my-child [inp]='true' (outp)='onOutp()'></my-child>`,
             standalone: false,
           })
           class MyComponent {
@@ -1902,6 +1888,7 @@ class WrapCompWithRef {
   selector: 'push-cmp',
   template: '<div (event)="noop()" emitterDirective></div>{{value}}{{renderIncrement}}',
   host: {'(event)': 'noop()'},
+  changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: false,
 })
 class PushComp {

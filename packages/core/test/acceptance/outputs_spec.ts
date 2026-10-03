@@ -15,7 +15,6 @@ import {
   OnDestroy,
   Output,
   ViewChild,
-  ChangeDetectionStrategy,
 } from '../../src/core';
 import {TestBed} from '../../testing';
 
@@ -24,8 +23,6 @@ describe('outputs', () => {
     selector: 'button-toggle',
     template: '',
     standalone: false,
-
-    changeDetection: ChangeDetectionStrategy.Eager,
   })
   class ButtonToggle {
     @Output('change') change = new EventEmitter<void>();
@@ -45,8 +42,6 @@ describe('outputs', () => {
     selector: 'destroy-comp',
     template: '',
     standalone: false,
-
-    changeDetection: ChangeDetectionStrategy.Eager,
   })
   class DestroyComp implements OnDestroy {
     events: string[] = [];
@@ -69,8 +64,6 @@ describe('outputs', () => {
     @Component({
       template: '<button-toggle (change)="onChange()"></button-toggle>',
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       @ViewChild(ButtonToggle) buttonToggle!: ButtonToggle;
@@ -96,8 +89,6 @@ describe('outputs', () => {
     @Component({
       template: '<button-toggle (change)="onChange()" (reset)="onReset()"></button-toggle>',
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       @ViewChild(ButtonToggle) buttonToggle!: ButtonToggle;
@@ -123,8 +114,6 @@ describe('outputs', () => {
     @Component({
       template: '<button-toggle (change)="counter = counter + 1"></button-toggle>',
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       @ViewChild(ButtonToggle) buttonToggle!: ButtonToggle;
@@ -147,8 +136,6 @@ describe('outputs', () => {
     @Component({
       template: '<button-toggle *ngIf="condition" (change)="onChange()"></button-toggle>',
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       @ViewChild(ButtonToggle) buttonToggle!: ButtonToggle;
@@ -183,8 +170,6 @@ describe('outputs', () => {
         </div>
       `,
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       @ViewChild(ButtonToggle) buttonToggle!: ButtonToggle;
@@ -223,8 +208,6 @@ describe('outputs', () => {
         </div>
       `,
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       @ViewChild(ButtonToggle) buttonToggle!: ButtonToggle;
@@ -272,8 +255,6 @@ describe('outputs', () => {
     @Component({
       template: '<button myButton (click)="onClick()">Click me</button>',
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       @ViewChild(MyButton) buttonDir!: MyButton;
@@ -301,8 +282,6 @@ describe('outputs', () => {
     @Component({
       template: '<button-toggle (change)="onChange()" otherDir></button-toggle>',
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       @ViewChild(ButtonToggle) buttonToggle!: ButtonToggle;
@@ -337,8 +316,6 @@ describe('outputs', () => {
       template:
         '<button-toggle (change)="onChange()" otherChangeDir [change]="change"></button-toggle>',
       standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       @ViewChild(ButtonToggle) buttonToggle!: ButtonToggle;

@@ -1,5 +1,5 @@
 // TODO: Define these packages in a single common location.
-const localAngularPackages = new Set([
+const localAngularPackages = [
   '@angular/animations',
   '@angular/common',
   '@angular/compiler',
@@ -15,9 +15,7 @@ const localAngularPackages = new Set([
   '@angular/router',
   '@angular/service-worker',
   '@angular/upgrade',
-]);
-
-const peerDepsToChange = new Set(['zone.js', 'rxjs']);
+];
 
 function readPackage(pkg, context) {
   // TODO(devversion): This allows us to make compiler/TS a production dependency of compiler-cli
@@ -27,38 +25,31 @@ function readPackage(pkg, context) {
     pkg.dependencies = {
       ...pkg.dependencies,
       '@angular/compiler': 'workspace:*',
-      'typescript': pkg.devDependencies['typescript'],
+      'typescript': '5.9.0-beta',
     };
-
-    delete pkg.devDependencies['typescript'];
   }
 
-  for (const [key, version] of Object.entries(pkg.peerDependencies)) {
+  Object.entries(pkg.peerDependencies).forEach(([key, version]) => {
     // Any package that has a peerDependency on rxjs or zone.js, should instead treat the peerDependency as a
     // regular dependency.
-    if (peerDepsToChange.has(key)) {
+    if (['rxjs', 'zone.js'].includes(key)) {
       pkg.dependencies = {
         ...pkg.dependencies,
-        [key]: pkg.devDependencies[key] ?? version,
+        [key]: version,
       };
-
-      delete pkg.devDependencies[key];
-
-      continue;
     }
 
     // Change all locally generated packages to directly depend on the other local packages, instead
     // of expecting them as peerDependencies automatically as we do not auto install peer deps. The
     // package is also removed from peerDependencies as it was moved over and will just cause errors.
-    if (pkg.version === '0.0.0-PLACEHOLDER' && localAngularPackages.has(key)) {
+    if (localAngularPackages.includes(key) && pkg.version === '0.0.0-PLACEHOLDER') {
       pkg.dependencies = {
         ...pkg.dependencies,
-        [key]: 'workspace:*',
+        [key]: 'workspace: *',
       };
-
       delete pkg.peerDependencies[key];
     }
-  }
+  });
 
   return pkg;
 }

@@ -26,19 +26,5 @@ export function getOutputPathFn(fs: PathManipulation, outputFolder: AbsoluteFsPa
   const [pre, post] = outputFolder.split('{{LOCALE}}');
   return post === undefined
     ? (_locale, relativePath) => fs.join(pre, relativePath)
-    : (locale, relativePath) => {
-        if (/[\/\\]|\.\./.test(locale)) {
-          throw new Error(`Invalid Locale: '${locale}' is not a valid locale.`);
-        }
-
-        const outputPath = fs.join(pre + locale + post, relativePath);
-        const resolvedOutputPath = fs.resolve(outputPath);
-        const resolvedPre = fs.resolve(pre);
-
-        if (!resolvedOutputPath.startsWith(resolvedPre)) {
-          throw new Error(`Invalid Locale: '${locale}' would cause path traversal.`);
-        }
-
-        return outputPath;
-      };
+    : (locale, relativePath) => fs.join(pre + locale + post, relativePath);
 }

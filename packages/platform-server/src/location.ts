@@ -13,11 +13,35 @@ import {
   PlatformLocation,
   ɵgetDOM as getDOM,
 } from '@angular/common';
-import {inject, Injectable, ɵWritable as Writable} from '@angular/core';
+import {inject, Inject, Injectable, Optional, ɵWritable as Writable} from '@angular/core';
 import {Subject} from 'rxjs';
 
-import {INITIAL_CONFIG} from './tokens';
-import {resolveUrl} from './url';
+import {INITIAL_CONFIG, PlatformConfig} from './tokens';
+
+const RESOLVE_PROTOCOL = 'resolve:';
+
+function parseUrl(urlStr: string): {
+  hostname: string;
+  protocol: string;
+  port: string;
+  pathname: string;
+  search: string;
+  hash: string;
+} {
+  const {hostname, protocol, port, pathname, search, hash} = new URL(
+    urlStr,
+    RESOLVE_PROTOCOL + '//',
+  );
+
+  return {
+    hostname,
+    protocol: protocol === RESOLVE_PROTOCOL ? '' : protocol,
+    port,
+    pathname,
+    search,
+    hash,
+  };
+}
 
 /**
  * Server-side implementation of URL state. Implements `pathname`, `search`, and `hash`
@@ -33,8 +57,7 @@ export class ServerPlatformLocation implements PlatformLocation {
   public readonly search: string = '';
   public readonly hash: string = '';
   private _hashUpdate = new Subject<LocationChangeEvent>();
-  private readonly _doc = inject(DOCUMENT);
-  private readonly origin = this._doc.location.origin;
+  private _doc = inject(DOCUMENT);
 
   constructor() {
     const config = inject(INITIAL_CONFIG, {optional: true});
@@ -42,18 +65,14 @@ export class ServerPlatformLocation implements PlatformLocation {
       return;
     }
     if (config.url) {
-      const {protocol, hostname, port, pathname, search, hash, href, origin} = resolveUrl(
-        config.url,
-        this.origin,
-      );
-      this.protocol = protocol;
-      this.hostname = hostname;
-      this.port = port;
-      this.pathname = pathname;
-      this.search = search;
-      this.hash = hash;
-      this.href = href;
-      this.origin = origin;
+      const url = parseUrl(config.url);
+      this.protocol = url.protocol;
+      this.hostname = url.hostname;
+      this.port = url.port;
+      this.pathname = url.pathname;
+      this.search = url.search;
+      this.hash = url.hash;
+      this.href = this._doc.location.href;
     }
   }
 
@@ -95,15 +114,10 @@ export class ServerPlatformLocation implements PlatformLocation {
 
   replaceState(state: any, title: string, newUrl: string): void {
     const oldUrl = this.url;
-    const {pathname, search, hash, href, protocol} = resolveUrl(newUrl, this.origin, {
-      allowOriginChange: false,
-    });
-    const writableThis = this as Writable<this>;
-    writableThis.pathname = pathname;
-    writableThis.search = search;
-    writableThis.href = href;
-    writableThis.protocol = protocol;
-    this.setHash(hash, oldUrl);
+    const parsedUrl = parseUrl(newUrl);
+    (this as Writable<this>).pathname = parsedUrl.pathname;
+    (this as Writable<this>).search = parsedUrl.search;
+    this.setHash(parsedUrl.hash, oldUrl);
   }
 
   pushState(state: any, title: string, newUrl: string): void {

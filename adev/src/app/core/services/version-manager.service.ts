@@ -6,13 +6,21 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
+import {DOCUMENT, Injectable, VERSION, computed, inject} from '@angular/core';
 import {httpResource} from '@angular/common/http';
-import {DOCUMENT, Service, VERSION, computed, inject} from '@angular/core';
 
 import versionJson from '../../../assets/others/versions.json';
-import {ANGULAR_DEV} from '../constants/links';
 
-type VersionMode = 'stable' | 'deprecated' | 'rc' | 'next' | number;
+export interface Version {
+  displayName: string;
+  url: string;
+}
+
+export type VersionMode = 'stable' | 'deprecated' | 'rc' | 'next' | number;
+
+export const INITIAL_ADEV_DOCS_VERSION = 18;
+export const VERSION_PLACEHOLDER = '{{version}}';
+export const MODE_PLACEHOLDER = '{{prefix}}';
 
 type VersionJson = {version: string; url: string};
 
@@ -22,18 +30,20 @@ type VersionJson = {version: string; url: string};
  * To have an up-to-date list of versions, it will fetch a json from the deployed website.
  * As fallback it will use a local json file that is bundled with the app.
  */
-@Service()
+@Injectable({
+  providedIn: 'root',
+})
 export class VersionManager {
   private document = inject(DOCUMENT);
 
-  readonly currentDocsVersionMode = computed<VersionMode>(() => {
+  get currentDocsVersionMode(): VersionMode {
     const hostname = this.document.location.hostname;
     if (hostname.startsWith('v')) return 'deprecated';
     if (hostname.startsWith('rc')) return 'rc';
     if (hostname.startsWith('next')) return 'next';
 
     return 'stable';
-  });
+  }
 
   private localVersions = (versionJson as VersionJson[]).map((v) => {
     return {
@@ -52,7 +62,7 @@ export class VersionManager {
   // which is the most up-to-date anyway.
   remoteVersions = httpResource(
     () => ({
-      url: `${ANGULAR_DEV}/assets/others/versions.json`,
+      url: 'https://angular.dev/assets/others/versions.json',
       transferCache: false,
       cache: 'no-cache',
     }),
@@ -85,7 +95,7 @@ export class VersionManager {
 
   readonly currentDocsVersion = computed(() => {
     // In devmode the version is 0, so we'll target next (which is first on the list)
-    if (VERSION.major === '0' || VERSION.patch.includes('next')) {
+    if (VERSION.major === '0') {
       return this.versions()[0];
     }
 

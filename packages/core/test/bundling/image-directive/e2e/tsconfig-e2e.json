@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "lib": ["es2022"],
-    "types": ["node", "jasmine", "selenium-webdriver"],
+    "types": ["node", "jasminewd2"],
     "declaration": true,
     "sourceMap": true
   }

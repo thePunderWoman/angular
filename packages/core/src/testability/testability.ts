@@ -6,10 +6,9 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {Inject, Injectable, InjectionToken, inject} from '../di';
+import {inject, Inject, Injectable, InjectionToken} from '../di';
 import {isInInjectionContext} from '../di/contextual';
 import {DestroyRef} from '../linker/destroy_ref';
-import {PendingTasksInternal} from '../pending_tasks_internal';
 import {NgZone} from '../zone/ng_zone';
 
 /**
@@ -63,14 +62,6 @@ export const TESTABILITY = new InjectionToken<Testability>('');
 export const TESTABILITY_GETTER = new InjectionToken<GetTestability>('');
 
 /**
- * Internal injection token to signal whether to use pending tasks for stability.
- */
-export const USE_PENDING_TASKS = new InjectionToken<boolean>('USE_PENDING_TASKS', {
-  providedIn: 'root',
-  factory: () => typeof Zone === 'undefined',
-});
-
-/**
  * The Testability service provides testing hooks that can be accessed from
  * the browser.
  *
@@ -99,8 +90,6 @@ export class Testability implements PublicTestability {
 
   private _destroyRef?: DestroyRef;
 
-  private readonly pendingTasksInternal = inject(PendingTasksInternal);
-  private readonly _usePendingTasks = inject(USE_PENDING_TASKS);
   constructor(
     private _ngZone: NgZone,
     private registry: TestabilityRegistry,
@@ -132,23 +121,8 @@ export class Testability implements PublicTestability {
       },
     });
 
-    let pendingTasksSubscription: any;
-    let onStableSubscription: any;
-
-    this._ngZone.runOutsideAngular(() => {
-      if (this._usePendingTasks) {
-        pendingTasksSubscription = this.pendingTasksInternal.hasPendingTasksObservable.subscribe(
-          () => {
-            if (this.isStable()) {
-              this._ngZone.runOutsideAngular(() => {
-                this._runCallbacksIfReady();
-              });
-            }
-          },
-        );
-      }
-
-      onStableSubscription = this._ngZone.onStable.subscribe({
+    const onStableSubscription = this._ngZone.runOutsideAngular(() =>
+      this._ngZone.onStable.subscribe({
         next: () => {
           NgZone.assertNotInAngularZone();
           queueMicrotask(() => {
@@ -156,12 +130,11 @@ export class Testability implements PublicTestability {
             this._runCallbacksIfReady();
           });
         },
-      });
-    });
+      }),
+    );
 
     this._destroyRef?.onDestroy(() => {
       onUnstableSubscription.unsubscribe();
-      pendingTasksSubscription?.unsubscribe();
       onStableSubscription.unsubscribe();
     });
   }
@@ -170,11 +143,7 @@ export class Testability implements PublicTestability {
    * Whether an associated application is stable
    */
   isStable(): boolean {
-    return (
-      this._isZoneStable &&
-      !this._ngZone.hasPendingMacrotasks &&
-      (!this._usePendingTasks || !this.pendingTasksInternal.hasPendingTasks)
-    );
+    return this._isZoneStable && !this._ngZone.hasPendingMacrotasks;
   }
 
   private _runCallbacksIfReady(): void {

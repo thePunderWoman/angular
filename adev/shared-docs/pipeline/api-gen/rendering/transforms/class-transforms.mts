@@ -28,7 +28,7 @@ export async function getClassRenderable(
 ): Promise<ClassEntryRenderable> {
   return setEntryFlags(
     await addRenderableCodeToc(
-      await addRenderableMembers(
+      addRenderableMembers(
         addHtmlAdditionalLinks(
           addHtmlUsageNotes(
             addHtmlJsDocTagComments(
@@ -36,7 +36,6 @@ export async function getClassRenderable(
             ),
           ),
         ),
-        classEntry.name,
       ),
     ),
   );

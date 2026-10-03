@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {AbstractType, Type} from '../interface/type';
+import {Type} from '../interface/type';
 import {noSideEffects} from '../util/closure';
 
 interface TypeWithMetadata extends Type<any> {
@@ -22,8 +22,6 @@ interface TypeWithMetadata extends Type<any> {
  */
 const ASYNC_COMPONENT_METADATA_FN = '__ngAsyncComponentMetadataFn__';
 
-const ASYNC_METADATA_LOADED = '__ngAsyncMetadataLoaded__';
-
 /**
  * If a given component has unresolved async metadata - returns a reference
  * to a function that applies component metadata after resolving defer-loadable
@@ -33,20 +31,7 @@ export function getAsyncClassMetadataFn(
   type: Type<unknown>,
 ): (() => Promise<Array<Type<unknown>>>) | null {
   const componentClass = type as any; // cast to `any`, so that we can read a monkey-patched field
-  if (componentClass[ASYNC_COMPONENT_METADATA_FN] === ASYNC_METADATA_LOADED) {
-    return null;
-  }
-
   return componentClass[ASYNC_COMPONENT_METADATA_FN] ?? null;
-}
-
-/**
- * Checks if a given component has async metadata.
- * Independent of whether the metadata is already loaded or not.
- */
-export function hasAsyncClassMetadata(type: Type<unknown>): boolean {
-  const componentClass = type as any; // cast to `any`, so that we can monkey-patch it
-  return !!componentClass[ASYNC_COMPONENT_METADATA_FN];
 }
 
 /**
@@ -58,17 +43,17 @@ export function hasAsyncClassMetadata(type: Type<unknown>): boolean {
  * @param metadataSetterFn Function that forms a scope in which the `setClassMetadata` is invoked
  */
 export function setClassMetadataAsync(
-  type: Type<any> | AbstractType<any>,
-  dependencyLoaderFn: () => Array<Promise<Type<unknown> | AbstractType<unknown>>>,
-  metadataSetterFn: (...types: (Type<unknown> | AbstractType<unknown>)[]) => void,
-): () => Promise<Array<Type<unknown> | AbstractType<unknown>>> {
+  type: Type<any>,
+  dependencyLoaderFn: () => Array<Promise<Type<unknown>>>,
+  metadataSetterFn: (...types: Type<unknown>[]) => void,
+): () => Promise<Array<Type<unknown>>> {
   const componentClass = type as any; // cast to `any`, so that we can monkey-patch it
   componentClass[ASYNC_COMPONENT_METADATA_FN] = () =>
     Promise.all(dependencyLoaderFn()).then((dependencies) => {
       metadataSetterFn(...dependencies);
       // Metadata is now set, reset field value to indicate that this component
       // can by used/compiled synchronously.
-      componentClass[ASYNC_COMPONENT_METADATA_FN] = ASYNC_METADATA_LOADED;
+      componentClass[ASYNC_COMPONENT_METADATA_FN] = null;
 
       return dependencies;
     });
@@ -85,8 +70,8 @@ export function setClassMetadataAsync(
  * being tree-shaken away during production builds.
  */
 export function setClassMetadata(
-  type: any,
-  decorators: readonly any[] | null,
+  type: Type<any>,
+  decorators: any[] | null,
   ctorParameters: (() => any[]) | null,
   propDecorators: {[field: string]: any} | null,
 ): void {
@@ -94,10 +79,10 @@ export function setClassMetadata(
     const clazz = type as TypeWithMetadata;
 
     if (decorators !== null) {
-      if (Object.hasOwn(clazz, 'decorators') && clazz.decorators !== undefined) {
+      if (clazz.hasOwnProperty('decorators') && clazz.decorators !== undefined) {
         clazz.decorators.push(...decorators);
       } else {
-        clazz.decorators = decorators as any[];
+        clazz.decorators = decorators;
       }
     }
     if (ctorParameters !== null) {
@@ -111,7 +96,7 @@ export function setClassMetadata(
       // different decorator types. Decorators on individual fields are not merged, as it's
       // also incredibly unlikely that a field will be decorated both with an Angular
       // decorator and a non-Angular decorator that's also been downleveled.
-      if (Object.hasOwn(clazz, 'propDecorators') && clazz.propDecorators !== undefined) {
+      if (clazz.hasOwnProperty('propDecorators') && clazz.propDecorators !== undefined) {
         clazz.propDecorators = {...clazz.propDecorators, ...propDecorators};
       } else {
         clazz.propDecorators = propDecorators;

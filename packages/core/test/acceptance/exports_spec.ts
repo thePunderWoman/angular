@@ -7,7 +7,6 @@
  */
 
 import {
-  ChangeDetectionStrategy,
   Component,
   Directive,
   DoCheck,
@@ -231,12 +230,7 @@ describe('exports', () => {
 });
 
 function initWithTemplate(compType: Type<any>, template: string) {
-  TestBed.overrideComponent(compType, {
-    set: new Component({
-      template,
-      changeDetection: ChangeDetectionStrategy.Eager,
-    }),
-  });
+  TestBed.overrideComponent(compType, {set: new Component({template})});
   return TestBed.createComponent(compType);
 }
 
@@ -244,8 +238,6 @@ function initWithTemplate(compType: Type<any>, template: string) {
   selector: 'comp-to-ref',
   template: '',
   standalone: false,
-
-  changeDetection: ChangeDetectionStrategy.Eager,
 })
 class ComponentToReference {
   name = 'Nancy';
@@ -255,8 +247,6 @@ class ComponentToReference {
   selector: 'app-comp',
   template: ``,
   standalone: false,
-
-  changeDetection: ChangeDetectionStrategy.Eager,
 })
 class AppComp {
   outer = false;

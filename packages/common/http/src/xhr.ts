@@ -6,17 +6,14 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
+import {XhrFactory} from '../../index';
 import {
-  ɵformatRuntimeError as formatRuntimeError,
-  inject,
   Injectable,
   ɵRuntimeError as RuntimeError,
-  ɵTracingService as TracingService,
-  ɵTracingSnapshot as TracingSnapshot,
+  ɵformatRuntimeError as formatRuntimeError,
 } from '@angular/core';
 import {from, Observable, Observer, of} from 'rxjs';
 import {switchMap} from 'rxjs/operators';
-import {XhrFactory} from '../../index';
 
 import type {HttpBackend} from './backend';
 import {RuntimeErrorCode} from './errors';
@@ -78,10 +75,6 @@ function validateXhrCompatibility(req: HttpRequest<any>) {
       property: 'referrer',
       errorCode: RuntimeErrorCode.REFERRER_NOT_SUPPORTED_WITH_XHR,
     },
-    {
-      property: 'referrerPolicy',
-      errorCode: RuntimeErrorCode.REFERRER_POLICY_NOT_SUPPORTED_WITH_XHR,
-    },
   ];
 
   // Check each unsupported option and warn if present
@@ -90,7 +83,7 @@ function validateXhrCompatibility(req: HttpRequest<any>) {
       console.warn(
         formatRuntimeError(
           errorCode,
-          `Angular detected that a \`HttpClient\` request with the \`${property}\` option was sent using XHR, which does not support it. To use the \`${property}\` option, use the Fetch API by removing \`withXhr()\` from the \`provideHttpClient()\` call.`,
+          `Angular detected that a \`HttpClient\` request with the \`${property}\` option was sent using XHR, which does not support it. To use the \`${property}\` option, enable Fetch API support by passing \`withFetch()\` as an argument to \`provideHttpClient()\`.`,
         ),
       );
     }
@@ -106,15 +99,7 @@ function validateXhrCompatibility(req: HttpRequest<any>) {
  */
 @Injectable({providedIn: 'root'})
 export class HttpXhrBackend implements HttpBackend {
-  private readonly tracingService: TracingService<TracingSnapshot> | null = inject(TracingService, {
-    optional: true,
-  });
-
   constructor(private xhrFactory: XhrFactory) {}
-
-  private maybePropagateTrace<T extends Function>(fn: T): T {
-    return this.tracingService?.propagate ? this.tracingService.propagate(fn) : fn;
-  }
 
   /**
    * Processes a request and returns a stream of response events.
@@ -230,7 +215,7 @@ export class HttpXhrBackend implements HttpBackend {
           // emit. This allows them to be unregistered as event listeners later.
 
           // First up is the load event, which represents a response being fully available.
-          const onLoad = this.maybePropagateTrace(() => {
+          const onLoad = () => {
             // Read response state from the memoized partial data.
             let {headers, status, statusText, url} = partialFromXhr();
 
@@ -307,12 +292,12 @@ export class HttpXhrBackend implements HttpBackend {
                 }),
               );
             }
-          });
+          };
 
           // The onError callback is called when something goes wrong at the network level.
           // Connection timeout, DNS error, offline, etc. These are actual errors, and are
           // transmitted on the error channel.
-          const onError = this.maybePropagateTrace((error: ProgressEvent) => {
+          const onError = (error: ProgressEvent) => {
             const {url} = partialFromXhr();
             const res = new HttpErrorResponse({
               error,
@@ -321,12 +306,12 @@ export class HttpXhrBackend implements HttpBackend {
               url: url || undefined,
             });
             observer.error(res);
-          });
+          };
 
           let onTimeout = onError;
 
           if (req.timeout) {
-            onTimeout = this.maybePropagateTrace((_: ProgressEvent) => {
+            onTimeout = (_: ProgressEvent) => {
               const {url} = partialFromXhr();
               const res = new HttpErrorResponse({
                 error: new DOMException('Request timed out', 'TimeoutError'),
@@ -335,7 +320,7 @@ export class HttpXhrBackend implements HttpBackend {
                 url: url || undefined,
               });
               observer.error(res);
-            });
+            };
           }
 
           // The sentHeaders flag tracks whether the HttpResponseHeaders event
@@ -346,7 +331,7 @@ export class HttpXhrBackend implements HttpBackend {
 
           // The download progress event handler, which is only registered if
           // progress events are enabled.
-          const onDownProgress = this.maybePropagateTrace((event: ProgressEvent) => {
+          const onDownProgress = (event: ProgressEvent) => {
             // Send the HttpResponseHeaders event if it hasn't been sent already.
             if (!sentHeaders) {
               observer.next(partialFromXhr());
@@ -374,11 +359,11 @@ export class HttpXhrBackend implements HttpBackend {
 
             // Finally, fire the event.
             observer.next(progressEvent);
-          });
+          };
 
           // The upload progress event handler, which is only registered if
           // progress events are enabled.
-          const onUpProgress = this.maybePropagateTrace((event: ProgressEvent) => {
+          const onUpProgress = (event: ProgressEvent) => {
             // Upload progress events are simpler. Begin building the progress
             // event.
             let progress: HttpUploadProgressEvent = {
@@ -394,7 +379,7 @@ export class HttpXhrBackend implements HttpBackend {
 
             // Send the event.
             observer.next(progress);
-          });
+          };
 
           // By default, register for load and error events.
           xhr.addEventListener('load', onLoad);
@@ -402,18 +387,15 @@ export class HttpXhrBackend implements HttpBackend {
           xhr.addEventListener('timeout', onTimeout);
           xhr.addEventListener('abort', onError);
 
-          const reportUploadProgress = req.reportProgress || req.reportUploadProgress;
-          const reportDownloadProgress = req.reportProgress || req.reportDownloadProgress;
-
           // Progress events are only enabled if requested.
-          if (reportDownloadProgress) {
+          if (req.reportProgress) {
             // Download progress is always enabled if requested.
             xhr.addEventListener('progress', onDownProgress);
-          }
 
-          // Upload progress depends on whether there is a body to upload.
-          if (reportUploadProgress && reqBody !== null && xhr.upload) {
-            xhr.upload.addEventListener('progress', onUpProgress);
+            // Upload progress depends on whether there is a body to upload.
+            if (reqBody !== null && xhr.upload) {
+              xhr.upload.addEventListener('progress', onUpProgress);
+            }
           }
 
           // Fire the request, and notify the event stream that it was fired.
@@ -428,12 +410,11 @@ export class HttpXhrBackend implements HttpBackend {
             xhr.removeEventListener('load', onLoad);
             xhr.removeEventListener('timeout', onTimeout);
 
-            if (reportDownloadProgress) {
+            if (req.reportProgress) {
               xhr.removeEventListener('progress', onDownProgress);
-            }
-
-            if (reportUploadProgress && reqBody !== null && xhr.upload) {
-              xhr.upload.removeEventListener('progress', onUpProgress);
+              if (reqBody !== null && xhr.upload) {
+                xhr.upload.removeEventListener('progress', onUpProgress);
+              }
             }
 
             // Finally, abort the in-flight request.

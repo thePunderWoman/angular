@@ -235,11 +235,6 @@ export enum PerfEvent {
   AnalyzePipe,
 
   /**
-   * An `@Service` class was analyzed.
-   */
-  AnalyzeService,
-
-  /**
    * A trait was analyzed.
    *
    * In theory, this should be the sum of the `Analyze` counters for each decorator type.
@@ -303,7 +298,7 @@ export enum PerfEvent {
   EmitSourceFile,
 
   /**
-   * Tracks the number of `PerfEvent`s, and must appear at the end of the list.
+   * Tracks the number of `PrefEvent`s, and must appear at the end of the list.
    */
   LAST,
 }

@@ -25,8 +25,6 @@ export interface Snippet {
   sanitizedContent: SafeHtml;
   /** Text in following format `start-end`. Start and end are numbers, based on them provided range of lines will be displayed in collapsed mode  */
   visibleLinesRange?: string;
-
-  shell?: boolean;
 }
 
 export interface ExampleMetadata {
@@ -42,6 +40,4 @@ export interface ExampleMetadata {
   preview: boolean;
   /** Whether to hide code example by default. */
   hideCode: boolean;
-  /** Visual style for the code example */
-  style?: 'prefer' | 'avoid';
 }

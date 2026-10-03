@@ -79,7 +79,7 @@ export function compileDeclareComponentFromMetadata(
 /**
  * Gathers the declaration fields for a component into a `DefinitionMap`.
  */
-function createComponentDefinitionMap(
+export function createComponentDefinitionMap(
   meta: R3ComponentMetadata<R3TemplateDependencyMetadata>,
   template: ParsedTemplate,
   templateInfo: DeclareComponentTemplateInfo,
@@ -279,10 +279,6 @@ class BlockPresenceVisitor extends RecursiveVisitor {
   }
 
   override visitSwitchBlockCase(): void {
-    this.hasBlocks = true;
-  }
-
-  override visitSwitchBlockCaseGroup(): void {
     this.hasBlocks = true;
   }
 }

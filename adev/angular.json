@@ -7,7 +7,9 @@
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
-          "style": "scss"
+          "style": "scss",
+          "standalone": true,
+          "changeDetection": "OnPush"
         }
       },
       "root": ".",
@@ -17,7 +19,7 @@
         "build": {
           "builder": "@angular/build:application",
           "options": {
-            "externalDependencies": ["path", "xhr2"],
+            "externalDependencies": ["path"],
             "outputMode": "static",
             "outputPath": "dist",
             "index": "src/index.html",
@@ -29,10 +31,9 @@
             "assets": [
               "src/favicon.ico",
               "src/robots.txt",
-              "src/llms.txt",
               "src/assets",
-              "src/assets/images/v21-event",
-              "src/assets/images/v22-event"
+              "src/context",
+              "src/llms.txt"
             ],
             "styles": ["@angular/docs/styles/global-styles.scss", "./src/local-styles.scss"],
             "scripts": [],
@@ -56,7 +57,7 @@
           "defaultConfiguration": "production"
         },
         "serve": {
-          "builder": "@angular/build:dev-server",
+          "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
               "buildTarget": "angular-dev:build:production"
@@ -70,16 +71,28 @@
             "buildTarget": "web-ui:build",
             "headers": {
               "Cross-Origin-Opener-Policy": "same-origin",
-              "Cross-Origin-Embedder-Policy": "credentialless"
+              "Cross-Origin-Embedder-Policy": "require-corp"
             }
           }
         },
-        "test": {
-          "builder": "@angular/build:unit-test",
+        "extract-i18n": {
+          "builder": "@angular-devkit/build-angular:extract-i18n",
           "options": {
-            "runner": "karma",
-            "browsers": ["ChromeHeadlessNoSandbox"],
-            "include": ["src/app/**/*.spec.ts"]
+            "buildTarget": "angular-dev:build"
+          }
+        },
+        "test": {
+          "builder": "@angular/build:karma",
+          "options": {
+            "tsConfig": "tsconfig.spec.json",
+            "include": ["src/app"],
+            "karmaConfig": "karma.conf.js",
+            "main": "test-main.ts",
+            "inlineStyleLanguage": "scss",
+            "assets": ["src/favicon.ico", "src/assets"],
+            "styles": ["@angular/docs/styles/global-styles.scss"],
+            "scripts": [],
+            "webWorkerTsConfig": "tsconfig.worker.json"
           }
         }
       }

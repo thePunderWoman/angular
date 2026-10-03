@@ -14,6 +14,7 @@ describe('CommandValidator', () => {
   let service: CommandValidator;
 
   beforeEach(() => {
+    TestBed.configureTestingModule({});
     service = TestBed.inject(CommandValidator);
   });
 

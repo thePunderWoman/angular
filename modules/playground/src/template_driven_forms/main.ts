@@ -8,7 +8,7 @@
 
 /* tslint:disable:no-console  */
 
-import {ChangeDetectionStrategy, Component, Directive, Host, NgModule} from '@angular/core';
+import {Component, Directive, Host, NgModule} from '@angular/core';
 import {FormControl, FormGroup, FormsModule, NG_VALIDATORS, NgForm} from '@angular/forms';
 import {BrowserModule, platformBrowser} from '@angular/platform-browser';
 
@@ -71,7 +71,6 @@ export class CreditCardValidator {}
   inputs: ['controlPath: control', 'errorTypes: errors'],
   template: ` <span *ngIf="errorMessage !== null">{{ errorMessage }}</span> `,
   standalone: false,
-  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class ShowError {
   formDir: NgForm;

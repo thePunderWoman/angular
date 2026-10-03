@@ -7,15 +7,13 @@
  */
 
 import ts from 'typescript';
+import {ReflectionHost, reflectObjectLiteral} from '@angular/compiler-cli/src/ngtsc/reflection';
+import {getAngularDecorators, ResourceLoader} from '@angular/compiler-cli/src/ngtsc/annotations';
+import {PartialEvaluator} from '@angular/compiler-cli/src/ngtsc/partial_evaluator';
 import {
-  getAngularDecorators,
-  PartialEvaluator,
-  ReflectionHost,
-  reflectObjectLiteral,
-  ResourceLoader,
   ExternalTemplateDeclaration,
   InlineTemplateDeclaration,
-} from '@angular/compiler-cli/private/migrations';
+} from '@angular/compiler-cli/src/ngtsc/annotations/component/src/resources';
 
 /**
  * Attempts to extract the `TemplateDefinition` for the given

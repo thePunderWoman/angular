@@ -6,8 +6,9 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {NgtscProgram, ParsedConfiguration} from '@angular/compiler-cli';
-import {NgCompilerOptions} from '@angular/compiler-cli/private/migrations';
+import {NgCompilerOptions} from '@angular/compiler-cli/src/ngtsc/core/api';
+import {NgtscProgram} from '@angular/compiler-cli/src/ngtsc/program';
+import {ParsedConfiguration} from '@angular/compiler-cli/src/perform_compile';
 import ts from 'typescript';
 import {BaseProgramInfo} from '../program_info';
 import {defaultMigrationTsOptions} from './ts_program';

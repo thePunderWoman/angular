@@ -6,31 +6,21 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {Component, ElementRef, output, viewChild} from '@angular/core';
-import {MatIcon} from '@angular/material/icon';
-import {MatTooltip} from '@angular/material/tooltip';
-
+import {ChangeDetectionStrategy, Component, output, signal} from '@angular/core';
 import {ButtonComponent} from '../../../../shared/button/button.component';
-import {createFilter, Filter} from './filter';
+
+const FILTER_PLACEHOLDER = 'Filter';
 
 @Component({
   selector: 'ng-recording-timeline-controls',
   templateUrl: './recording-timeline-controls.component.html',
   styleUrls: ['./recording-timeline-controls.component.scss'],
-  imports: [ButtonComponent, MatIcon, MatTooltip],
+  imports: [ButtonComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RecordingTimelineControlsComponent {
-  protected readonly filterRef = viewChild<ElementRef>('filter');
   protected readonly exportProfile = output<void>();
-  protected readonly filter = output<Filter>();
-
-  onFilterInput(value: string) {
-    this.filter.emit(createFilter(value));
-  }
-
-  clearFilter() {
-    const filterInput = this.filterRef()?.nativeElement;
-    filterInput.value = '';
-    this.onFilterInput('');
-  }
+  protected readonly filter = output<string>();
+  protected readonly filterPlaceholder = signal(FILTER_PLACEHOLDER);
+  protected readonly FILTER_PLACEHOLDER = FILTER_PLACEHOLDER;
 }

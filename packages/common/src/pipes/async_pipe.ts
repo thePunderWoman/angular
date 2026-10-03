@@ -20,7 +20,7 @@ import {
 } from '@angular/core';
 import type {Observable, Subscribable, Unsubscribable} from 'rxjs';
 
-import {invalidPipeArgumentError} from './utils';
+import {invalidPipeArgumentError} from './invalid_pipe_argument_error';
 
 interface SubscriptionStrategy {
   createSubscription(
@@ -132,8 +132,6 @@ const _subscribableStrategy = new SubscribableStrategy();
  * to the view. The Observable continuously updates the view with the current time.
  *
  * {@example common/pipes/ts/async_pipe.ts region='AsyncPipeObservable'}
- *
- * @see [Built-in Pipes](guide/templates/pipes#built-in-pipes)
  *
  * @publicApi
  */

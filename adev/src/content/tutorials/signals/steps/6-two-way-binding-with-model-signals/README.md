@@ -13,7 +13,7 @@ Create a model signal in the `custom-checkbox` component that can both receive a
 
 ```ts
 // Add imports for model signals
-import {Component, model, input, ChangeDetectionStrategy} from '@angular/core';
+import {Component, model, input} from '@angular/core';
 
 // Model signal for two-way binding
 checked = model.required<boolean>();
@@ -30,7 +30,10 @@ Build the checkbox template that responds to clicks and updates its own model.
 
 ```html
 <label class="custom-checkbox">
-  <input type="checkbox" [checked]="checked()" (change)="toggle()" />
+  <input
+    type="checkbox"
+    [checked]="checked()"
+    (change)="toggle()">
   <span class="checkmark"></span>
   {{ label() }}
 </label>
@@ -80,14 +83,8 @@ Part 1. **Uncomment the checkboxes and add two-way binding:**
 
 Part 2. **Replace the `???` placeholders with @if blocks:**
 
-```angular-html
+```html
 @if (agreedToTerms()) {
-  Yes
-} @else {
-  No
-}
-
-@if (enableNotifications()) {
   Yes
 } @else {
   No

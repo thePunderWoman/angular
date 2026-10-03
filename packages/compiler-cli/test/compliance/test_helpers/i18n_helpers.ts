@@ -33,11 +33,10 @@ export function i18nMsg(
     let ${varName};
     if (typeof ngI18nClosureMode !== "undefined" && ngI18nClosureMode) {
         ${i18nMsgClosureMeta(meta)}
-        const $MSG_EXTERNAL_${msgIndex}$ = /* @ts-ignore */ goog.getMsg("${message}"${closurePlaceholders}${closureOptions});
+        const $MSG_EXTERNAL_${msgIndex}$ = goog.getMsg("${message}"${closurePlaceholders}${closureOptions});
         ${varName} = $MSG_EXTERNAL_${msgIndex}$;
     }
     else {
-      /* @ts-ignore */
       ${varName} = $localize \`${i18nMsgLocalizeMeta(meta)}${locMessageWithPlaceholders}\`;
     }`;
 }
@@ -81,7 +80,7 @@ export function i18nIcuMsg(message: string, placeholders: Placeholder[], options
  * - The third (optional) items is the id of the message that this placeholder references.
  *   This is used for matching ICU placeholders to ICU messages.
  */
-export type Placeholder = [name: string, identifier: string, associatedId: string];
+export type Placeholder = [name: string, indentifier: string, associatedId: string];
 
 /**
  * Describes message metadata object.

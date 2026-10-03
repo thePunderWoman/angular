@@ -6,12 +6,14 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {EnvironmentInjector, Service, inject} from '@angular/core';
+import {EnvironmentInjector, Injectable, inject} from '@angular/core';
 import sdk, {Project, ProjectFiles} from '@stackblitz/sdk';
 
 import {injectNodeRuntimeSandbox} from './inject-node-runtime-sandbox';
 
-@Service()
+@Injectable({
+  providedIn: 'root',
+})
 export class StackBlitzOpener {
   private readonly environmentInjector = inject(EnvironmentInjector);
 

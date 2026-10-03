@@ -149,7 +149,7 @@ export class ReflectionCapabilities implements PlatformReflectionCapabilities {
     }
 
     // API for metadata created by invoking the decorators.
-    const paramAnnotations = Object.hasOwn(type, PARAMETERS) && (type as any)[PARAMETERS];
+    const paramAnnotations = type.hasOwnProperty(PARAMETERS) && (type as any)[PARAMETERS];
     const paramTypes =
       this._reflect &&
       this._reflect.getOwnMetadata &&
@@ -195,7 +195,7 @@ export class ReflectionCapabilities implements PlatformReflectionCapabilities {
     }
 
     // API for metadata created by invoking the decorators.
-    if (Object.hasOwn(typeOrFunc, ANNOTATIONS)) {
+    if (typeOrFunc.hasOwnProperty(ANNOTATIONS)) {
       return (typeOrFunc as any)[ANNOTATIONS];
     }
     return null;
@@ -238,7 +238,7 @@ export class ReflectionCapabilities implements PlatformReflectionCapabilities {
     }
 
     // API for metadata created by invoking the decorators.
-    if (Object.hasOwn(typeOrFunc, PROP_METADATA)) {
+    if (typeOrFunc.hasOwnProperty(PROP_METADATA)) {
       return (typeOrFunc as any)[PROP_METADATA];
     }
     return null;
@@ -260,7 +260,7 @@ export class ReflectionCapabilities implements PlatformReflectionCapabilities {
     if (ownPropMetadata) {
       Object.keys(ownPropMetadata).forEach((propName) => {
         const decorators: any[] = [];
-        if (Object.hasOwn(propMetadata, propName)) {
+        if (propMetadata.hasOwnProperty(propName)) {
           decorators.push(...propMetadata[propName]);
         }
         decorators.push(...ownPropMetadata[propName]);

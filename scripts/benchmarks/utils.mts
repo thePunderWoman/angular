@@ -17,21 +17,16 @@ const scriptDir = path.dirname(url.fileURLToPath(import.meta.url));
 export const projectDir: string = path.join(scriptDir, '../..');
 
 /**
- * Executes the given command with the provided arguments. Arguments are passed
- * as a discrete array to the child process, bypassing shell interpretation.
- * This ensures that special shell characters within arguments are treated as
- * literal values and cannot be used to inject additional commands.
+ * Executes the given command, forwarding stdin, stdout and stderr while
+ * still capturing stdout in order to return it.
  */
-export function exec(cmd: string, args: string[] = [], cwd: string = projectDir): Promise<string> {
+export function exec(cmd: string, args: string[] = []): Promise<string> {
   return new Promise((resolve, reject) => {
-    Log.info('Running command:', cmd, args.join(' '), `(in ${cwd})`);
+    Log.info('Running command:', cmd, args.join(' '));
 
     const proc = childProcess.spawn(cmd, args, {
-      // Do not use a shell to spawn the process. This ensures that arguments
-      // are passed directly to the executable without shell interpretation,
-      // preventing injection via shell metacharacters.
-      shell: false,
-      cwd,
+      shell: true,
+      cwd: projectDir,
       // Only capture `stdout`. Forward the rest to the parent TTY.
       stdio: ['inherit', 'pipe', 'inherit'],
     });

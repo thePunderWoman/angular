@@ -6,17 +6,11 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 import {AST, TmplAstComponent, TmplAstNode} from '@angular/compiler';
-import {
-  absoluteFrom,
-  DirectiveMeta,
-  MetaKind,
-  NgCompiler,
-  PerfPhase,
-  PipeMeta,
-  SymbolKind,
-  TemplateTypeChecker,
-} from '@angular/compiler-cli';
-
+import {NgCompiler} from '@angular/compiler-cli/src/ngtsc/core';
+import {absoluteFrom} from '@angular/compiler-cli/src/ngtsc/file_system';
+import {MetaKind, PipeMeta, DirectiveMeta} from '@angular/compiler-cli/src/ngtsc/metadata';
+import {PerfPhase} from '@angular/compiler-cli/src/ngtsc/perf';
+import {SymbolKind, TemplateTypeChecker} from '@angular/compiler-cli/src/ngtsc/typecheck/api';
 import ts from 'typescript';
 
 import {
@@ -389,14 +383,9 @@ export class RenameBuilder {
     for (const targetDetails of allTargetDetails) {
       for (const location of targetDetails.typescriptLocations) {
         if (targetDetails.symbol.kind === SymbolKind.Pipe) {
-          const classSymbol = this.ttc.getTsSymbolOfSymbol(targetDetails.symbol.classSymbol);
-          if (
-            !classSymbol?.valueDeclaration ||
-            !ts.isClassDeclaration(classSymbol.valueDeclaration)
-          ) {
-            return null;
-          }
-          const meta = this.compiler.getMeta(classSymbol.valueDeclaration);
+          const meta = this.compiler.getMeta(
+            targetDetails.symbol.classSymbol.tsSymbol.valueDeclaration,
+          );
           if (meta === null || meta.kind !== MetaKind.Pipe) {
             return null;
           }
@@ -409,7 +398,7 @@ export class RenameBuilder {
           targetDetails.symbol.kind === SymbolKind.SelectorlessComponent ||
           targetDetails.symbol.kind === SymbolKind.SelectorlessDirective
         ) {
-          const tsSymbol = this.ttc.getTsSymbolOfSymbol(targetDetails.symbol);
+          const tsSymbol = targetDetails.symbol.tsSymbol;
           const meta =
             tsSymbol === null || tsSymbol.valueDeclaration === undefined
               ? null

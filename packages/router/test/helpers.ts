@@ -6,13 +6,12 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {EnvironmentInjector, Type} from '@angular/core';
+import {Type} from '@angular/core';
 
 import {Data, ResolveData, Route} from '../src/models';
 import {ActivatedRouteSnapshot} from '../src/router_state';
-import {Params, PRIMARY_OUTLET} from '../src/shared';
+import {Params} from '../src/shared';
 import {UrlSegment, UrlTree} from '../src/url_tree';
-import {TestBed} from '@angular/core/testing';
 
 export class Logger {
   logs: string[] = [];
@@ -40,13 +39,28 @@ export function createActivatedRouteSnapshot(args: ARSArgs): ActivatedRouteSnaps
   return new (ActivatedRouteSnapshot as any)(
     args.url || [],
     args.params || {},
-    args.queryParams || {},
+    args.queryParams || null,
     args.fragment || null,
-    args.data || {},
-    args.outlet || PRIMARY_OUTLET,
-    args.component as any,
+    args.data || null,
+    args.outlet || null,
+    args.component,
     args.routeConfig || {},
     args.resolve || {},
-    TestBed.inject(EnvironmentInjector),
   );
+}
+
+export async function timeout(ms?: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+export function useAutoTick() {
+  beforeEach(() => {
+    jasmine.clock().install();
+    jasmine.clock().autoTick();
+  });
+  afterEach(() => {
+    jasmine.clock().uninstall();
+  });
 }

@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {DevToolsNode, Properties, PropType} from '../../../../../../protocol';
+import {Properties, PropType} from '../../../../../../protocol';
 
 import {IndexedNode} from '../directive-forest/index-forest';
 
@@ -18,6 +18,7 @@ const mockIndexedNode: IndexedNode = {
     id: 0,
     isElement: false,
   },
+  hydration: null,
   directives: [
     {
       id: 1,
@@ -28,13 +29,11 @@ const mockIndexedNode: IndexedNode = {
       name: 'BazDir',
     },
   ],
-  controlFlowBlock: null,
-  static: false,
+  defer: null,
   hasNativeElement: true,
   children: [],
-  tagName: 'foo',
+  element: 'foo',
   position: [0],
-  original: {} as DevToolsNode,
 };
 
 const fooNestedProperties: Properties = {

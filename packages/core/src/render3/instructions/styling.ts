@@ -6,13 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {formatRuntimeError, RuntimeErrorCode} from '../../errors';
-import {
-  BypassType,
-  getSanitizationBypassType,
-  SafeValue,
-  unwrapSafeValue,
-} from '../../sanitization/bypass';
+import {SafeValue, unwrapSafeValue} from '../../sanitization/bypass';
 import {KeyValueArray, keyValueArrayGet, keyValueArraySet} from '../../util/array_utils';
 import {
   assertDefined,
@@ -104,7 +98,10 @@ export function ɵɵstyleProp(
  *
  * @codeGenApi
  */
-export function ɵɵclassProp(className: string, value: any): typeof ɵɵclassProp {
+export function ɵɵclassProp(
+  className: string,
+  value: boolean | undefined | null,
+): typeof ɵɵclassProp {
   checkStylingProperty(className, value, null, true);
   return ɵɵclassProp;
 }
@@ -128,9 +125,7 @@ export function ɵɵclassProp(className: string, value: any): typeof ɵɵclassPr
  *
  * @codeGenApi
  */
-export function ɵɵstyleMap(
-  styles: {[styleName: string]: any} | string | undefined | null | NO_CHANGE,
-): void {
+export function ɵɵstyleMap(styles: {[styleName: string]: any} | string | undefined | null): void {
   checkStylingMap(styleKeyValueArraySet, styleStringParser, styles, false);
 }
 
@@ -168,14 +163,7 @@ export function styleStringParser(keyValueArray: KeyValueArray<any>, text: strin
  * @codeGenApi
  */
 export function ɵɵclassMap(
-  classes:
-    | {[className: string]: boolean | undefined | null}
-    | string
-    | string[]
-    | Set<string>
-    | undefined
-    | null
-    | NO_CHANGE,
+  classes: {[className: string]: boolean | undefined | null} | string | undefined | null,
 ): void {
   checkStylingMap(classKeyValueArraySet, classStringParser, classes, true);
 }
@@ -219,9 +207,6 @@ export function checkStylingProperty(
     stylingFirstUpdatePass(tView, prop, bindingIndex, isClassBased);
   }
   if (value !== NO_CHANGE && bindingUpdated(lView, bindingIndex, value)) {
-    if (ngDevMode && !isClassBased) {
-      warnInvalidStylePropValue(prop, value);
-    }
     const tNode = tView.data[getSelectedIndex()] as TNode;
     updateStyling(
       tView,
@@ -233,36 +218,6 @@ export function checkStylingProperty(
       isClassBased,
       bindingIndex,
     );
-  }
-}
-
-function warnInvalidStylePropValue(prop: string, value: unknown): void {
-  if (
-    value == null ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    getSanitizationBypassType(value) === BypassType.Style
-  ) {
-    return;
-  }
-
-  console.warn(
-    formatRuntimeError(
-      RuntimeErrorCode.INVALID_STYLE_PROP_VALUE,
-      `\`[style.${prop}]\` was bound to an invalid value. ` +
-        `Expected a string, number, SafeValue, null, or undefined, but received ` +
-        `\`${typeof value}\` (\`${stringifyInvalidStylePropValue(value)}\`).`,
-    ),
-  );
-}
-
-function stringifyInvalidStylePropValue(value: unknown): string {
-  try {
-    return stringify(value);
-  } catch {
-    // Invalid values may have throwing accessors or conversion methods. A development diagnostic
-    // must not interrupt the binding update when the value cannot be represented in the warning.
-    return '[unstringifiable value]';
   }
 }
 
@@ -718,23 +673,18 @@ function collectStylingFromTAttrs(
 export function toStylingKeyValueArray(
   keyValueArraySet: (keyValueArray: KeyValueArray<any>, key: string, value: any) => void,
   stringParser: (styleKeyValueArray: KeyValueArray<any>, text: string) => void,
-  value: string | string[] | Set<string> | {[key: string]: any} | SafeValue | null | undefined,
+  value: string | string[] | {[key: string]: any} | SafeValue | null | undefined,
 ): KeyValueArray<any> {
   if (value == null /*|| value === undefined */ || value === '') return EMPTY_ARRAY as any;
   const styleKeyValueArray: KeyValueArray<any> = [] as any;
-  const unwrappedValue = unwrapSafeValue(value) as
-    string | string[] | Set<string> | {[key: string]: any};
+  const unwrappedValue = unwrapSafeValue(value) as string | string[] | {[key: string]: any};
   if (Array.isArray(unwrappedValue)) {
     for (let i = 0; i < unwrappedValue.length; i++) {
       keyValueArraySet(styleKeyValueArray, unwrappedValue[i], true);
     }
-  } else if (unwrappedValue instanceof Set) {
-    for (const current of unwrappedValue) {
-      keyValueArraySet(styleKeyValueArray, current, true);
-    }
   } else if (typeof unwrappedValue === 'object') {
     for (const key in unwrappedValue) {
-      if (Object.hasOwn(unwrappedValue, key)) {
+      if (unwrappedValue.hasOwnProperty(key)) {
         keyValueArraySet(styleKeyValueArray, key, unwrappedValue[key]);
       }
     }
@@ -759,7 +709,6 @@ export function toStylingKeyValueArray(
  * @param value The value to set.
  */
 export function styleKeyValueArraySet(keyValueArray: KeyValueArray<any>, key: string, value: any) {
-  ngDevMode && warnInvalidStylePropValue(key, value);
   keyValueArraySet(keyValueArray, key, unwrapSafeValue(value));
 }
 
@@ -1031,7 +980,7 @@ function normalizeSuffix(
     // As it produce invalid CSS, which the browsers will automatically omit but Domino will not.
     // Example: `"left": "px;"` instead of `"left": ""`.
   } else if (typeof suffix === 'string') {
-    value = unwrapSafeValue(value) + suffix;
+    value = value + suffix;
   } else if (typeof value === 'object') {
     value = stringify(unwrapSafeValue(value));
   }

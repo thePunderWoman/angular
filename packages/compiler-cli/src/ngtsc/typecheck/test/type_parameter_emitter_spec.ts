@@ -5,23 +5,20 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.dev/license
  */
-import {ExpressionType} from '@angular/compiler';
 import ts from 'typescript';
 
 import {absoluteFrom, LogicalFileSystem} from '../../file_system';
 import {runInEachFileSystem, TestFile} from '../../file_system/testing';
 import {
   AbsoluteModuleStrategy,
-  assertSuccessfulReferenceEmit,
   ImportFlags,
   LocalIdentifierStrategy,
   LogicalProjectStrategy,
   ModuleResolver,
   ReferenceEmitter,
 } from '../../imports';
-import {isNamedClassDeclaration, ReflectionHost, TypeScriptReflectionHost} from '../../reflection';
+import {isNamedClassDeclaration, TypeScriptReflectionHost} from '../../reflection';
 import {getDeclaration, makeProgram} from '../../testing';
-import {translateType} from '../../translator';
 import {Environment} from '../src/environment';
 import {TypeCheckFile} from '../src/type_check_file';
 import {TypeParameterEmitter} from '../src/type_parameter_emitter';
@@ -62,41 +59,22 @@ runInEachFileSystem(() => {
         absoluteFrom('/app/main.ngtypecheck.ts'),
         ALL_ENABLED_CONFIG,
         refEmitter,
+        reflector,
         host,
       );
       const emitter = new TypeParameterEmitter(TestClass.typeParameters, reflector);
-      return {emitter, env, reflector};
+      return {emitter, env};
     }
 
     function emit(
-      {
-        emitter,
-        env,
-        reflector,
-      }: {emitter: TypeParameterEmitter; env: TypeCheckFile; reflector: ReflectionHost},
+      {emitter, env}: {emitter: TypeParameterEmitter; env: Environment},
       flags?: ImportFlags,
     ) {
       const canEmit = emitter.canEmit((ref) => env.canReferenceType(ref, flags));
 
       let emitted: ts.TypeParameterDeclaration[] | undefined;
       try {
-        emitted = emitter.emit((ref) => {
-          const combinedFlags =
-            flags !== undefined
-              ? flags
-              : ImportFlags.NoAliasing |
-                ImportFlags.AllowTypeImports |
-                ImportFlags.AllowRelativeDtsImports;
-          const ngExpr = env.refEmitter.emit(ref, env.contextFile, combinedFlags);
-          assertSuccessfulReferenceEmit(ngExpr, env.contextFile, 'symbol');
-          return translateType(
-            new ExpressionType(ngExpr.expression),
-            env.contextFile,
-            reflector,
-            env.refEmitter,
-            env.importManager,
-          );
-        });
+        emitted = emitter.emit((ref) => env.referenceType(ref, flags));
         expect(canEmit).toBe(true);
       } catch (e) {
         expect(canEmit).toBe(false);

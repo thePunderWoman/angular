@@ -23,7 +23,6 @@ import {
 
 import {pendingUntilEvent} from '../src';
 import {TestBed} from '../../testing';
-import {timeout} from '@angular/private/testing';
 
 describe('pendingUntilEvent', () => {
   let taskService: PendingTasksInternal;
@@ -231,21 +230,21 @@ describe('pendingUntilEvent', () => {
     sub.next();
     observable.subscribe();
     // first subscription unblocks
-    await timeout(5);
+    await new Promise((r) => setTimeout(r, 5));
     // still pending because the other subscribed after the emit
     expect(taskService.hasPendingTasks).toBe(true);
 
     sub.next();
-    await timeout(3);
+    await new Promise((r) => setTimeout(r, 3));
     observable.subscribe();
     sub.next();
     // second subscription unblocks
-    await timeout(2);
+    await new Promise((r) => setTimeout(r, 2));
     // still pending because third subscription delay not finished
     expect(taskService.hasPendingTasks).toBe(true);
 
     // finishes third subscription
-    await timeout(3);
+    await new Promise((r) => setTimeout(r, 3));
     await expectAsync(appRef.whenStable()).toBeResolved();
   });
 });

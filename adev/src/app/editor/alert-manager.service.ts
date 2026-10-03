@@ -6,24 +6,20 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {inject, Service} from '@angular/core';
+import {Injectable, inject} from '@angular/core';
 import {LOCAL_STORAGE, WINDOW, isMobile} from '@angular/docs';
 import {MatSnackBar} from '@angular/material/snack-bar';
-import {
-  ErrorSnackBar,
-  ErrorSnackBarData,
-  ErrorSnackBarPose,
-} from '../core/services/errors-handling/error-snack-bar';
+import {ErrorSnackBar, ErrorSnackBarData} from '../core/services/errors-handling/error-snack-bar';
 
 export const MAX_RECOMMENDED_WEBCONTAINERS_INSTANCES = 3;
-const WEBCONTAINERS_COUNTER_KEY = 'numberOfWebcontainers';
+export const WEBCONTAINERS_COUNTER_KEY = 'numberOfWebcontainers';
 
 export enum AlertReason {
   OUT_OF_MEMORY,
   MOBILE,
 }
 
-@Service()
+@Injectable({providedIn: 'root'})
 export class AlertManager {
   private readonly localStorage = inject(LOCAL_STORAGE);
   private readonly window = inject(WINDOW);
@@ -89,15 +85,12 @@ export class AlertManager {
 
   private openSnackBar(reason: AlertReason) {
     let message = '';
-    let pose: ErrorSnackBarPose = 'greeting';
     switch (reason) {
       case AlertReason.OUT_OF_MEMORY:
         message = `Your browser is currently limiting the memory available to run the Angular Tutorials or Playground. If you have multiple tabs open with Tutorials or Playground, please close some of them and refresh this page.`;
-        pose = 'error';
         break;
       case AlertReason.MOBILE:
         message = `You are running the embedded editor in a mobile device, this may result in an Out of memory error.`;
-        pose = 'greeting';
         break;
     }
 
@@ -106,7 +99,6 @@ export class AlertManager {
       data: {
         message,
         actionText: 'I understand',
-        pose,
       } satisfies ErrorSnackBarData,
     });
   }

@@ -38,10 +38,7 @@ import {
 import {LView} from '../interfaces/view';
 import {ViewContext} from '../view_context';
 import {assertNotInReactiveContext} from './asserts';
-import {
-  emitAfterRenderEffectPhaseCreatedEvent,
-  setInjectorProfilerContext,
-} from '../debug/injector_profiler';
+import {emitEffectCreatedEvent, setInjectorProfilerContext} from '../debug/injector_profiler';
 
 const NOT_SET = /* @__PURE__ */ Symbol('NOT_SET');
 const EMPTY_CLEANUP_SET = /* @__PURE__ */ new Set<() => void>();
@@ -60,7 +57,7 @@ type AfterRenderPhaseEffectHook = (
  * This node type extends `SignalNode` because `afterRenderEffect` phases effects produce a value
  * which is consumed as a `Signal` by subsequent phases.
  */
-export interface AfterRenderPhaseEffectNode extends SignalNode<unknown> {
+interface AfterRenderPhaseEffectNode extends SignalNode<unknown> {
   /** The phase of the effect implemented by this node */
   phase: AfterRenderPhase;
   /** The sequence of phases to which this node belongs, used for state of the whole sequence */
@@ -77,12 +74,8 @@ export interface AfterRenderPhaseEffectNode extends SignalNode<unknown> {
   phaseFn(previousValue?: unknown): unknown;
 }
 
-const AFTER_RENDER_PHASE_EFFECT_NODE: Omit<
-  AfterRenderPhaseEffectNode,
-  'phase' | 'sequence' | 'userFn' | 'signal' | 'registerCleanupFn'
-> = /* @__PURE__ */ (() => ({
+const AFTER_RENDER_PHASE_EFFECT_NODE = /* @__PURE__ */ (() => ({
   ...SIGNAL_NODE,
-  kind: 'afterRenderEffectPhase',
   consumerIsAlwaysLive: true,
   consumerAllowSignalWrites: true,
   value: NOT_SET,
@@ -180,9 +173,6 @@ export class AfterRenderEffectSequence extends AfterRenderSequence {
     AfterRenderPhaseEffectNode | undefined,
   ] = [undefined, undefined, undefined, undefined];
 
-  /** Function to be called when the effect is destroyed. */
-  onDestroyFns: (() => void)[] | null = null;
-
   constructor(
     impl: AfterRenderImpl,
     effectHooks: Array<AfterRenderPhaseEffectHook | undefined>,
@@ -240,12 +230,6 @@ export class AfterRenderEffectSequence extends AfterRenderSequence {
   }
 
   override destroy(): void {
-    if (this.onDestroyFns !== null) {
-      for (const fn of this.onDestroyFns) {
-        fn();
-      }
-    }
-
     super.destroy();
 
     // Run the cleanup functions for each node.
@@ -436,7 +420,7 @@ function setupDebugInfo(node: AfterRenderPhaseEffectNode, injector: Injector): v
   node.debugName = `afterRenderEffect - ${phaseDebugName(node.phase)} phase`;
   const prevInjectorProfilerContext = setInjectorProfilerContext({injector, token: null});
   try {
-    emitAfterRenderEffectPhaseCreatedEvent(node);
+    emitEffectCreatedEvent({[SIGNAL]: node, destroy() {}} as any);
   } finally {
     setInjectorProfilerContext(prevInjectorProfilerContext);
   }

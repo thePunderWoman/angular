@@ -6,10 +6,9 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-// 3p-only-start
 import {
   NavigationNavigateOptions,
-  NavigationType,
+  NavigationTypeString,
   NavigationOptions,
   NavigateEvent,
   NavigationCurrentEntryChangeEvent,
@@ -19,13 +18,9 @@ import {
   NavigationResult,
   NavigationHistoryEntry,
   NavigationInterceptOptions,
-  NavigationInterceptHandler,
-  NavigationPrecommitHandler,
   NavigationDestination,
   Navigation,
-  NavigationPrecommitController,
 } from '../src/navigation_types';
-// 3p-only-end
 
 /**
  * Fake implementation of user agent history and navigation behavior. This is a
@@ -66,7 +61,7 @@ export class FakeNavigation implements Navigation {
    * A prospective current active entry index, which includes unresolved
    * traversals. Used by `go` to determine where navigations are intended to go.
    */
-  private propsectiveTraversalDestinations: number[] = [];
+  private prospectiveEntryIndex = 0;
 
   /**
    * A test-only option to make traversals synchronous, rather than emulate
@@ -83,8 +78,6 @@ export class FakeNavigation implements Navigation {
    */
   eventTarget: EventTarget;
 
-  readonly activation: NavigationActivation | null = null;
-
   /** The next unique id for created entries. Replace recreates this id. */
   private nextId = 0;
 
@@ -94,26 +87,15 @@ export class FakeNavigation implements Navigation {
   /** Whether this fake is disposed. */
   private disposed = false;
 
-  /**
-   * Equivalent to `navigation.currentEntry`.
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigation-currententry
-   */
+  /** Equivalent to `navigation.currentEntry`. */
   get currentEntry(): FakeNavigationHistoryEntry {
     return this.entriesArr[this.currentEntryIndex];
   }
 
-  /**
-   * Equivalent to `navigation.canGoBack`.
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigation-cangoback
-   */
   get canGoBack(): boolean {
     return this.currentEntryIndex > 0;
   }
 
-  /**
-   * Equivalent to `navigation.canGoForward`.
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigation-cangoforward
-   */
   get canGoForward(): boolean {
     return this.currentEntryIndex < this.entriesArr.length - 1;
   }
@@ -143,7 +125,7 @@ export class FakeNavigation implements Navigation {
         return new EventTarget();
       }
     };
-    this._window = doc.defaultView ?? this.createEventTarget();
+    this._window = document.defaultView ?? this.createEventTarget();
     this.eventTarget = this.createEventTarget();
     // First entry.
     this.setInitialEntryForTesting(startURL);
@@ -158,7 +140,7 @@ export class FakeNavigation implements Navigation {
   ): void {
     if (!this.canSetInitialEntry) {
       throw new Error(
-        'setInitialEntryForTesting can only be called before any navigation has occurred',
+        'setInitialEntryForTesting can only be called before any ' + 'navigation has occurred',
       );
     }
     const currentInitialEntry = this.entriesArr[0];
@@ -185,23 +167,17 @@ export class FakeNavigation implements Navigation {
     this.synchronousTraversals = synchronousTraversals;
   }
 
-  /**
-   * Equivalent to `navigation.entries()`.
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigation-entries
-   */
+  /** Equivalent to `navigation.entries()`. */
   entries(): FakeNavigationHistoryEntry[] {
     return this.entriesArr.slice();
   }
 
-  /**
-   * Equivalent to `navigation.navigate()`.
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigation-navigate
-   */
+  /** Equivalent to `navigation.navigate()`. */
   navigate(url: string, options?: NavigationNavigateOptions): FakeNavigationResult {
     const fromUrl = new URL(this.currentEntry.url!);
     const toUrl = new URL(url, this.currentEntry.url!);
 
-    let navigationType: NavigationType;
+    let navigationType: NavigationTypeString;
     if (!options?.history || options.history === 'auto') {
       // Auto defaults to push, but if the URLs are the same, is a replace.
       if (fromUrl.toString() === toUrl.toString()) {
@@ -221,8 +197,9 @@ export class FakeNavigation implements Navigation {
       sameDocument: hashChange,
       historyState: null,
     });
+    const result = new InternalNavigationResult(this);
 
-    return this.performNonTraverseNavigation(destination, {
+    const intercepted = this.userAgentNavigate(destination, result, {
       navigationType,
       cancelable: true,
       canIntercept: true,
@@ -231,6 +208,14 @@ export class FakeNavigation implements Navigation {
       hashChange,
       info: options?.info,
     });
+    if (!intercepted) {
+      this.updateNavigationEntriesForSameDocumentNavigation(this.navigateEvent!);
+    }
+
+    return {
+      committed: result.committed,
+      finished: result.finished,
+    };
   }
 
   /** Equivalent to `history.pushState()`. */
@@ -244,7 +229,7 @@ export class FakeNavigation implements Navigation {
   }
 
   private pushOrReplaceState(
-    navigationType: NavigationType,
+    navigationType: NavigationTypeString,
     data: unknown,
     _title: string,
     url?: string,
@@ -260,8 +245,9 @@ export class FakeNavigation implements Navigation {
       historyState: data,
       state: undefined, // No Navigation API state directly from history.pushState
     });
+    const result = new InternalNavigationResult(this);
 
-    this.performNonTraverseNavigation(destination, {
+    const intercepted = this.userAgentNavigate(destination, result, {
       navigationType,
       cancelable: true,
       canIntercept: true,
@@ -269,17 +255,26 @@ export class FakeNavigation implements Navigation {
       userInitiated: false,
       hashChange,
     });
+    if (intercepted) {
+      return;
+    }
+    this.updateNavigationEntriesForSameDocumentNavigation(this.navigateEvent!);
   }
 
-  /**
-   * Equivalent to `navigation.traverseTo()`.
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigation-traverseto
-   */
+  /** Equivalent to `navigation.traverseTo()`. */
   traverseTo(key: string, options?: NavigationOptions): FakeNavigationResult {
     const fromUrl = new URL(this.currentEntry.url!);
     const entry = this.findEntry(key);
     if (!entry) {
-      return earlyErrorResult(new DOMException('Invalid key', 'InvalidStateError'));
+      const domException = new DOMException('Invalid key', 'InvalidStateError');
+      const committed = Promise.reject(domException);
+      const finished = Promise.reject(domException);
+      committed.catch(() => {});
+      finished.catch(() => {});
+      return {
+        committed,
+        finished,
+      };
     }
     if (entry === this.currentEntry) {
       return {
@@ -296,8 +291,16 @@ export class FakeNavigation implements Navigation {
     }
 
     const hashChange = isHashChange(fromUrl, new URL(entry.url!, this.currentEntry.url!));
-    const destination = this.createDestinationFromEntry(entry);
-    this.propsectiveTraversalDestinations.push(entry.index);
+    const destination = new FakeNavigationDestination({
+      url: entry.url!,
+      state: entry.getState(),
+      historyState: entry.getHistoryState(),
+      key: entry.key,
+      id: entry.id,
+      index: entry.index,
+      sameDocument: entry.sameDocument,
+    });
+    this.prospectiveEntryIndex = entry.index;
     const result = new InternalNavigationResult(this);
     this.traversalQueue.set(entry.key, result);
     this.runTraversal(() => {
@@ -321,25 +324,35 @@ export class FakeNavigation implements Navigation {
     };
   }
 
-  /**
-   * Equivalent to `navigation.back()`.
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigation-back
-   */
+  /** Equivalent to `navigation.back()`. */
   back(options?: NavigationOptions): FakeNavigationResult {
     if (this.currentEntryIndex === 0) {
-      return earlyErrorResult(new DOMException('Cannot go back', 'InvalidStateError'));
+      const domException = new DOMException('Cannot go back', 'InvalidStateError');
+      const committed = Promise.reject(domException);
+      const finished = Promise.reject(domException);
+      committed.catch(() => {});
+      finished.catch(() => {});
+      return {
+        committed,
+        finished,
+      };
     }
     const entry = this.entriesArr[this.currentEntryIndex - 1];
     return this.traverseTo(entry.key, options);
   }
 
-  /**
-   * Equivalent to `navigation.forward()`.
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigation-forward
-   */
+  /** Equivalent to `navigation.forward()`. */
   forward(options?: NavigationOptions): FakeNavigationResult {
     if (this.currentEntryIndex === this.entriesArr.length - 1) {
-      return earlyErrorResult(new DOMException('Cannot go forward', 'InvalidStateError'));
+      const domException = new DOMException('Cannot go forward', 'InvalidStateError');
+      const committed = Promise.reject(domException);
+      const finished = Promise.reject(domException);
+      committed.catch(() => {});
+      finished.catch(() => {});
+      return {
+        committed,
+        finished,
+      };
     }
     const entry = this.entriesArr[this.currentEntryIndex + 1];
     return this.traverseTo(entry.key, options);
@@ -353,13 +366,11 @@ export class FakeNavigation implements Navigation {
    * `back(); forward()` chains it collapses certain traversals.
    */
   go(direction: number): void {
-    const targetIndex =
-      (this.propsectiveTraversalDestinations[this.propsectiveTraversalDestinations.length - 1] ??
-        this.currentEntryIndex) + direction;
+    const targetIndex = this.prospectiveEntryIndex + direction;
     if (targetIndex >= this.entriesArr.length || targetIndex < 0) {
       return;
     }
-    this.propsectiveTraversalDestinations.push(targetIndex);
+    this.prospectiveEntryIndex = targetIndex;
     this.runTraversal(() => {
       // Check again that destination is in the entries array.
       if (targetIndex >= this.entriesArr.length || targetIndex < 0) {
@@ -368,7 +379,15 @@ export class FakeNavigation implements Navigation {
       const fromUrl = new URL(this.currentEntry.url!);
       const entry = this.entriesArr[targetIndex];
       const hashChange = isHashChange(fromUrl, new URL(entry.url!, this.currentEntry.url!));
-      const destination = this.createDestinationFromEntry(entry);
+      const destination = new FakeNavigationDestination({
+        url: entry.url!,
+        state: entry.getState(),
+        historyState: entry.getHistoryState(),
+        key: entry.key,
+        id: entry.id,
+        index: entry.index,
+        sameDocument: entry.sameDocument,
+      });
       const result = new InternalNavigationResult(this);
       const intercepted = this.userAgentNavigate(destination, result, {
         navigationType: 'traverse',
@@ -384,44 +403,10 @@ export class FakeNavigation implements Navigation {
     });
   }
 
-  /** Creates a FakeNavigationDestination matching a given history entry. */
-  private createDestinationFromEntry(entry: FakeNavigationHistoryEntry): FakeNavigationDestination {
-    return new FakeNavigationDestination({
-      url: entry.url!,
-      state: entry.getState(),
-      historyState: entry.getHistoryState(),
-      key: entry.key,
-      id: entry.id,
-      index: entry.index,
-      sameDocument: entry.sameDocument,
-    });
-  }
-
-  /**
-   * Implementation of "performing a non-traverse navigation" from the spec.
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigation-navigate
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigation-reload
-   */
-  private performNonTraverseNavigation(
-    destination: FakeNavigationDestination,
-    options: InternalNavigateOptions,
-  ): FakeNavigationResult {
-    const result = new InternalNavigationResult(this);
-    const intercepted = this.userAgentNavigate(destination, result, options);
-    if (!intercepted) {
-      this.updateNavigationEntriesForSameDocumentNavigation(this.navigateEvent!);
-    }
-    return {
-      committed: result.committed,
-      finished: result.finished,
-    };
-  }
-
   /** Runs a traversal synchronously or asynchronously */
   private runTraversal(traversal: () => void) {
     if (this.synchronousTraversals) {
       traversal();
-      this.propsectiveTraversalDestinations.shift();
       return;
     }
 
@@ -433,7 +418,6 @@ export class FakeNavigation implements Navigation {
         setTimeout(() => {
           resolve();
           traversal();
-          this.propsectiveTraversalDestinations.shift();
         });
       });
     });
@@ -482,12 +466,11 @@ export class FakeNavigation implements Navigation {
       return;
     }
     const abortReason = reason ?? new DOMException('Navigation aborted', 'AbortError');
-    this.navigateEvent.abort(abortReason);
+    this.navigateEvent.cancel(abortReason);
   }
 
   /**
    * Implementation for all navigations and traversals.
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#navigate-event-firing
    * @returns true if the event was intercepted, otherwise false
    */
   private userAgentNavigate(
@@ -516,8 +499,6 @@ export class FakeNavigation implements Navigation {
       hashChange: options.hashChange,
       destination,
       info: options.info,
-      hasUAVisualTransition: options.hasUAVisualTransition,
-      sourceElement: options.sourceElement,
       sameDocument: destination.sameDocument,
       result,
     });
@@ -526,8 +507,8 @@ export class FakeNavigation implements Navigation {
 
   /**
    * Implementation for a push or replace navigation.
-   * https://html.spec.whatwg.org/multipage/browsing-the-web.html#url-and-history-update-steps
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#update-the-navigation-api-entries-for-a-same-document-navigation
+   * https://whatpr.org/html/10919/browsing-the-web.html#url-and-history-update-steps
+   * https://whatpr.org/html/10919/nav-history-apis.html#update-the-navigation-api-entries-for-a-same-document-navigation
    * @internal
    */
   urlAndHistoryUpdateSteps(navigateEvent: InternalFakeNavigateEvent) {
@@ -537,21 +518,20 @@ export class FakeNavigation implements Navigation {
   /**
    * Implementation for a traverse navigation.
    *
-   * https://html.spec.whatwg.org/multipage/browsing-the-web.html#apply-the-traverse-history-step
+   * https://whatpr.org/html/10919/browsing-the-web.html#apply-the-traverse-history-step
    * ...
    * > Let updateDocument be an algorithm step which performs update document for history step application given targetEntry's document, targetEntry, changingNavigableContinuation's update-only, scriptHistoryLength, scriptHistoryIndex, navigationType, entriesForNavigationAPI, and previousEntry.
    * > If targetEntry's document is equal to displayedDocument, then perform updateDocument.
-   * https://html.spec.whatwg.org/multipage/browsing-the-web.html#update-document-for-history-step-application
-   * which then goes to https://html.spec.whatwg.org/multipage/nav-history-apis.html#update-the-navigation-api-entries-for-a-same-document-navigation
+   * https://whatpr.org/html/10919/browsing-the-web.html#update-document-for-history-step-application
+   * which then goes to https://whatpr.org/html/10919/nav-history-apis.html#update-the-navigation-api-entries-for-a-same-document-navigation
    * @internal
    */
   userAgentTraverse(navigateEvent: InternalFakeNavigateEvent) {
     const oldUrl = this.currentEntry.url!;
     this.updateNavigationEntriesForSameDocumentNavigation(navigateEvent);
-    // Happens as part of "updating the document" steps https://html.spec.whatwg.org/multipage/browsing-the-web.html#updating-the-document
+    // Happens as part of "updating the document" steps https://whatpr.org/html/10919/browsing-the-web.html#updating-the-document
     const popStateEvent = createPopStateEvent({
       state: navigateEvent.destination.getHistoryState(),
-      hasUAVisualTransition: navigateEvent.hasUAVisualTransition,
     });
     this._window.dispatchEvent(popStateEvent);
     if (navigateEvent.hashChange) {
@@ -561,7 +541,7 @@ export class FakeNavigation implements Navigation {
   }
 
   /**
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#update-the-navigation-api-entries-for-a-same-document-navigation
+   * https://whatpr.org/html/10919/nav-history-apis.html#update-the-navigation-api-entries-for-a-same-document-navigation
    * @internal
    */
   updateNavigationEntriesForSameDocumentNavigation({
@@ -578,7 +558,7 @@ export class FakeNavigation implements Navigation {
       }
     } else if (navigationType === 'push') {
       this.currentEntryIndex++;
-      this.propsectiveTraversalDestinations = []; // prospectiveEntryIndex isn't in the spec but is an implementation detail
+      this.prospectiveEntryIndex = this.currentEntryIndex; // prospectiveEntryIndex isn't in the spec but is an implementation detail
       disposedNHEs.push(...this.entriesArr.splice(this.currentEntryIndex));
     } else if (navigationType === 'replace') {
       disposedNHEs.push(oldCurrentNHE);
@@ -598,8 +578,6 @@ export class FakeNavigation implements Navigation {
         historyState: destination.getHistoryState(),
       });
       this.entriesArr[this.currentEntryIndex] = newNHE;
-    } else if (navigationType === 'reload') {
-      oldCurrentNHE.setState(destination.getState());
     }
     result.committedResolve(this.currentEntry);
     const currentEntryChangeEvent = createFakeNavigationCurrentEntryChangeEvent({
@@ -620,79 +598,52 @@ export class FakeNavigation implements Navigation {
     return undefined;
   }
 
-  private _onnavigate: ((this: Navigation, ev: NavigateEvent) => any) | null = null;
-  /**
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#handler-navigation-onnavigate
-   */
-  // tslint:disable-next-line:no-any
-  get onnavigate(): ((this: Navigation, ev: NavigateEvent) => any) | null {
-    return this._onnavigate;
-  }
   set onnavigate(
     // tslint:disable-next-line:no-any
-    handler: ((this: Navigation, ev: NavigateEvent) => any) | null,
+    _handler: ((this: Navigation, ev: NavigateEvent) => any) | null,
   ) {
-    this._onnavigate = setEventHandler(this, 'navigate', this._onnavigate, handler);
+    throw new Error('unimplemented');
   }
 
-  private _oncurrententrychange:
-    ((this: Navigation, ev: NavigationCurrentEntryChangeEvent) => any) | null = null;
-  /**
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#handler-navigation-oncurrententrychange
-   */
-  get oncurrententrychange():
-    | // tslint:disable-next-line:no-any
-      ((this: Navigation, ev: NavigationCurrentEntryChangeEvent) => any)
-    | null {
-    return this._oncurrententrychange;
-  }
-  set oncurrententrychange(
-    handler:
-      | // tslint:disable-next-line:no-any
-        ((this: Navigation, ev: NavigationCurrentEntryChangeEvent) => any)
-      | null,
-  ) {
-    this._oncurrententrychange = setEventHandler(
-      this,
-      'currententrychange',
-      this._oncurrententrychange,
-      handler,
-    );
-  }
-
-  private _onnavigatesuccess: ((this: Navigation, ev: Event) => any) | null = null;
-  /**
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#handler-navigation-onnavigatesuccess
-   */
   // tslint:disable-next-line:no-any
-  get onnavigatesuccess(): ((this: Navigation, ev: Event) => any) | null {
-    return this._onnavigatesuccess;
+  get onnavigate(): ((this: Navigation, ev: NavigateEvent) => any) | null {
+    throw new Error('unimplemented');
   }
+
+  set oncurrententrychange(
+    _handler: // tslint:disable-next-line:no-any
+    ((this: Navigation, ev: NavigationCurrentEntryChangeEvent) => any) | null,
+  ) {
+    throw new Error('unimplemented');
+  }
+
+  get oncurrententrychange(): // tslint:disable-next-line:no-any
+  ((this: Navigation, ev: NavigationCurrentEntryChangeEvent) => any) | null {
+    throw new Error('unimplemented');
+  }
+
   set onnavigatesuccess(
     // tslint:disable-next-line:no-any
-    handler: ((this: Navigation, ev: Event) => any) | null,
+    _handler: ((this: Navigation, ev: Event) => any) | null,
   ) {
-    this._onnavigatesuccess = setEventHandler(
-      this,
-      'navigatesuccess',
-      this._onnavigatesuccess,
-      handler,
-    );
+    throw new Error('unimplemented');
   }
 
-  private _onnavigateerror: ((this: Navigation, ev: ErrorEvent) => any) | null = null;
-  /**
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#handler-navigation-onnavigateerror
-   */
   // tslint:disable-next-line:no-any
-  get onnavigateerror(): ((this: Navigation, ev: ErrorEvent) => any) | null {
-    return this._onnavigateerror;
+  get onnavigatesuccess(): ((this: Navigation, ev: Event) => any) | null {
+    throw new Error('unimplemented');
   }
+
   set onnavigateerror(
     // tslint:disable-next-line:no-any
-    handler: ((this: Navigation, ev: ErrorEvent) => any) | null,
+    _handler: ((this: Navigation, ev: ErrorEvent) => any) | null,
   ) {
-    this._onnavigateerror = setEventHandler(this, 'navigateerror', this._onnavigateerror, handler);
+    throw new Error('unimplemented');
+  }
+
+  // tslint:disable-next-line:no-any
+  get onnavigateerror(): ((this: Navigation, ev: ErrorEvent) => any) | null {
+    throw new Error('unimplemented');
   }
 
   private _transition: NavigationTransition | null = null;
@@ -704,57 +655,12 @@ export class FakeNavigation implements Navigation {
     return this._transition;
   }
 
-  /**
-   * Equivalent to `navigation.updateCurrentEntry()`.
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigation-updatecurrententry
-   */
-  updateCurrentEntry(options: NavigationUpdateCurrentEntryOptions): void {
-    const current = this.currentEntry;
-    if (!current) {
-      throw new DOMException(
-        'Cannot update current entry when current is null',
-        'InvalidStateError',
-      );
-    }
-    current.setState(cloneState(options.state));
-    const currentEntryChangeEvent = createFakeNavigationCurrentEntryChangeEvent({
-      from: current,
-      navigationType: null,
-    });
-    this.eventTarget.dispatchEvent(currentEntryChangeEvent);
+  updateCurrentEntry(_options: NavigationUpdateCurrentEntryOptions): void {
+    throw new Error('unimplemented');
   }
 
-  /**
-   * Equivalent to `navigation.reload()`.
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigation-reload
-   */
-  reload(options?: NavigationReloadOptions): FakeNavigationResult {
-    const current = this.currentEntry;
-    if (!current) {
-      return earlyErrorResult(
-        new DOMException('Cannot reload when currentEntry is null', 'InvalidStateError'),
-      );
-    }
-
-    const state = options && 'state' in options ? options.state : current.getState();
-    const destination = new FakeNavigationDestination({
-      url: current.url!,
-      state,
-      historyState: current.getHistoryState(),
-      key: '',
-      id: '',
-      index: -1,
-      sameDocument: current.sameDocument,
-    });
-
-    return this.performNonTraverseNavigation(destination, {
-      navigationType: 'reload',
-      cancelable: true,
-      canIntercept: true,
-      userInitiated: false,
-      hashChange: false,
-      info: options?.info,
-    });
+  reload(_options?: NavigationReloadOptions): NavigationResult {
+    throw new Error('unimplemented');
   }
 }
 
@@ -769,7 +675,6 @@ interface FakeNavigationResult extends NavigationResult {
 
 /**
  * Fake equivalent of `NavigationHistoryEntry`.
- * https://html.spec.whatwg.org/multipage/nav-history-apis.html#the-navigationhistoryentry-interface
  */
 export class FakeNavigationHistoryEntry implements NavigationHistoryEntry {
   readonly sameDocument: boolean;
@@ -777,23 +682,11 @@ export class FakeNavigationHistoryEntry implements NavigationHistoryEntry {
   readonly id: string;
   readonly key: string;
   readonly index: number;
-  private state: unknown;
+  private readonly state: unknown;
   private readonly historyState: unknown;
 
-  private _ondispose: ((this: NavigationHistoryEntry, ev: Event) => any) | null = null;
-  /**
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigationhistoryentry-ondispose
-   */
   // tslint:disable-next-line:no-any
-  get ondispose(): ((this: NavigationHistoryEntry, ev: Event) => any) | null {
-    return this._ondispose;
-  }
-  set ondispose(
-    // tslint:disable-next-line:no-any
-    handler: ((this: NavigationHistoryEntry, ev: Event) => any) | null,
-  ) {
-    this._ondispose = setEventHandler(this, 'dispose', this._ondispose, handler);
-  }
+  ondispose: ((this: NavigationHistoryEntry, ev: Event) => any) | null = null;
 
   constructor(
     private eventTarget: EventTarget,
@@ -822,20 +715,16 @@ export class FakeNavigationHistoryEntry implements NavigationHistoryEntry {
     this.historyState = historyState;
   }
 
-  /**
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigationhistoryentry-getstate
-   */
   getState(): unknown {
-    return cloneState(this.state);
-  }
-
-  /** @internal */
-  setState(state: unknown) {
-    this.state = state;
+    // Budget copy.
+    return this.state ? (JSON.parse(JSON.stringify(this.state)) as unknown) : this.state;
   }
 
   getHistoryState(): unknown {
-    return cloneState(this.historyState);
+    // Budget copy.
+    return this.historyState
+      ? (JSON.parse(JSON.stringify(this.historyState)) as unknown)
+      : this.historyState;
   }
 
   addEventListener(
@@ -858,23 +747,34 @@ export class FakeNavigationHistoryEntry implements NavigationHistoryEntry {
     return this.eventTarget.dispatchEvent(event);
   }
 
-  /**
-   * internal
-   * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigationhistoryentry-ondispose
-   */
+  /** internal */
   dispose() {
-    const disposeEvent = new Event('dispose');
+    const disposeEvent = new Event('disposed');
     this.dispatchEvent(disposeEvent);
     // release current listeners
     this.eventTarget = null!;
   }
 }
 
+/** `NavigationInterceptOptions` with experimental commit option. */
+export interface ExperimentalNavigationInterceptOptions extends NavigationInterceptOptions {
+  precommitHandler?: (controller: NavigationPrecommitController) => Promise<void>;
+}
+
+export interface NavigationPrecommitController {
+  redirect: (url: string, options?: NavigationNavigateOptions) => void;
+}
+
+export interface ExperimentalNavigateEvent extends NavigateEvent {
+  intercept(options?: ExperimentalNavigationInterceptOptions): void;
+
+  precommitHandler?: () => Promise<void>;
+}
+
 /**
  * Fake equivalent of `NavigateEvent`.
- * https://html.spec.whatwg.org/multipage/nav-history-apis.html#the-navigateevent-interface
  */
-export interface FakeNavigateEvent extends NavigateEvent {
+export interface FakeNavigateEvent extends ExperimentalNavigateEvent {
   readonly destination: FakeNavigationDestination;
 }
 
@@ -886,7 +786,7 @@ interface InternalFakeNavigateEvent extends FakeNavigateEvent {
   focusResetBehavior: 'after-transition' | 'manual' | null;
 
   abortController: AbortController;
-  abort(reason: Error): void;
+  cancel(reason: Error): void;
 }
 
 /**
@@ -900,11 +800,9 @@ function dispatchNavigateEvent({
   canIntercept,
   userInitiated,
   hashChange,
-  hasUAVisualTransition,
   navigationType,
   destination,
   info,
-  sourceElement = null,
   sameDocument,
   result,
 }: {
@@ -912,11 +810,9 @@ function dispatchNavigateEvent({
   canIntercept: boolean;
   userInitiated: boolean;
   hashChange: boolean;
-  hasUAVisualTransition?: boolean;
-  navigationType: NavigationType;
+  navigationType: NavigationTypeString;
   destination: FakeNavigationDestination;
   info: unknown;
-  sourceElement?: Element | null;
   sameDocument: boolean;
   result: InternalNavigationResult;
 }) {
@@ -932,13 +828,9 @@ function dispatchNavigateEvent({
   event.canIntercept = canIntercept;
   event.userInitiated = userInitiated;
   event.hashChange = hashChange;
-  if (hasUAVisualTransition) {
-    event.hasUAVisualTransition = true;
-  }
   event.signal = eventAbortController.signal;
   event.abortController = eventAbortController;
   event.info = info;
-  event.sourceElement = sourceElement;
   event.focusResetBehavior = null;
   event.scrollBehavior = null;
   event.interceptionState = 'none';
@@ -947,15 +839,13 @@ function dispatchNavigateEvent({
   event.result = result;
   event.sameDocument = sameDocument;
 
-  let precommitHandlers: Array<
-    (controller: NavigationPrecommitController) => PromiseLike<void> | void
-  > = [];
-  let handlers: Array<() => PromiseLike<void> | void> = [];
+  let precommitHandlers: Array<(controller: NavigationPrecommitController) => Promise<void>> = [];
+  let handlers: Array<() => Promise<void>> = [];
 
-  // https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigateevent-intercept
+  // https://whatpr.org/html/10919/nav-history-apis.html#dom-navigateevent-intercept
   event.intercept = function (
     this: InternalFakeNavigateEvent,
-    options?: NavigationInterceptOptions,
+    options?: ExperimentalNavigationInterceptOptions,
   ): void {
     if (!this.canIntercept) {
       throw new DOMException(`Cannot intercept when canIntercept is 'false'`, 'SecurityError');
@@ -985,7 +875,7 @@ function dispatchNavigateEvent({
     event.scrollBehavior = options?.scroll ?? event.scrollBehavior;
   };
 
-  // https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigateevent-scroll
+  // https://whatpr.org/html/10919/nav-history-apis.html#dom-navigateevent-scroll
   event.scroll = function (this: InternalFakeNavigateEvent): void {
     if (event.interceptionState !== 'committed') {
       throw new DOMException(
@@ -997,7 +887,7 @@ function dispatchNavigateEvent({
     processScrollBehavior(event);
   };
 
-  // https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigationprecommitcontroller-redirect
+  // https://whatpr.org/html/10919/nav-history-apis.html#dom-navigationprecommitcontroller-redirect
   function redirect(url: string, options: NavigationNavigateOptions = {}) {
     if (event.interceptionState === 'none') {
       throw new Error('cannot redirect when event is not intercepted');
@@ -1018,47 +908,23 @@ function dispatchNavigateEvent({
     if (options.history === 'push' || options.history === 'replace') {
       event.navigationType = options.history;
     }
-    if (Object.hasOwn(options, 'state')) {
+    if (options.hasOwnProperty('state')) {
       event.destination.state = options.state;
     }
     event.destination.url = destinationUrl.href;
-    if (Object.hasOwn(options, 'info')) {
+    if (options.hasOwnProperty('info')) {
       event.info = options.info;
     }
   }
 
-  // https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigationprecommitcontroller-addhandler
-  function addHandler(handler: () => PromiseLike<void> | void) {
-    if (event.interceptionState !== 'intercepted') {
-      throw new DOMException(
-        `cannot addHandler when event is not in 'intercepted' state`,
-        'InvalidStateError',
-      );
-    }
-    handlers.push(handler);
-  }
-
-  // https://html.spec.whatwg.org/multipage/nav-history-apis.html#process-navigate-event-handler-failure
-  function processNavigateEventHandlerFailure(reason: any) {
-    if (event.abortController.signal.aborted) {
-      return;
-    }
-    if (event !== navigation.navigateEvent) {
-      throw new Error('Event is no longer the current navigation event');
-    }
-    if (event.interceptionState !== 'intercepted') {
-      finishNavigationEvent(event, false);
-    }
-    event.abort(reason);
-  }
-
-  // https://html.spec.whatwg.org/multipage/nav-history-apis.html#commit-a-navigate-event
-  // "To commit a navigate event given a NavigateEvent..."
+  // https://whatpr.org/html/10919/nav-history-apis.html#inner-navigate-event-firing-algorithm
+  // "Let commit be the following steps:"
   function commit() {
     if (result.signal.aborted) {
       return;
     }
-    if (event.interceptionState !== 'none') {
+    (navigation.transition as InternalNavigationTransition)?.committedResolve();
+    if (event.interceptionState === 'intercepted') {
       event.interceptionState = 'committed';
       switch (event.navigationType) {
         case 'push':
@@ -1076,19 +942,10 @@ function dispatchNavigateEvent({
         }
       }
     }
-    (navigation.transition as InternalNavigationTransition)?.committedResolve();
-    const promisesList: Array<PromiseLike<unknown>> = [];
-    for (const handler of handlers) {
-      try {
-        const handlerResult = handler();
-        if (handlerResult) {
-          promisesList.push(handlerResult);
-        }
-      } catch (e) {
-        promisesList.push(Promise.reject(e));
-      }
+    const promisesList = handlers.map((handler) => handler());
+    if (promisesList.length === 0) {
+      promisesList.push(Promise.resolve());
     }
-    promisesList.push(result.committed);
     Promise.all(promisesList)
       .then(() => {
         // Follows steps outlined under "Wait for all of promisesList, with the following success steps:"
@@ -1115,15 +972,31 @@ function dispatchNavigateEvent({
         (navigation.transition as InternalNavigationTransition)?.finishedResolve();
         navigation.transition = null;
       })
-      .catch(processNavigateEventHandlerFailure);
+      .catch((reason) => {
+        if (!event.abortController.signal.aborted) {
+          event.cancel(reason);
+        }
+      });
   }
 
   // Internal only.
-  // https://html.spec.whatwg.org/multipage/nav-history-apis.html#abort-a-navigateevent
-  // "To abort a NavigateEvent event given reason:"
-  event.abort = function (this: InternalFakeNavigateEvent, reason: Error) {
+  // https://whatpr.org/html/10919/nav-history-apis.html#inner-navigate-event-firing-algorithm
+  // "Let cancel be the following steps given reason"
+  event.cancel = function (this: InternalFakeNavigateEvent, reason: Error) {
+    if (result.signal.aborted) {
+      return;
+    }
     this.abortController.abort(reason);
-    navigation.navigateEvent = null;
+    const isCurrentGlobalNavigationEvent = this === navigation.navigateEvent;
+    if (isCurrentGlobalNavigationEvent) {
+      navigation.navigateEvent = null;
+    }
+    if (this.interceptionState !== 'intercepted' && this.interceptionState !== 'finished') {
+      finishNavigationEvent(this, false);
+    } else if (this.interceptionState === 'intercepted') {
+      this.interceptionState = 'finished';
+    }
+    result.committedReject(reason);
     result.finishedReject(reason);
     const navigateerrorEvent = new Event('navigateerror', {
       bubbles: false,
@@ -1143,7 +1016,7 @@ function dispatchNavigateEvent({
 
     if (event.interceptionState === 'intercepted') {
       if (!navigation.currentEntry) {
-        event.abort(
+        event.cancel(
           new DOMException(
             'Cannot create transition without a currentEntry for intercepted navigation.',
             'InvalidStateError',
@@ -1151,11 +1024,7 @@ function dispatchNavigateEvent({
         );
         return;
       }
-      const transition = new InternalNavigationTransition(
-        navigation.currentEntry,
-        event.destination,
-        navigationType,
-      );
+      const transition = new InternalNavigationTransition(navigation.currentEntry, navigationType);
       navigation.transition = transition;
       // Mark transition.finished as handled (Spec Step 33.4)
       transition.finished.catch(() => {});
@@ -1163,7 +1032,7 @@ function dispatchNavigateEvent({
     }
     if (!dispatchResult && event.cancelable) {
       if (!event.abortController.signal.aborted) {
-        event.abort(
+        event.cancel(
           new DOMException('Navigation prevented by event.preventDefault()', 'AbortError'),
         );
       }
@@ -1171,26 +1040,28 @@ function dispatchNavigateEvent({
       if (precommitHandlers.length === 0) {
         commit();
       } else {
-        const precommitController: NavigationPrecommitController = {redirect, addHandler};
-        const precommitPromisesList: Array<PromiseLike<unknown>> = [];
-        for (const handler of precommitHandlers) {
+        const precommitController: NavigationPrecommitController = {redirect};
+        const precommitPromisesList = precommitHandlers.map((handler) => {
+          let p: Promise<void>;
           try {
-            const handlerResult = handler(precommitController);
-            if (handlerResult) {
-              if (typeof (handlerResult as any).catch === 'function') {
-                (handlerResult as any).catch(() => {});
-              }
-              precommitPromisesList.push(handlerResult);
-            }
+            p = handler(precommitController);
           } catch (e) {
-            const rejected = Promise.reject(e);
-            rejected.catch(() => {});
-            precommitPromisesList.push(rejected);
+            p = Promise.reject(e);
           }
-        }
+          p.catch(() => {});
+          return p;
+        });
         Promise.all(precommitPromisesList)
           .then(() => commit())
-          .catch(processNavigateEventHandlerFailure);
+          .catch((reason: Error) => {
+            if (event.abortController.signal.aborted) {
+              return;
+            }
+            if (navigation.transition) {
+              (navigation.transition as InternalNavigationTransition).committedReject(reason);
+            }
+            event.cancel(reason);
+          });
       }
     }
   }
@@ -1199,7 +1070,7 @@ function dispatchNavigateEvent({
   return event.interceptionState === 'none';
 }
 
-/** https://html.spec.whatwg.org/multipage/nav-history-apis.html#navigateevent-finish */
+/** https://whatpr.org/html/10919/nav-history-apis.html#navigateevent-finish */
 function finishNavigationEvent(event: InternalFakeNavigateEvent, didFulfill: boolean) {
   if (event.interceptionState === 'finished') {
     throw new Error('Attempting to finish navigation event that was already finished');
@@ -1221,7 +1092,7 @@ function finishNavigationEvent(event: InternalFakeNavigateEvent, didFulfill: boo
   event.interceptionState = 'finished';
 }
 
-/** https://html.spec.whatwg.org/multipage/nav-history-apis.html#potentially-reset-the-focus */
+/** https://whatpr.org/html/10919/nav-history-apis.html#potentially-reset-the-focus */
 function potentiallyResetFocus(event: InternalFakeNavigateEvent) {
   if (event.interceptionState !== 'committed' && event.interceptionState !== 'scrolled') {
     throw new Error('cannot reset focus if navigation event is not committed or scrolled');
@@ -1232,7 +1103,6 @@ function potentiallyResetFocus(event: InternalFakeNavigateEvent) {
   // TODO(atscott): the rest of the steps
 }
 
-/** https://html.spec.whatwg.org/multipage/nav-history-apis.html#potentially-reset-the-scroll-position */
 function potentiallyResetScroll(event: InternalFakeNavigateEvent) {
   if (event.interceptionState !== 'committed' && event.interceptionState !== 'scrolled') {
     throw new Error('cannot reset scroll if navigation event is not committed or scrolled');
@@ -1243,7 +1113,7 @@ function potentiallyResetScroll(event: InternalFakeNavigateEvent) {
   processScrollBehavior(event);
 }
 
-/** https://html.spec.whatwg.org/multipage/nav-history-apis.html#process-scroll-behavior */
+/* https://whatpr.org/html/10919/nav-history-apis.html#process-scroll-behavior */
 function processScrollBehavior(event: InternalFakeNavigateEvent) {
   if (event.interceptionState !== 'committed') {
     throw new Error('invalid event interception state when processing scroll behavior');
@@ -1252,10 +1122,7 @@ function processScrollBehavior(event: InternalFakeNavigateEvent) {
   // TODO(atscott): the rest of the steps
 }
 
-/**
- * Fake equivalent of `NavigationCurrentEntryChangeEvent`.
- * https://html.spec.whatwg.org/multipage/nav-history-apis.html#the-navigationcurrententrychangeevent-interface
- */
+/** Fake equivalent of `NavigationCurrentEntryChangeEvent`. */
 export interface FakeNavigationCurrentEntryChangeEvent extends NavigationCurrentEntryChangeEvent {
   readonly from: FakeNavigationHistoryEntry;
 }
@@ -1263,14 +1130,13 @@ export interface FakeNavigationCurrentEntryChangeEvent extends NavigationCurrent
 /**
  * Create a fake equivalent of `NavigationCurrentEntryChange`. This does not use
  * a class because ES5 transpiled JavaScript cannot extend native Event.
- * https://html.spec.whatwg.org/multipage/nav-history-apis.html#the-navigationcurrententrychangeevent-interface
  */
 function createFakeNavigationCurrentEntryChangeEvent({
   from,
   navigationType,
 }: {
   from: FakeNavigationHistoryEntry;
-  navigationType: NavigationType | null;
+  navigationType: NavigationTypeString;
 }) {
   const event = new Event('currententrychange', {
     bubbles: false,
@@ -1287,21 +1153,12 @@ function createFakeNavigationCurrentEntryChangeEvent({
  * Create a fake equivalent of `PopStateEvent`. This does not use a class
  * because ES5 transpiled JavaScript cannot extend native Event.
  */
-function createPopStateEvent({
-  state,
-  hasUAVisualTransition,
-}: {
-  state: unknown;
-  hasUAVisualTransition?: boolean;
-}) {
+function createPopStateEvent({state}: {state: unknown}) {
   const event = new Event('popstate', {
     bubbles: false,
     cancelable: false,
   }) as {-readonly [P in keyof PopStateEvent]: PopStateEvent[P]};
   event.state = state;
-  if (hasUAVisualTransition) {
-    event.hasUAVisualTransition = true;
-  }
   return event as PopStateEvent;
 }
 
@@ -1317,13 +1174,12 @@ function createHashChangeEvent(newURL: string, oldURL: string) {
 
 /**
  * Fake equivalent of `NavigationDestination`.
- * https://html.spec.whatwg.org/multipage/nav-history-apis.html#the-navigationdestination-interface
  */
 export class FakeNavigationDestination implements NavigationDestination {
   url: string;
   readonly sameDocument: boolean;
-  readonly key: string;
-  readonly id: string;
+  readonly key: string | null;
+  readonly id: string | null;
   readonly index: number;
 
   state?: unknown;
@@ -1350,8 +1206,8 @@ export class FakeNavigationDestination implements NavigationDestination {
     this.sameDocument = sameDocument;
     this.state = state;
     this.historyState = historyState;
-    this.key = key ?? '';
-    this.id = id ?? '';
+    this.key = key;
+    this.id = id;
     this.index = index;
   }
 
@@ -1374,48 +1230,6 @@ function isHashChange(from: URL, to: URL): boolean {
   );
 }
 
-/**
- * Sets an IDL event listener attribute, removing the old listener and adding the new one.
- */
-function setEventHandler<H extends ((...args: any[]) => any) | null>(
-  target: EventTarget,
-  type: string,
-  current: H,
-  next: H,
-): H {
-  if (current) {
-    target.removeEventListener(type, current as EventListener);
-  }
-  if (next) {
-    target.addEventListener(type, next as EventListener);
-  }
-  return next;
-}
-
-/** Budget structured clone for state objects. */
-function cloneState<T>(state: T): T {
-  return state !== undefined && state !== null ? (JSON.parse(JSON.stringify(state)) as T) : state;
-}
-
-/**
- * Creates a FakeNavigationResult where both committed and finished promises
- * are rejected with the given error and marked as handled.
- */
-function earlyErrorResult(error: DOMException): FakeNavigationResult {
-  const committed = Promise.reject(error);
-  const finished = Promise.reject(error);
-  committed.catch(() => {});
-  finished.catch(() => {});
-  return {
-    committed,
-    finished,
-  };
-}
-
-/**
- * Fake equivalent of `NavigationTransition`.
- * https://html.spec.whatwg.org/multipage/nav-history-apis.html#the-navigationtransition-interface
- */
 class InternalNavigationTransition implements NavigationTransition {
   readonly finished: Promise<void>;
   readonly committed: Promise<void>;
@@ -1425,8 +1239,7 @@ class InternalNavigationTransition implements NavigationTransition {
   committedReject!: (reason: Error) => void;
   constructor(
     readonly from: NavigationHistoryEntry,
-    readonly to: NavigationDestination,
-    readonly navigationType: NavigationType,
+    readonly navigationType: NavigationTypeString,
   ) {
     this.finished = new Promise<void>((resolve, reject) => {
       this.finishedReject = reject;
@@ -1477,10 +1290,9 @@ class InternalNavigationResult {
         }
         resolve(this.committedTo);
       };
-      // https://html.spec.whatwg.org/multipage/nav-history-apis.html#reject-the-finished-promise
       this.finishedReject = (reason: Error) => {
-        this.committedReject(reason);
         reject(reason);
+        this.abortController.abort(reason);
       };
     });
     // All rejections are handled.
@@ -1491,12 +1303,10 @@ class InternalNavigationResult {
 
 /** Internal options for performing a navigate. */
 interface InternalNavigateOptions {
-  navigationType: NavigationType;
+  navigationType: NavigationTypeString;
   cancelable: boolean;
   canIntercept: boolean;
   userInitiated: boolean;
   hashChange: boolean;
   info?: unknown;
-  hasUAVisualTransition?: boolean;
-  sourceElement?: Element | null;
 }

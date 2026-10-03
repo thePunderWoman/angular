@@ -1,4 +1,4 @@
-load("//devtools/tools:defaults.bzl", "ng_project", "sass_binary", "ts_project", "ts_test_library", "zoneless_web_test_suite")
+load("//devtools/tools:defaults.bzl", "ng_project", "ng_web_test_suite", "sass_binary", "ts_project", "ts_test_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,15 +20,13 @@ ng_project(
         ":directive_forest_utils",
         "//:node_modules/@angular/cdk",
         "//:node_modules/@angular/core",
-        "//:node_modules/@angular/material",
-        "//devtools/projects/ng-devtools/src/lib/application-providers:deep_link",
-        "//devtools/projects/ng-devtools/src/lib/devtools-tabs/directive-explorer/diffing",
-        "//devtools/projects/ng-devtools/src/lib/devtools-tabs/directive-explorer/directive-forest:directive-forest-filter-fn-generator",
+        "//devtools/projects/ng-devtools/src/lib/devtools-tabs/diffing",
         "//devtools/projects/ng-devtools/src/lib/devtools-tabs/directive-explorer/directive-forest/component-data-source",
+        "//devtools/projects/ng-devtools/src/lib/devtools-tabs/directive-explorer/directive-forest/filter",
+        "//devtools/projects/ng-devtools/src/lib/devtools-tabs/directive-explorer/directive-forest/filter:directive-forest-filter-fn-generator",
         "//devtools/projects/ng-devtools/src/lib/devtools-tabs/directive-explorer/directive-forest/index-forest",
         "//devtools/projects/ng-devtools/src/lib/devtools-tabs/directive-explorer/directive-forest/tree-node",
         "//devtools/projects/ng-devtools/src/lib/devtools-tabs/tab-update",
-        "//devtools/projects/ng-devtools/src/lib/shared/filter",
         "//devtools/projects/ng-devtools/src/lib/shared/utils",
         "//devtools/projects/protocol",
     ],
@@ -49,47 +47,12 @@ ts_test_library(
     deps = [
         ":directive_forest_utils",
         "//devtools/projects/ng-devtools/src/lib/devtools-tabs/directive-explorer/directive-forest/component-data-source",
-        "//devtools/projects/protocol",
     ],
 )
 
-ts_project(
-    name = "directive-forest-filter-fn-generator",
-    srcs = ["directive-forest-filter-fn-generator.ts"],
-    deps = [
-        "//devtools/projects/ng-devtools/src/lib/shared/filter",
-    ],
-)
-
-ts_test_library(
-    name = "directive-forest-filter-fn-generator_test",
-    srcs = ["directive-forest-filter-fn-generator.spec.ts"],
-    deps = [
-        ":directive-forest-filter-fn-generator",
-    ],
-)
-
-ts_test_library(
-    name = "directive_forest_component_test",
-    srcs = ["directive-forest.component.spec.ts"],
-    deps = [
-        ":directive-forest",
-        "//:node_modules/@angular/core",
-        "//:node_modules/@angular/material",
-        "//:node_modules/@angular/platform-browser",
-        "//devtools/projects/ng-devtools/src/lib/application-providers:app_data",
-        "//devtools/projects/ng-devtools/src/lib/application-providers:deep_link",
-        "//devtools/projects/ng-devtools/src/lib/devtools-tabs/directive-explorer/directive-forest/tree-node",
-        "//devtools/projects/ng-devtools/src/lib/devtools-tabs/tab-update",
-        "//devtools/projects/protocol",
-    ],
-)
-
-zoneless_web_test_suite(
+ng_web_test_suite(
     name = "test",
     deps = [
-        ":directive-forest-filter-fn-generator_test",
-        ":directive_forest_component_test",
         ":directive_forest_utils_test",
     ],
 )

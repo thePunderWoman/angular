@@ -6,19 +6,13 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {AST, Binary, KeyedRead, TmplAstNode} from '@angular/compiler';
+import {AST, Binary, TmplAstNode} from '@angular/compiler';
 import ts from 'typescript';
 
 import {NgCompilerOptions} from '../../../../core/api';
 import {ErrorCode, ExtendedTemplateDiagnosticName} from '../../../../diagnostics';
 import {NgTemplateDiagnostic, SymbolKind} from '../../../api';
-import {
-  TemplateCheckFactory,
-  TemplateCheckWithVisitor,
-  TemplateContext,
-  formatExtendedError,
-  isAccessFromUncheckedIndex,
-} from '../../api';
+import {TemplateCheckFactory, TemplateCheckWithVisitor, TemplateContext} from '../../api';
 
 /**
  * Ensures the left side of a nullish coalescing operation is nullable.
@@ -27,11 +21,8 @@ import {
  * otherwise it would produce inaccurate results.
  */
 class NullishCoalescingNotNullableCheck extends TemplateCheckWithVisitor<ErrorCode.NULLISH_COALESCING_NOT_NULLABLE> {
+  override readonly canVisitStructuralAttributes = false;
   override code = ErrorCode.NULLISH_COALESCING_NOT_NULLABLE as const;
-
-  constructor(private readonly noUncheckedIndexedAccess: boolean) {
-    super();
-  }
 
   override visitNode(
     ctx: TemplateContext<ErrorCode.NULLISH_COALESCING_NOT_NULLABLE>,
@@ -40,18 +31,12 @@ class NullishCoalescingNotNullableCheck extends TemplateCheckWithVisitor<ErrorCo
   ): NgTemplateDiagnostic<ErrorCode.NULLISH_COALESCING_NOT_NULLABLE>[] {
     if (!(node instanceof Binary) || node.operation !== '??') return [];
 
-    // When `noUncheckedIndexedAccess` is disabled, an indexed access is not checked
-    // and may result in `undefined`.
-    if (!this.noUncheckedIndexedAccess && isAccessFromUncheckedIndex(node.left)) {
-      return [];
-    }
-
     const symbolLeft = ctx.templateTypeChecker.getSymbolOfNode(node.left, component);
     if (symbolLeft === null || symbolLeft.kind !== SymbolKind.Expression) {
       return [];
     }
-    const typeLeft = ctx.templateTypeChecker.getTypeOfSymbol(symbolLeft);
-    if (!typeLeft || typeLeft.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
+    const typeLeft = symbolLeft.tsType;
+    if (typeLeft.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
       // We should not make assumptions about the any and unknown types; using a nullish coalescing
       // operator is acceptable for those.
       return [];
@@ -74,10 +59,7 @@ class NullishCoalescingNotNullableCheck extends TemplateCheckWithVisitor<ErrorCo
     }
     const diagnostic = ctx.makeTemplateDiagnostic(
       templateMapping.span,
-      formatExtendedError(
-        ErrorCode.NULLISH_COALESCING_NOT_NULLABLE,
-        `The left side of this nullish coalescing operation does not include 'null' or 'undefined' in its type, therefore the '??' operator can be safely removed.`,
-      ),
+      `The left side of this nullish coalescing operation does not include 'null' or 'undefined' in its type, therefore the '??' operator can be safely removed.`,
     );
     return [diagnostic];
   }
@@ -97,8 +79,6 @@ export const factory: TemplateCheckFactory<
       return null;
     }
 
-    const noUncheckedIndexedAccess = !!options.noUncheckedIndexedAccess;
-
-    return new NullishCoalescingNotNullableCheck(noUncheckedIndexedAccess);
+    return new NullishCoalescingNotNullableCheck();
   },
 };

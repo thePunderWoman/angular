@@ -43,24 +43,23 @@ describe('markdown to html', () => {
     expect(codeBlock?.textContent?.trim()).not.toContain('docregion');
   });
 
-  it('should load header and html code', () => {
+  it('properly shows the diff of two provided file paths', () => {
     const codeBlock = markdownDocument.querySelectorAll('code')[3];
     expect(codeBlock).toBeTruthy();
-    expect(codeBlock?.textContent).not.toContain('docregion');
+
+    const codeLines = codeBlock.querySelectorAll('.line');
+    expect(codeLines[8].textContent).toContain('oldFuncName');
+    expect(codeLines[8].classList.contains('remove')).toBeTrue();
+
+    expect(codeLines[9].textContent).toContain('newName');
+    expect(codeLines[9].classList.contains('add')).toBeTrue();
+
+    expect(codeLines[10].classList.contains('add')).toBeFalse();
+    expect(codeLines[10].classList.contains('remove')).toBeFalse();
   });
 
-  it('should not link property names in object literals', () => {
+  it('should load header and html code', () => {
     const codeBlock = markdownDocument.querySelectorAll('code')[4];
-    expect(codeBlock?.innerHTML).not.toContain('<a href="/api/animations/state">state</a>');
-  });
-
-  it('should parse the hideDollar attribute', () => {
-    const codeBlock = markdownDocument.querySelectorAll('.docs-code')[5];
-    expect(codeBlock.getAttribute('hideDollar')).toBe('true');
-  });
-
-  it('should deindent inline code blocks correctly', () => {
-    const codeBlock = markdownDocument.querySelectorAll('.docs-code')[6]?.querySelector('code');
-    expect(codeBlock?.textContent).toMatch(/^  \/\/ bar/m);
+    expect(codeBlock).toBeTruthy();
   });
 });

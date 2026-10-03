@@ -3,7 +3,7 @@
  * Copyright Google LLC
  *
  * Use of this source code is governed by an MIT-style license that can be
- * found in the LICENSE file at https://angular.dev/license
+ * found in the LICENSE file at https://angular.io/license
  */
 
 /* tslint:disable:no-console  */
@@ -31,7 +31,12 @@ export function openBrowser(config: {
   }
 }
 
+/**
+ * @experimental This API will be moved to Protractor.
+ */
 export function verifyNoBrowserErrors() {
+  // TODO(tbosch): Bug in ChromeDriver: Need to execute at least one command
+  // so that the browser logs can be read out!
   browser.executeScript('1+1');
   browser
     .manage()

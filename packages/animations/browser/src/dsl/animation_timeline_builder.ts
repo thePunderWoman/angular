@@ -605,7 +605,7 @@ export class AnimationTimelineContext {
       }
 
       Object.keys(newParams).forEach((name) => {
-        if (!skipIfExists || !Object.hasOwn(paramsToUpdate, name)) {
+        if (!skipIfExists || !paramsToUpdate.hasOwnProperty(name)) {
           paramsToUpdate[name] = interpolateParams(newParams[name], paramsToUpdate, this.errors);
         }
       });

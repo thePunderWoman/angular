@@ -81,7 +81,7 @@ function _extractId(valueString: string): string {
  */
 @Directive({
   selector:
-    'select[multiple]:not([ngNoCva])[formControlName],select[multiple]:not([ngNoCva])[formControl],select[multiple]:not([ngNoCva])[ngModel]',
+    'select[multiple][formControlName],select[multiple][formControl],select[multiple][ngModel]',
   host: {'(change)': 'onChange($event.target)', '(blur)': 'onTouched()'},
   providers: [SELECT_MULTIPLE_VALUE_ACCESSOR],
   standalone: false,
@@ -126,15 +126,15 @@ export class SelectMultipleControlValueAccessor
    */
   writeValue(value: any): void {
     this.value = value;
-    let optionSelectedStateSetter: (opt: ɵNgSelectMultipleOption, id: string) => void;
+    let optionSelectedStateSetter: (opt: ɵNgSelectMultipleOption, o: any) => void;
     if (Array.isArray(value)) {
       // convert values to ids
       const ids = value.map((v) => this._getOptionId(v));
-      optionSelectedStateSetter = (opt, id) => {
-        opt._setSelected(ids.indexOf(id) > -1);
+      optionSelectedStateSetter = (opt, o) => {
+        opt._setSelected(ids.indexOf(o.toString()) > -1);
       };
     } else {
-      optionSelectedStateSetter = (opt) => {
+      optionSelectedStateSetter = (opt, o) => {
         opt._setSelected(false);
       };
     }

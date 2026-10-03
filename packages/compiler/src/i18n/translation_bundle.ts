@@ -125,7 +125,7 @@ class I18nToHtmlVisitor implements i18n.Visitor {
 
     // TODO(vicb): Once all format switch to using expression placeholders
     // we should throw when the placeholder is not in the source message
-    const exp = Object.hasOwn(this._srcMsg.placeholders, icu.expression)
+    const exp = this._srcMsg.placeholders.hasOwnProperty(icu.expression)
       ? this._srcMsg.placeholders[icu.expression].text
       : icu.expression;
 
@@ -134,11 +134,11 @@ class I18nToHtmlVisitor implements i18n.Visitor {
 
   visitPlaceholder(ph: i18n.Placeholder, context?: any): string {
     const phName = this._mapper(ph.name);
-    if (Object.hasOwn(this._srcMsg.placeholders, phName)) {
+    if (this._srcMsg.placeholders.hasOwnProperty(phName)) {
       return this._srcMsg.placeholders[phName].text;
     }
 
-    if (Object.hasOwn(this._srcMsg.placeholderToMessage, phName)) {
+    if (this._srcMsg.placeholderToMessage.hasOwnProperty(phName)) {
       return this._convertToText(this._srcMsg.placeholderToMessage[phName]);
     }
 
@@ -189,7 +189,7 @@ class I18nToHtmlVisitor implements i18n.Visitor {
     this._contextStack.push({msg: this._srcMsg, mapper: this._mapper});
     this._srcMsg = srcMsg;
 
-    if (Object.hasOwn(this._i18nNodesByMsgId, id)) {
+    if (this._i18nNodesByMsgId.hasOwnProperty(id)) {
       // When there is a translation use its nodes as the source
       // And create a mapper to convert serialized placeholder names to internal names
       nodes = this._i18nNodesByMsgId[id];

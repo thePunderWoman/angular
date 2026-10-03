@@ -21,7 +21,7 @@ runInEachFileSystem(() => {
 
     beforeEach(() => {
       env = NgtscTestEnvironment.setup(testFiles);
-      env.tsconfig({strictTemplates: true});
+      env.tsconfig({strictTemplates: true, _checkTwoWayBoundEvents: true});
     });
 
     it('should declare an input/output pair for a field initialized to a model()', () => {
@@ -294,8 +294,9 @@ runInEachFileSystem(() => {
         );
 
         const diags = env.driveDiagnostics();
-        expect(diags.length).toBe(1);
+        expect(diags.length).toBe(2);
         expect(diags[0].messageText).toBe(`Type 'boolean' is not assignable to type 'number'.`);
+        expect(diags[1].messageText).toBe(`Type 'number' is not assignable to type 'boolean'.`);
       });
 
       it('should check a signal value bound to a model input via a two-way binding', () => {
@@ -322,8 +323,9 @@ runInEachFileSystem(() => {
         );
 
         const diags = env.driveDiagnostics();
-        expect(diags.length).toBe(1);
+        expect(diags.length).toBe(2);
         expect(diags[0].messageText).toBe(`Type 'boolean' is not assignable to type 'number'.`);
+        expect(diags[1].messageText).toBe(`Type 'number' is not assignable to type 'boolean'.`);
       });
 
       it('should check two-way binding of a signal to a decorator-based input/output pair', () => {
@@ -351,8 +353,9 @@ runInEachFileSystem(() => {
         );
 
         const diags = env.driveDiagnostics();
-        expect(diags.length).toBe(1);
+        expect(diags.length).toBe(2);
         expect(diags[0].messageText).toBe(`Type 'boolean' is not assignable to type 'number'.`);
+        expect(diags[1].messageText).toBe(`Type 'number' is not assignable to type 'boolean'.`);
       });
 
       it('should not allow a non-writable signal to be assigned to a model', () => {
@@ -379,9 +382,12 @@ runInEachFileSystem(() => {
         );
 
         const diags = env.driveDiagnostics();
-        expect(diags.length).toBe(1);
+        expect(diags.length).toBe(2);
         expect(diags[0].messageText).toBe(
           `Type 'InputSignal<number>' is not assignable to type 'number'.`,
+        );
+        expect(diags[1].messageText).toBe(
+          `Type 'number' is not assignable to type 'InputSignal<number>'.`,
         );
       });
 
@@ -495,10 +501,15 @@ runInEachFileSystem(() => {
         );
 
         const diags = env.driveDiagnostics();
-        expect(diags.length).toBe(1);
+        expect(diags.length).toBe(2);
         expect(diags[0].messageText).toEqual(
           jasmine.objectContaining({
             messageText: `Type '{ id: number; }' is not assignable to type '{ id: string; }'.`,
+          }),
+        );
+        expect(diags[1].messageText).toEqual(
+          jasmine.objectContaining({
+            messageText: `Type '{ id: string; }' is not assignable to type '{ id: number; }'.`,
           }),
         );
       });
@@ -527,10 +538,15 @@ runInEachFileSystem(() => {
         );
 
         const diags = env.driveDiagnostics();
-        expect(diags.length).toBe(1);
+        expect(diags.length).toBe(2);
         expect(diags[0].messageText).toEqual(
           jasmine.objectContaining({
             messageText: `Type '{ id: number; }' is not assignable to type '{ id: string; }'.`,
+          }),
+        );
+        expect(diags[1].messageText).toEqual(
+          jasmine.objectContaining({
+            messageText: `Type '{ id: string; }' is not assignable to type '{ id: number; }'.`,
           }),
         );
       });
@@ -730,31 +746,6 @@ runInEachFileSystem(() => {
         const diagnostics = env.driveDiagnostics();
         expect(diagnostics.length).toBe(0);
       });
-    });
-
-    it('should capture model input/output pair in the setClassMetadata call', () => {
-      env.write(
-        'test.ts',
-        `
-        import {Directive, model} from '@angular/core';
-
-        @Directive()
-        export class TestDir {
-          value = model(1);
-        }
-      `,
-      );
-      env.driveMain();
-
-      const js = env.getContents('test.js');
-      expect(js).toContain('import * as i0 from "@angular/core";');
-      expect(js).toContain(
-        `i0.ɵsetClassMetadata(TestDir, [{
-        type: Directive
-    }], null, { value: [` +
-          `{ type: i0.Input, args: [{ isSignal: true, alias: "value", required: false }] }, ` +
-          `{ type: i0.Output, args: ["valueChange"] }] });`,
-      );
     });
   });
 });

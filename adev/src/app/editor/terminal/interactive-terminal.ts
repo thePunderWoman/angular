@@ -7,12 +7,12 @@
  */
 
 import {Subject} from 'rxjs';
-import {Terminal, ITerminalOptions, ITerminalInitOnlyOptions} from '@xterm/xterm';
+import {Terminal} from '@xterm/xterm';
 
 import {CommandValidator} from './command-validator.service';
 
-const NOT_VALID_COMMAND_MSG = 'Angular Documentation - Not allowed command!';
-const ALLOWED_KEYS: Array<KeyboardEvent['key']> = [
+export const NOT_VALID_COMMAND_MSG = 'Angular Documentation - Not allowed command!';
+export const ALLOWED_KEYS: Array<KeyboardEvent['key']> = [
   // Allow Backspace to delete what was typed
   'Backspace',
   // Allow ArrowUp to interact with CLI
@@ -21,16 +21,6 @@ const ALLOWED_KEYS: Array<KeyboardEvent['key']> = [
   'ArrowDown',
 ];
 
-/** Set of defaults to use for all terminal instances in adev. */
-export const adevTerminalDefaultOptions: ITerminalOptions = {
-  convertEol: true,
-  theme: {
-    background: '#00000000',
-  },
-  fontFamily: 'courier-new, courier, monospace',
-  fontSize: 15,
-};
-
 export class InteractiveTerminal extends Terminal {
   private readonly breakProcess = new Subject<void>();
 
@@ -38,11 +28,10 @@ export class InteractiveTerminal extends Terminal {
   breakProcess$ = this.breakProcess.asObservable();
 
   constructor(
-    options: ITerminalOptions & ITerminalInitOnlyOptions,
     readonly window: Window,
     readonly commandValidator: CommandValidator,
   ) {
-    super(options);
+    super({convertEol: true, disableStdin: false});
 
     // bypass command validation if sudo=true is present in the query string
     if (!this.window.location.search.includes('sudo=true')) {

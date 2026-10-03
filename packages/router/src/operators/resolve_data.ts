@@ -20,6 +20,7 @@ import {
 } from '../router_state';
 import {RouteTitleKey} from '../shared';
 import {getDataKeys, wrapIntoObservable} from '../utils/collection';
+import {getClosestRouteInjector} from '../utils/config';
 import {getTokenOrFunctionIdentity} from '../utils/preactivation';
 import {isEmptyError} from '../utils/type_guards';
 import {redirectingNavigationError} from '../navigation_canceling_error';
@@ -27,6 +28,7 @@ import {DefaultUrlSerializer} from '../url_tree';
 
 export function resolveData(
   paramsInheritanceStrategy: 'emptyOnly' | 'always',
+  injector: EnvironmentInjector,
 ): MonoTypeOperatorFunction<NavigationTransition> {
   return mergeMap((t) => {
     const {
@@ -55,7 +57,7 @@ export function resolveData(
     return from(routesNeedingDataUpdates).pipe(
       concatMap((route) => {
         if (routesWithResolversToRun.has(route)) {
-          return runResolve(route, targetSnapshot!, paramsInheritanceStrategy);
+          return runResolve(route, targetSnapshot!, paramsInheritanceStrategy, injector);
         } else {
           route.data = getInherited(route, route.parent, paramsInheritanceStrategy).resolve;
           return of(void 0);
@@ -80,6 +82,7 @@ function runResolve(
   futureARS: ActivatedRouteSnapshot,
   futureRSS: RouterStateSnapshot,
   paramsInheritanceStrategy: 'emptyOnly' | 'always',
+  injector: EnvironmentInjector,
 ) {
   const config = futureARS.routeConfig;
   const resolve = futureARS._resolve;
@@ -88,7 +91,7 @@ function runResolve(
   }
   return defer(() => {
     futureARS.data = getInherited(futureARS, futureARS.parent, paramsInheritanceStrategy).resolve;
-    return resolveNode(resolve, futureARS, futureRSS).pipe(
+    return resolveNode(resolve, futureARS, futureRSS, injector).pipe(
       map((resolvedData: any) => {
         futureARS._resolvedData = resolvedData;
         futureARS.data = {...futureARS.data, ...resolvedData};
@@ -102,6 +105,7 @@ function resolveNode(
   resolve: ResolveData,
   futureARS: ActivatedRouteSnapshot,
   futureRSS: RouterStateSnapshot,
+  injector: EnvironmentInjector,
 ): Observable<any> {
   const keys = getDataKeys(resolve);
   if (keys.length === 0) {
@@ -110,7 +114,7 @@ function resolveNode(
   const data: {[k: string | symbol]: any} = {};
   return from(keys).pipe(
     mergeMap((key) =>
-      getResolver(resolve[key], futureARS, futureRSS).pipe(
+      getResolver(resolve[key], futureARS, futureRSS, injector).pipe(
         first(),
         tap((value: any) => {
           if (value instanceof RedirectCommand) {
@@ -130,8 +134,9 @@ function getResolver(
   injectionToken: ProviderToken<any> | Function,
   futureARS: ActivatedRouteSnapshot,
   futureRSS: RouterStateSnapshot,
+  injector: EnvironmentInjector,
 ): Observable<any> {
-  const closestInjector = futureARS._environmentInjector;
+  const closestInjector = getClosestRouteInjector(futureARS) ?? injector;
   const resolver = getTokenOrFunctionIdentity(injectionToken, closestInjector);
   const resolverValue = resolver.resolve
     ? resolver.resolve(futureARS, futureRSS)

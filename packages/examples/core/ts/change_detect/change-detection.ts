@@ -5,13 +5,21 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.dev/license
  */
-import {ChangeDetectorRef, Component, effect, input, signal} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  effect,
+  input,
+  signal,
+} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 
 // #docregion mark-for-check
 @Component({
   selector: 'app-root',
   template: `Number of ticks: {{ numberOfTicks }}`,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 class AppComponent {
   numberOfTicks = 0;
@@ -36,8 +44,9 @@ class DataListProvider {
 
 @Component({
   selector: 'giant-list',
-  template: ` <ul>
-    @for (d of dataProvider.data; track $index) {
+  template: `
+  <ul>
+    @for( d of dataProvider.data; track $index) {
       <li>Item {{ d }}</li>
     }
   </ul>`,
@@ -58,7 +67,7 @@ class GiantList {
   selector: 'app',
   providers: [DataListProvider],
   imports: [GiantList],
-  template: `<giant-list />`,
+  template: `<giant-list/>`,
 })
 class App {}
 // #enddocregion detach

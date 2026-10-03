@@ -7,14 +7,12 @@
  */
 
 import {InputSignalNode} from '../../authoring/input/input_signal_node';
-import {OnChanges} from '../../change_detection/lifecycle_hooks';
-import {SimpleChange, SimpleChanges} from '../../change_detection/simple_change';
+import {OnChanges} from '../../interface/lifecycle_hooks';
+import {SimpleChange, SimpleChanges} from '../../interface/simple_change';
 import {assertString} from '../../util/assert';
 import {EMPTY_OBJ} from '../../util/empty';
 import {applyValueToInputField} from '../apply_value_input_field';
 import {DirectiveDef, DirectiveDefFeature} from '../interfaces/definition';
-
-let _ngOnChangesFeatureImpl: typeof NgOnChangesFeatureImpl | null = null;
 
 /**
  * The NgOnChangesFeature decorates a component with support for the ngOnChanges
@@ -39,7 +37,6 @@ let _ngOnChangesFeatureImpl: typeof NgOnChangesFeatureImpl | null = null;
  * @codeGenApi
  */
 export const ɵɵNgOnChangesFeature: () => DirectiveDefFeature = /* @__PURE__ */ (() => {
-  _ngOnChangesFeatureImpl = NgOnChangesFeatureImpl;
   const ɵɵNgOnChangesFeatureImpl = () => NgOnChangesFeatureImpl;
 
   // This option ensures that the ngOnChanges lifecycle hook will be inherited
@@ -50,14 +47,7 @@ export const ɵɵNgOnChangesFeature: () => DirectiveDefFeature = /* @__PURE__ */
   return ɵɵNgOnChangesFeatureImpl;
 })();
 
-export function getNgOnChangesFeatureImpl(): typeof NgOnChangesFeatureImpl {
-  return _ngOnChangesFeatureImpl!;
-}
-
-/**
- * We don't expose the feature implementation directly in order to tree shake it when `ngOnChanges` isn't used.
- */
-function NgOnChangesFeatureImpl<T>(definition: DirectiveDef<T>) {
+export function NgOnChangesFeatureImpl<T>(definition: DirectiveDef<T>) {
   if (definition.type.prototype.ngOnChanges) {
     definition.setInput = ngOnChangesSetInput;
   }
@@ -122,9 +112,7 @@ function ngOnChangesSetInput<T>(
 const SIMPLE_CHANGES_STORE = '__ngSimpleChanges__';
 
 function getSimpleChangesStore(instance: any): null | NgSimpleChangesStore {
-  return Object.hasOwn(instance, SIMPLE_CHANGES_STORE)
-    ? instance[SIMPLE_CHANGES_STORE] || null
-    : null;
+  return instance[SIMPLE_CHANGES_STORE] || null;
 }
 
 function setSimpleChangesStore(instance: any, store: NgSimpleChangesStore): NgSimpleChangesStore {

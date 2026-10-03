@@ -13,6 +13,7 @@ import {
 } from '@angular/cdk/scrolling';
 import {
   afterRenderEffect,
+  ChangeDetectionStrategy,
   Component,
   computed,
   ElementRef,
@@ -30,13 +31,13 @@ import {TabUpdate} from '../../../tab-update/index';
 import {GraphNode} from '../record-formatter/record-formatter';
 import {MatIcon} from '@angular/material/icon';
 import {MatTooltip} from '@angular/material/tooltip';
-import {NgStyle} from '@angular/common';
+import {DecimalPipe, NgStyle} from '@angular/common';
 import {ProfilerFrame} from '../../../../../../../protocol';
 import {ButtonComponent} from '../../../../shared/button/button.component';
-import {calculateFrameRate} from '../shared/calculate-frame-rate';
+import {estimateFrameRate} from '../shared/estimate-frame-rate';
 
 const ITEM_GAP = 2.5;
-const ITEM_WIDTH = 14;
+const ITEM_WIDTH = 18;
 const MAX_HEIGHT = 100;
 const DRAG_SCROLL_SPEED = 2;
 
@@ -58,9 +59,7 @@ function framesBoundSignal<T>(source: Signal<ProfilerFrame[]>, defaultValue: T) 
   templateUrl: './frame-selector.component.html',
   styleUrls: ['./frame-selector.component.scss'],
   styles: `
-    :host {
-      --max-bar-height: ${MAX_HEIGHT}px;
-    }
+    :host { --max-bar-height: ${MAX_HEIGHT}px }
   `,
   imports: [
     MatTooltip,
@@ -70,7 +69,9 @@ function framesBoundSignal<T>(source: Signal<ProfilerFrame[]>, defaultValue: T) 
     CdkVirtualForOf,
     NgStyle,
     ButtonComponent,
+    DecimalPipe,
   ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FrameSelectorComponent {
   private readonly tabUpdate = inject(TabUpdate);
@@ -99,10 +100,10 @@ export class FrameSelectorComponent {
       return `${this.startFrameIndex() + 1}`;
     }
 
-    return this.smartJoinIndexLabels([...this.selectedFrameIndexes()]);
+    return this._smartJoinIndexLabels([...this.selectedFrameIndexes()]);
   });
 
-  private viewportScrollState = {scrollLeft: 0, xCoordinate: 0, isDragScrolling: false};
+  private _viewportScrollState = {scrollLeft: 0, xCoordinate: 0, isDragScrolling: false};
 
   readonly itemWidth = ITEM_WIDTH + ITEM_GAP;
 
@@ -117,22 +118,6 @@ export class FrameSelectorComponent {
   protected readonly graphData = computed<GraphNode[]>(() =>
     this.frames().map((r) => this.getBarStyles(r, this.multiplicationFactor())),
   );
-
-  /**
-   * Represents the position of the line that corresponds to 16.6 ms (60 fps) in the
-   * frame selector. It is available only if there is a bar/frame that exceeds that time.
-   */
-  protected readonly sixtyFpsLineHeightPerc = computed(() => {
-    const max = Math.max(...this.graphData().map((n) => n.frame.duration));
-    if (max === -Infinity || max === 0) {
-      return null;
-    }
-    const frameRate = calculateFrameRate(max);
-    if (frameRate >= 60) {
-      return null;
-    }
-    return (1000 / 60 / max) * 100;
-  });
 
   constructor() {
     afterRenderEffect(() => {
@@ -150,7 +135,7 @@ export class FrameSelectorComponent {
     });
   }
 
-  private smartJoinIndexLabels(indexArray: number[]): string {
+  private _smartJoinIndexLabels(indexArray: number[]): string {
     const sortedIndexes = indexArray.sort((a, b) => a - b);
 
     const groups: number[][] = [];
@@ -186,15 +171,15 @@ export class FrameSelectorComponent {
     const newVal = this.startFrameIndex() + value;
     this.selectedFrameIndexes.set(new Set([newVal]));
     if (newVal > -1 && newVal < this.frameCount()) {
-      this.emitSelectedFrames({indexes: this.selectedFrameIndexes()});
+      this._selectFrames({indexes: this.selectedFrameIndexes()});
     }
   }
 
-  private emitSelectedFrames({indexes}: {indexes: Set<number>}): void {
+  private _selectFrames({indexes}: {indexes: Set<number>}): void {
     const sortedIndexes = [...indexes].sort((a, b) => a - b);
     this.startFrameIndex.set(sortedIndexes[0]);
     this.endFrameIndex.set(sortedIndexes[sortedIndexes.length - 1]);
-    this.ensureVisible(this.startFrameIndex());
+    this._ensureVisible(this.startFrameIndex());
     this.selectFrames.emit({indexes: sortedIndexes});
   }
 
@@ -221,10 +206,10 @@ export class FrameSelectorComponent {
       frames = new Set([idx]);
     }
     this.selectedFrameIndexes.set(new Set(frames));
-    this.emitSelectedFrames({indexes: this.selectedFrameIndexes()});
+    this._selectFrames({indexes: this.selectedFrameIndexes()});
   }
 
-  private ensureVisible(index: number): void {
+  private _ensureVisible(index: number): void {
     if (!this.viewport()) {
       return;
     }
@@ -243,12 +228,12 @@ export class FrameSelectorComponent {
 
   stopDragScrolling(): void {
     this.dragScrolling.set(false);
-    this.viewportScrollState.isDragScrolling = false;
+    this._viewportScrollState.isDragScrolling = false;
   }
 
   startDragScroll(event: MouseEvent): void {
     this.dragScrolling.set(true);
-    this.viewportScrollState = {
+    this._viewportScrollState = {
       xCoordinate: event.clientX,
       scrollLeft: this.viewport().elementRef.nativeElement.scrollLeft,
       isDragScrolling: true,
@@ -256,13 +241,13 @@ export class FrameSelectorComponent {
   }
 
   dragScroll(event: MouseEvent): void {
-    if (!this.viewportScrollState.isDragScrolling) {
+    if (!this._viewportScrollState.isDragScrolling) {
       return;
     }
 
-    const dx = event.clientX - this.viewportScrollState.xCoordinate;
+    const dx = event.clientX - this._viewportScrollState.xCoordinate;
     this.viewport().elementRef.nativeElement.scrollLeft =
-      this.viewportScrollState.scrollLeft - dx * DRAG_SCROLL_SPEED;
+      this._viewportScrollState.scrollLeft - dx * DRAG_SCROLL_SPEED;
   }
 
   trackByIndex(index: number): number {
@@ -271,23 +256,16 @@ export class FrameSelectorComponent {
 
   private getBarStyles(frame: ProfilerFrame, multiplicationFactor: number): GraphNode {
     const height = frame.duration * multiplicationFactor;
-    const colorPercentage = Math.max(1, Math.round((height / MAX_HEIGHT) * 100));
-    const frameRate = calculateFrameRate(frame.duration);
-    const backgroundColor = this.getColorByFrameRate(frameRate);
+    const colorPercentage = Math.max(10, Math.round((height / MAX_HEIGHT) * 100));
+    const backgroundColor = this.getColorByFrameRate(estimateFrameRate(frame.duration));
 
     const style = {
-      // We use a linear gradient to illustrate the height of
-      // the bar that corresponds to the duration of the frame.
       'background-image': `-webkit-linear-gradient(bottom, ${backgroundColor} ${colorPercentage}%, transparent ${colorPercentage}%)`,
       width: ITEM_WIDTH + 'px',
       height: MAX_HEIGHT + 'px',
     };
-    const tooltip =
-      `Time spent: ${frame.duration.toFixed(1)} ms` +
-      (frameRate < 60 ? `\nFrame rate: ${frameRate} fps` : '') +
-      (frame.source ? `\nSource: ${frame.source}` : '');
-
-    return {style, tooltip, frame};
+    const toolTip = `${frame.source} TimeSpent: ${frame.duration.toFixed(3)}ms`;
+    return {style, toolTip, frame};
   }
 
   private getColorByFrameRate(framerate: number): string {
@@ -296,7 +274,7 @@ export class FrameSelectorComponent {
     } else if (60 > framerate && framerate >= 30) {
       return 'var(--dynamic-yellow-01)';
     } else if (30 > framerate && framerate >= 15) {
-      return 'var(--dynamic-orange-01)';
+      return 'var(--dynamic-red-03)';
     }
     return 'var(--dynamic-red-01)';
   }

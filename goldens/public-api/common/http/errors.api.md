@@ -13,10 +13,6 @@ export const enum RuntimeErrorCode {
     // (undocumented)
     CREDENTIALS_NOT_SUPPORTED_WITH_XHR = 2818,
     // (undocumented)
-    FETCH_RESPONSE_BODY_TOO_LARGE = -2825,
-    // (undocumented)
-    FETCH_UPLOAD_PROGRESS_NOT_SUPPORTED = 2824,
-    // (undocumented)
     HEADERS_ALTERED_BY_TRANSFER_CACHE = -2802,
     // (undocumented)
     HTTP_ORIGIN_MAP_CONTAINS_PATH = 2804,
@@ -26,13 +22,11 @@ export const enum RuntimeErrorCode {
     INTEGRITY_NOT_SUPPORTED_WITH_XHR = 2820,
     // (undocumented)
     INVALID_TIMEOUT_VALUE = 2822,
-    // @deprecated (undocumented)
+    // (undocumented)
     JSONP_HEADERS_NOT_SUPPORTED = 2812,
-    // @deprecated (undocumented)
-    JSONP_UNSAFE_URL = 2826,
-    // @deprecated (undocumented)
+    // (undocumented)
     JSONP_WRONG_METHOD = 2810,
-    // @deprecated (undocumented)
+    // (undocumented)
     JSONP_WRONG_RESPONSE_TYPE = 2811,
     // (undocumented)
     KEEPALIVE_NOT_SUPPORTED_WITH_XHR = 2813,
@@ -48,8 +42,6 @@ export const enum RuntimeErrorCode {
     REDIRECT_NOT_SUPPORTED_WITH_XHR = 2817,
     // (undocumented)
     REFERRER_NOT_SUPPORTED_WITH_XHR = 2821,
-    // (undocumented)
-    REFERRER_POLICY_NOT_SUPPORTED_WITH_XHR = 2823,
     // (undocumented)
     RESPONSE_IS_NOT_A_BLOB = 2807,
     // (undocumented)

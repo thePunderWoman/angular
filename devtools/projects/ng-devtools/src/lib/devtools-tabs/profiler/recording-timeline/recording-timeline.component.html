@@ -1,8 +1,5 @@
 @if (!hasFrames() && visualizing()) {
-  <div class="info">
-    <ng-angie type="question" size="md" />
-    <p>There's no information to show.</p>
-  </div>
+  <p class="info">There's no information to show.</p>
 }
 
 @if (hasFrames()) {
@@ -16,14 +13,11 @@
 @let frame = this.frame();
 
 @if (hasFrames() && !frame) {
-  <div class="info">
-    <ng-angie type="magnifying-glass" size="md" />
-    <p>Select a bar to preview a particular change detection cycle.</p>
-  </div>
+  <p class="info">Select a bar to preview a particular change detection cycle.</p>
 } @else if (hasFrames() && frame) {
   <ng-visualizer-controls
     [record]="frame"
-    [frameRate]="currentFrameRate()"
+    [estimatedFrameRate]="currentFrameRate()"
     [(visualizationMode)]="visualizationMode"
     [(changeDetection)]="changeDetection"
   />

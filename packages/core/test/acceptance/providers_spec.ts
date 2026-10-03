@@ -7,10 +7,7 @@
  */
 
 import {CommonModule} from '@angular/common';
-import {By} from '@angular/platform-browser';
-import {expect} from '@angular/private/testing/matchers';
 import {
-  ChangeDetectionStrategy,
   Component,
   Directive,
   forwardRef,
@@ -23,6 +20,8 @@ import {
 } from '../../src/core';
 import {leaveView, specOnlyIsInstructionStateEmpty} from '../../src/render3/state';
 import {inject, TestBed, waitForAsync} from '../../testing';
+import {By} from '@angular/platform-browser';
+import {expect} from '@angular/private/testing/matchers';
 
 describe('providers', () => {
   describe('inheritance', () => {
@@ -55,7 +54,6 @@ describe('providers', () => {
         selector: 'app-comp',
         template: `<div other-dir sub-dir></div>`,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {}
 
@@ -90,7 +88,6 @@ describe('providers', () => {
         template: '',
         providers: [SubInjectableWithDestroyHook],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         constructor(foo: SubInjectableWithDestroyHook) {}
@@ -118,7 +115,6 @@ describe('providers', () => {
         template: '',
         providers: [InjectableWithDestroyHook],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {}
 
@@ -144,7 +140,6 @@ describe('providers', () => {
         selector: 'my-cmp',
         template: '',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComponent {
         constructor(foo: InjectableWithDestroyHook) {}
@@ -157,7 +152,6 @@ describe('providers', () => {
         `,
         providers: [InjectableWithDestroyHook],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {}
 
@@ -183,7 +177,6 @@ describe('providers', () => {
         template: '',
         providers: [{provide: InjectableWithDestroyHook, useClass: InjectableWithDestroyHook}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         constructor(foo: InjectableWithDestroyHook) {}
@@ -220,7 +213,6 @@ describe('providers', () => {
           {provide: InjectableWithDestroyHookToken, useClass: InjectableWithDestroyHookValue},
         ],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         constructor(foo: InjectableWithDestroyHookToken) {}
@@ -258,7 +250,6 @@ describe('providers', () => {
           {provide: InjectableWithDestroyHookToken, useExisting: InjectableWithDestroyHookExisting},
         ],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         constructor(
@@ -317,7 +308,6 @@ describe('providers', () => {
         template: '<div dir-one dir-two></div>',
         providers: [DestroyService],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         constructor(service: DestroyService) {
@@ -380,7 +370,6 @@ describe('providers', () => {
         template: '<div dir-one dir-two></div>',
         providers: [{provide: token, useClass: DestroyService}],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         constructor(@Inject(token) service: DestroyService) {
@@ -426,8 +415,6 @@ describe('providers', () => {
             {provide: SERVICES, useClass: OtherDestroyService, multi: true},
           ],
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class App {
           constructor(@Inject(SERVICES) s: any) {}
@@ -477,8 +464,6 @@ describe('providers', () => {
             {provide: SERVICES, useClass: Service4, multi: true},
           ],
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class App {
           constructor(@Inject(SERVICES) s: any) {}
@@ -517,8 +502,6 @@ describe('providers', () => {
             {provide: SERVICES, useFactory: () => new OtherDestroyService(), multi: true},
           ],
           standalone: false,
-
-          changeDetection: ChangeDetectionStrategy.Eager,
         })
         class App {
           constructor(@Inject(SERVICES) s: any) {}
@@ -548,7 +531,6 @@ describe('providers', () => {
         template: '',
         providers: [InjectableWithDestroyHookToken],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class CompWithProvider {
         constructor(token: InjectableWithDestroyHookToken) {}
@@ -558,7 +540,6 @@ describe('providers', () => {
         selector: 'app',
         template: '<comp-with-provider *ngIf="condition"></comp-with-provider>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         condition = true;
@@ -589,7 +570,6 @@ describe('providers', () => {
       selector: 'my-comp',
       template: ``,
       standalone: false,
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyComp {
       constructor(public svc: MyService) {}
@@ -608,7 +588,6 @@ describe('providers', () => {
         selector: 'test-comp',
         template: '<my-comp></my-comp>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestComp {}
 
@@ -628,7 +607,6 @@ describe('providers', () => {
         selector: 'test-comp',
         template: '<div some-dir></div>',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class TestComp {}
 
@@ -677,7 +655,6 @@ describe('providers', () => {
         selector: 'app-comp',
         template: ``,
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class AppComp {
         constructor(public myService: MyService) {}
@@ -713,7 +690,6 @@ describe('providers', () => {
         selector: 'my-app',
         template: '',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         constructor(public foo: SomeProvider) {}
@@ -740,7 +716,6 @@ describe('providers', () => {
         selector: 'my-app',
         template: '',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class App {
         constructor(public foo: SomeProvider) {}
@@ -792,7 +767,6 @@ describe('providers', () => {
           {provide: Number, useValue: 2, multi: true},
         ],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Comp {
         constructor(
@@ -814,7 +788,6 @@ describe('providers', () => {
         selector: 'repeated',
         template: '[{{s}}-{{n}}]',
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Repeated {
         constructor(
@@ -837,7 +810,6 @@ describe('providers', () => {
           {provide: Number, useValue: 2, multi: true},
         ],
         standalone: false,
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class ComponentWithProviders {
         items = [1, 2, 3];

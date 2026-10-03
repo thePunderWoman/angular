@@ -25,8 +25,8 @@ interface TestObject {
 const host: AstHost<ts.Expression> = new TypeScriptAstHost();
 const factory = new TypeScriptAstFactory(/* annotateForClosureCompiler */ false);
 const nestedObj = factory.createObjectLiteral([
-  {propertyName: 'x', kind: 'property', quoted: false, value: factory.createLiteral(42)},
-  {propertyName: 'y', kind: 'property', quoted: false, value: factory.createLiteral('X')},
+  {propertyName: 'x', quoted: false, value: factory.createLiteral(42)},
+  {propertyName: 'y', quoted: false, value: factory.createLiteral('X')},
 ]);
 const nestedArray = factory.createArrayLiteral([
   factory.createLiteral(1),
@@ -34,11 +34,11 @@ const nestedArray = factory.createArrayLiteral([
 ]);
 const obj = AstObject.parse<TestObject, ts.Expression>(
   factory.createObjectLiteral([
-    {propertyName: 'a', kind: 'property', quoted: false, value: factory.createLiteral(42)},
-    {propertyName: 'b', kind: 'property', quoted: false, value: factory.createLiteral('X')},
-    {propertyName: 'c', kind: 'property', quoted: false, value: factory.createLiteral(true)},
-    {propertyName: 'd', kind: 'property', quoted: false, value: nestedObj},
-    {propertyName: 'e', kind: 'property', quoted: false, value: nestedArray},
+    {propertyName: 'a', quoted: false, value: factory.createLiteral(42)},
+    {propertyName: 'b', quoted: false, value: factory.createLiteral('X')},
+    {propertyName: 'c', quoted: false, value: factory.createLiteral(true)},
+    {propertyName: 'd', quoted: false, value: nestedObj},
+    {propertyName: 'e', quoted: false, value: nestedArray},
   ]),
   host,
 );
@@ -346,7 +346,6 @@ describe('AstValue', () => {
         'foo',
         [],
         factory.createBlock([factory.createReturnStatement(factory.createLiteral(42))]),
-        null,
       );
       expect(createAstValue(funcExpr).isFunction()).toEqual(true);
     });
@@ -362,7 +361,6 @@ describe('AstValue', () => {
         'foo',
         [],
         factory.createBlock([factory.createReturnStatement(factory.createLiteral(42))]),
-        null,
       );
       expect(createAstValue<Function>(funcExpr).getFunctionReturnValue()).toEqual(
         createAstValue(factory.createLiteral(42)),
@@ -383,7 +381,6 @@ describe('AstValue', () => {
         factory.createBlock([
           factory.createExpressionStatement(factory.createLiteral('do nothing')),
         ]),
-        null,
       );
       expect(() => createAstValue<Function>(funcExpr).getFunctionReturnValue()).toThrowError(
         'Unsupported syntax, expected a function body with a single return statement.',
@@ -393,15 +390,7 @@ describe('AstValue', () => {
 
   describe('getFunctionParameters', () => {
     it('should return the parameters of a function expression', () => {
-      const funcExpr = factory.createFunctionExpression(
-        'foo',
-        [
-          {name: 'a', type: null},
-          {name: 'b', type: null},
-        ],
-        factory.createBlock([]),
-        null,
-      );
+      const funcExpr = factory.createFunctionExpression('foo', ['a', 'b'], factory.createBlock([]));
       expect(createAstValue<Function>(funcExpr).getFunctionParameters()).toEqual(
         ['a', 'b'].map((name) => createAstValue(factory.createIdentifier(name))),
       );

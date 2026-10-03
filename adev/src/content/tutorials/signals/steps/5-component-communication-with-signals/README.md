@@ -13,7 +13,7 @@ Add signal `input()` functions to receive data in the `product-card` component.
 
 ```ts
 // Add imports for signal inputs
-import {Component, input, ChangeDetectionStrategy} from '@angular/core';
+import {Component, input} from '@angular/core';
 
 // Add these signal inputs
 name = input.required<string>();
@@ -27,12 +27,11 @@ Notice how `input.required()` creates an input that must be provided, while `inp
 <docs-step title="Connect inputs to the template">
 Update the template in `product-card` to display the signal input values.
 
-```angular-html
+```html
 <div class="product-card">
   <h3>{{ name() }}</h3>
   <p class="price">\${{ price() }}</p>
-  <p class="status">
-    Status:
+  <p class="status">Status:
     @if (available()) {
       Available
     } @else {
@@ -50,10 +49,18 @@ Update the `product-card` usage in `app.ts` to pass dynamic signal values instea
 
 ```html
 <!-- Change from static values: -->
-<product-card name="Static Product" price="99" available="true" />
+<product-card
+  name="Static Product"
+  price="99"
+  available="true"
+/>
 
 <!-- To dynamic signals: -->
-<product-card [name]="productName()" [price]="productPrice()" [available]="productAvailable()" />
+<product-card
+  [name]="productName()"
+  [price]="productPrice()"
+  [available]="productAvailable()"
+/>
 ```
 
 The square brackets `[]` create property bindings that pass the current signal values to the child.

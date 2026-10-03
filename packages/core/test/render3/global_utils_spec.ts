@@ -19,23 +19,26 @@ import {
   getRootComponents,
 } from '../../src/render3/util/discovery_utils';
 import {
-  ExternalCoreGlobalUtils,
+  GLOBAL_PUBLISH_EXPANDO_KEY,
+  GlobalDevModeUtils,
   publishDefaultGlobalUtils,
   publishGlobalUtil,
 } from '../../src/render3/util/global_utils';
 import {setProfiler} from '../../src/render3/profiler';
+import {getDeferBlocks} from '../../src/render3/util/defer';
 import {global} from '../../src/util/global';
-import {getControlFlowBlocks} from '../../src/render3/util/control_flow';
+
+type GlobalUtilFunctions = keyof GlobalDevModeUtils['ng'];
 
 describe('global utils', () => {
   describe('publishGlobalUtil', () => {
     it('should publish a function to the window', () => {
-      const ng = (global as any).ng as ExternalCoreGlobalUtils;
-      const foo = 'foo' as keyof ExternalCoreGlobalUtils;
-      expect(ng[foo]).toBeFalsy();
+      const w = global as any as GlobalDevModeUtils;
+      const foo = 'foo' as GlobalUtilFunctions;
+      expect(w[GLOBAL_PUBLISH_EXPANDO_KEY][foo]).toBeFalsy();
       const fooFn = () => {};
       publishGlobalUtil(foo, fooFn);
-      expect(ng[foo]).toBe(fooFn);
+      expect(w[GLOBAL_PUBLISH_EXPANDO_KEY][foo]).toBe(fooFn);
     });
   });
 
@@ -86,13 +89,13 @@ describe('global utils', () => {
       assertPublished('ɵsetProfiler', setProfiler);
     });
 
-    it('should publish ɵgetControlFlowBlocks', () => {
-      assertPublished('ɵgetControlFlowBlocks', getControlFlowBlocks);
+    it('should publish ɵgetDeferBlocks', () => {
+      assertPublished('ɵgetDeferBlocks', getDeferBlocks);
     });
   });
 });
 
-function assertPublished(name: keyof ExternalCoreGlobalUtils, value: Function) {
-  const w = (global as any).ng as ExternalCoreGlobalUtils;
-  expect(w[name]).toBe(value);
+function assertPublished(name: GlobalUtilFunctions, value: Function) {
+  const w = global as any as GlobalDevModeUtils;
+  expect(w[GLOBAL_PUBLISH_EXPANDO_KEY][name]).toBe(value);
 }

@@ -8,7 +8,7 @@
 
 import ts from 'typescript';
 
-import {SymbolKind, TemplateTypeChecker} from '@angular/compiler-cli/private/migrations';
+import {SymbolKind, TemplateTypeChecker} from '@angular/compiler-cli/src/ngtsc/typecheck/api';
 import {
   AST,
   Binary,
@@ -20,14 +20,13 @@ import {
   PropertyRead,
   RecursiveAstVisitor,
   SafePropertyRead,
+  ThisReceiver,
   TmplAstBoundAttribute,
   TmplAstBoundEvent,
   TmplAstBoundText,
   TmplAstDeferredBlock,
   TmplAstForLoopBlock,
-  TmplAstIcu,
   TmplAstIfBlockBranch,
-  TmplAstLetDeclaration,
   TmplAstNode,
   TmplAstRecursiveVisitor,
   TmplAstSwitchBlock,
@@ -176,11 +175,7 @@ export class TemplateReferenceVisitor<
 
   override visitForLoopBlock(block: TmplAstForLoopBlock): void {
     this.checkExpressionForReferencedFields(block, block.expression);
-
-    if (block.trackBy !== null) {
-      this.checkExpressionForReferencedFields(block, block.trackBy);
-    }
-
+    this.checkExpressionForReferencedFields(block, block.trackBy);
     super.visitForLoopBlock(block);
   }
 
@@ -229,21 +224,6 @@ export class TemplateReferenceVisitor<
       this.templateAttributeReferencedFields.push(...referencedFields);
     }
   }
-
-  override visitLetDeclaration(decl: TmplAstLetDeclaration): void {
-    this.checkExpressionForReferencedFields(decl, decl.value);
-  }
-
-  override visitIcu(icu: TmplAstIcu): void {
-    for (const v of Object.values(icu.vars)) {
-      this.checkExpressionForReferencedFields(icu, v.value);
-    }
-    for (const p of Object.values(icu.placeholders)) {
-      if (p instanceof TmplAstBoundText) {
-        this.checkExpressionForReferencedFields(icu, p.value);
-      }
-    }
-  }
 }
 
 /**
@@ -260,7 +240,6 @@ export class TemplateExpressionReferenceVisitor<
   private activeTmplAstNode: ExprContext | null = null;
   private detectedInputReferences: TmplInputExpressionReference<ExprContext, D>[] = [];
   private isInsideObjectShorthandExpression = false;
-  private isInsideAssignment = false;
   private insideConditionalExpressionsWithReads: AST[] = [];
 
   constructor(
@@ -294,28 +273,24 @@ export class TemplateExpressionReferenceVisitor<
   // E.g. `{bla}` may be transformed to `{bla: bla()}`.
   override visitLiteralMap(ast: LiteralMap, context: any) {
     for (const [idx, key] of ast.keys.entries()) {
-      this.isInsideObjectShorthandExpression =
-        key.kind === 'property' && !!key.isShorthandInitialized;
+      this.isInsideObjectShorthandExpression = !!key.isShorthandInitialized;
       (ast.values[idx] as AST).visit(this, context);
       this.isInsideObjectShorthandExpression = false;
     }
   }
 
   override visitPropertyRead(ast: PropertyRead, context: AST[]) {
-    this._inspectPropertyAccess(ast, context);
+    this._inspectPropertyAccess(ast, false, context);
     super.visitPropertyRead(ast, context);
   }
   override visitSafePropertyRead(ast: SafePropertyRead, context: AST[]) {
-    this._inspectPropertyAccess(ast, context);
+    this._inspectPropertyAccess(ast, false, context);
     super.visitPropertyRead(ast, context);
   }
 
   override visitBinary(ast: Binary, context: AST[]) {
-    if (ast.operation === '=') {
-      this.isInsideAssignment = true;
-      this.visit(ast.left, [...context, ast]);
-      this.isInsideAssignment = false;
-      this.visit(ast.right, [...context, ast]);
+    if (ast.operation === '=' && ast.left instanceof PropertyRead) {
+      this._inspectPropertyAccess(ast.left, true, [...context, ast, ast.left]);
     } else {
       super.visitBinary(ast, context);
     }
@@ -333,7 +308,7 @@ export class TemplateExpressionReferenceVisitor<
    * Inspects the property access and attempts to resolve whether they access
    * a known field. If so, the result is captured.
    */
-  private _inspectPropertyAccess(ast: PropertyRead, astPath: AST[]) {
+  private _inspectPropertyAccess(ast: PropertyRead, isAssignment: boolean, astPath: AST[]) {
     if (
       this.fieldNamesToConsiderForReferenceLookup !== null &&
       !this.fieldNamesToConsiderForReferenceLookup.has(ast.name)
@@ -342,7 +317,7 @@ export class TemplateExpressionReferenceVisitor<
     }
 
     const isWrite = !!(
-      this.isInsideAssignment ||
+      isAssignment ||
       (this.activeTmplAstNode && isTwoWayBindingNode(this.activeTmplAstNode))
     );
 
@@ -365,19 +340,14 @@ export class TemplateExpressionReferenceVisitor<
     }
 
     const symbol = this.templateTypeChecker.getSymbolOfNode(ast, this.componentClass);
-    if (symbol?.kind !== SymbolKind.Expression) {
-      return false;
-    }
-
-    const tsSymbol = this.templateTypeChecker.getTsSymbolOfSymbol(symbol);
-    if (tsSymbol === null) {
+    if (symbol?.kind !== SymbolKind.Expression || symbol.tsSymbol === null) {
       return false;
     }
 
     // Dangerous: Type checking symbol retrieval is a totally different `ts.Program`,
     // than the one where we analyzed `knownInputs`.
     // --> Find the input via its input id.
-    const targetInput = this.knownFields.attemptRetrieveDescriptorFromSymbol(tsSymbol);
+    const targetInput = this.knownFields.attemptRetrieveDescriptorFromSymbol(symbol.tsSymbol);
 
     if (targetInput === null) {
       return false;
@@ -474,7 +444,7 @@ function traverseReceiverAndLookupSymbol(
     path.unshift(node.name);
   }
 
-  if (!(node.receiver instanceof ImplicitReceiver)) {
+  if (!(node.receiver instanceof ImplicitReceiver || node.receiver instanceof ThisReceiver)) {
     return null;
   }
 

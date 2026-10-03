@@ -175,7 +175,7 @@ Did you run and wait for 'resolveComponentResources()'?`.trim(),
       };
       compileComponent(MyComponent, metadata);
 
-      await expectAsync(resolveComponentResources(testResolver)).toBeRejectedWithError(
+      expect(() => resolveComponentResources(testResolver)).toThrowError(
         /@Component cannot define both `styleUrl` and `styleUrls`/,
       );
     });

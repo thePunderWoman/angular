@@ -6,10 +6,11 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {Component} from '@angular/core';
+import {ChangeDetectionStrategy, Component} from '@angular/core';
 
 @Component({
   selector: 'docs-algolia-icon',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './algolia-icon.component.html',
 })
 export class AlgoliaIcon {}

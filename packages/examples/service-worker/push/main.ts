@@ -8,17 +8,8 @@
 
 import 'zone.js';
 
-import {bootstrapApplication, provideProtractorTestingSupport} from '@angular/platform-browser';
-import {AppComponent} from './service_worker_component';
-import {ApplicationConfig, importProvidersFrom, provideZoneChangeDetection} from '@angular/core';
-import {ServiceWorkerModule} from '@angular/service-worker';
+import {platformBrowser} from '@angular/platform-browser';
 
-const appConfig: ApplicationConfig = {
-  providers: [
-    provideZoneChangeDetection(),
-    provideProtractorTestingSupport(),
-    importProvidersFrom(ServiceWorkerModule.register('ngsw-worker.js')),
-  ],
-};
+import {AppModule} from './module';
 
-bootstrapApplication(AppComponent, appConfig).catch((err) => console.error(err));
+platformBrowser().bootstrapModule(AppModule);
