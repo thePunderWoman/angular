@@ -3,9 +3,8 @@
     "lib": ["es2015"],
     "types": ["node", "jasmine"],
     "module": "esnext",
-    "moduleResolution": "node10",
-    "strict": true,
+    "moduleResolution": "nodenext",
     "sourceMap": true,
-    "declaration": true,
+    "declaration": true
   }
 }

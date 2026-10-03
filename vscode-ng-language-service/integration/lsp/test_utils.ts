@@ -1,9 +1,9 @@
-/**
+/*!
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
- * found in the LICENSE file at https://angular.io/license
+ * found in the LICENSE file at https://angular.dev/license
  */
 
 import {fork} from 'child_process';
@@ -20,7 +20,6 @@ import {URI} from 'vscode-uri';
 import {PROJECT_PATH, SERVER_PATH} from '../test_constants';
 
 export interface ServerOptions {
-  ivy: boolean;
   includeAutomaticOptionalChainCompletions?: boolean;
   includeCompletionsWithSnippetText?: boolean;
   angularCoreVersion?: string;
@@ -34,9 +33,6 @@ export function createConnection(serverOptions: ServerOptions): MessageConnectio
     '--ngProbeLocations',
     [SERVER_PATH, PROJECT_PATH].join(','),
   ];
-  if (!serverOptions.ivy) {
-    argv.push('--viewEngine');
-  }
   if (serverOptions.includeAutomaticOptionalChainCompletions) {
     argv.push('--includeAutomaticOptionalChainCompletions');
   }
@@ -63,6 +59,53 @@ export function createConnection(serverOptions: ServerOptions): MessageConnectio
   connection.onDispose(() => {
     server.kill();
   });
+
+  // Handle workspace/configuration requests from the server
+  // This provides default empty configuration for all requested sections
+  connection.onRequest(lsp.ConfigurationRequest.type, (params) => {
+    return params.items.map((item) => {
+      if (item.section === 'angular.inlayHints') {
+        // Integration tests assert inlay output for many Angular template scenarios.
+        // Keep those assertions explicit by enabling Angular inlay categories here,
+        // independent of extension default values.
+        return {
+          variableTypes: {
+            forLoopVariableTypes: true,
+            ifAliasTypes: true,
+            letDeclarationTypes: true,
+            referenceVariableTypes: true,
+            suppressWhenTypeMatchesName: false,
+          },
+          functionTypes: {
+            arrowFunctionParameterTypes: true,
+            arrowFunctionReturnTypes: true,
+          },
+          parameterHints: {
+            nameHints: 'all',
+            suppressWhenArgumentMatchesName: true,
+          },
+          eventHints: {
+            parameterTypes: true,
+            hostListenerArgumentTypes: true,
+          },
+          bindingHints: {
+            propertyBindingTypes: true,
+            pipeOutputTypes: true,
+            twoWayBindingSignalTypes: true,
+            requiredInputIndicator: 'none',
+          },
+          interaction: {
+            interactiveInlayHints: true,
+          },
+          controlFlowHints: {
+            switchExpressionTypes: true,
+            deferTriggerTypes: true,
+          },
+        };
+      }
+      return {};
+    });
+  });
   return connection;
 }
 
@@ -84,6 +127,12 @@ export function initializeServer(client: MessageConnection): Promise<lsp.Initial
         moniker: {},
         definition: {linkSupport: true},
         typeDefinition: {linkSupport: true},
+        inlayHint: {
+          dynamicRegistration: false,
+        },
+      },
+      workspace: {
+        configuration: true,
       },
     },
     /**

@@ -5,64 +5,20 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.dev/license
  */
-import {AbsoluteSourceSpan, ParseSourceSpan} from '@angular/compiler';
 import ts from 'typescript';
 
-import {TemplateDiagnostic, TypeCheckId} from '../api';
+import {TemplateDiagnostic} from '../api';
 import {makeTemplateDiagnostic} from '../diagnostics';
 
 import {getSourceMapping, TypeCheckSourceResolver} from './tcb_util';
 
 /**
- * Wraps the node in parenthesis such that inserted span comments become attached to the proper
- * node. This is an alias for `ts.factory.createParenthesizedExpression` with the benefit that it
- * signifies that the inserted parenthesis are for diagnostic purposes, not for correctness of the
- * rendered TCB code.
- *
- * Note that it is important that nodes and its attached comment are not wrapped into parenthesis
- * by default, as it prevents correct translation of e.g. diagnostics produced for incorrect method
- * arguments. Such diagnostics would then be produced for the parenthesised node whereas the
- * positional comment would be located within that node, resulting in a mismatch.
+ * This function will the check the source text of the TCB instead of doing a more expensive AST traversal (via getTokenAtPosition)
  */
-export function wrapForDiagnostics(expr: ts.Expression): ts.Expression {
-  return ts.factory.createParenthesizedExpression(expr);
-}
-
-/**
- * Wraps the node in parenthesis such that inserted span comments become attached to the proper
- * node. This is an alias for `ts.factory.createParenthesizedExpression` with the benefit that it
- * signifies that the inserted parenthesis are for use by the type checker, not for correctness of
- * the rendered TCB code.
- */
-export function wrapForTypeChecker(expr: ts.Expression): ts.Expression {
-  return ts.factory.createParenthesizedExpression(expr);
-}
-
-/**
- * Adds a synthetic comment to the expression that represents the parse span of the provided node.
- * This comment can later be retrieved as trivia of a node to recover original source locations.
- */
-export function addParseSpanInfo(node: ts.Node, span: AbsoluteSourceSpan | ParseSourceSpan): void {
-  let commentText: string;
-  if (span instanceof AbsoluteSourceSpan) {
-    commentText = `${span.start},${span.end}`;
-  } else {
-    commentText = `${span.start.offset},${span.end.offset}`;
-  }
-  ts.addSyntheticTrailingComment(
-    node,
-    ts.SyntaxKind.MultiLineCommentTrivia,
-    commentText,
-    /* hasTrailingNewLine */ false,
+function isAccessOnThis(text: string, start: number): boolean {
+  return (
+    text.substring(start - 5, start) === 'this.' || text.substring(start - 7, start) === '(this).'
   );
-}
-
-/**
- * Adds a synthetic comment to the function declaration that contains the type checking ID
- * of the class declaration.
- */
-export function addTypeCheckId(tcb: ts.FunctionDeclaration, id: TypeCheckId): void {
-  ts.addSyntheticLeadingComment(tcb, ts.SyntaxKind.MultiLineCommentTrivia, id, true);
 }
 
 /**
@@ -80,7 +36,15 @@ export function shouldReportDiagnostic(diagnostic: ts.Diagnostic): boolean {
     return false;
   } else if (code === 7006 /* Parameter '$event' implicitly has an 'any' type. */) {
     return false;
+  } else if (code === 2341 /* Property 'X' is private and only accessible within class */) {
+    if (diagnostic.file !== undefined && diagnostic.start !== undefined) {
+      // Here we're discarding private property reads error to allow them to be used in template expressions
+      if (isAccessOnThis(diagnostic.file.text, diagnostic.start)) {
+        return false;
+      }
+    }
   }
+
   return true;
 }
 

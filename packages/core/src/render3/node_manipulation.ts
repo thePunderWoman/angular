@@ -8,6 +8,7 @@
 
 import {consumerDestroy, setActiveConsumer} from '../../primitives/signals';
 
+import {RuntimeError, RuntimeErrorCode} from '../errors';
 import {NotificationSource} from '../change_detection/scheduling/zoneless_scheduling';
 import {hasInSkipHydrationBlockFlag} from '../hydration/skip_hydration';
 import {ViewEncapsulation} from '../metadata/view';
@@ -35,7 +36,13 @@ import {
   nativeRemoveNode,
 } from './dom_node_manipulation';
 import {icuContainerIterate} from './i18n/i18n_tree_shaking';
-import {CONTAINER_HEADER_OFFSET, LContainer, MOVED_VIEWS, NATIVE} from './interfaces/container';
+import {
+  CONTAINER_HEADER_OFFSET,
+  LContainer,
+  LContainerFlags,
+  MOVED_VIEWS,
+  NATIVE,
+} from './interfaces/container';
 import {ComponentDef} from './interfaces/definition';
 import {NodeInjectorFactory} from './interfaces/injector';
 import {unregisterLView} from './interfaces/lview_tracking';
@@ -75,14 +82,18 @@ import {
   TVIEW,
   TView,
   TViewType,
+  INJECTOR,
+  ID,
 } from './interfaces/view';
 import {assertTNodeType} from './node_assert';
 import {profiler} from './profiler';
-import {ProfilerEvent} from './profiler_types';
+import {ProfilerEvent} from '../../primitives/devtools';
 import {getLViewParent, getNativeByTNode, unwrapRNode} from './util/view_utils';
-import {allLeavingAnimations} from '../animation/longest_animation';
+import {cancelLeavingNodes, reusedNodes, trackLeavingNodes} from '../animation/utils';
+import {Injector} from '../di';
+import {maybeQueueEnterAnimation, runLeaveAnimationsWithCallback} from './node_animations';
 
-const enum WalkTNodeTreeAction {
+export const enum WalkTNodeTreeAction {
   /** node create in the native environment. Run on initial creation. */
   Create = 0,
 
@@ -106,8 +117,10 @@ const enum WalkTNodeTreeAction {
 function applyToElementOrContainer(
   action: WalkTNodeTreeAction,
   renderer: Renderer,
+  injector: Injector,
   parent: RElement | null,
   lNodeToHandle: RNode | LContainer | LView,
+  tNode: TNode,
   beforeNode?: RNode | null,
   parentLView?: LView,
 ) {
@@ -129,8 +142,8 @@ function applyToElementOrContainer(
       lNodeToHandle = lNodeToHandle[HOST]!;
     }
     const rNode: RNode = unwrapRNode(lNodeToHandle);
-
     if (action === WalkTNodeTreeAction.Create && parent !== null) {
+      maybeQueueEnterAnimation(parentLView, parent, tNode, injector);
       if (beforeNode == null) {
         nativeAppendChild(renderer, parent, rNode);
       } else {
@@ -138,20 +151,38 @@ function applyToElementOrContainer(
       }
     } else if (action === WalkTNodeTreeAction.Insert && parent !== null) {
       nativeInsertBefore(renderer, parent, rNode, beforeNode || null, true);
+      cancelLeavingNodes(tNode, rNode as HTMLElement, parentLView);
+      if (!reusedNodes.has(rNode as HTMLElement)) {
+        maybeQueueEnterAnimation(parentLView, parent, tNode, injector);
+      }
     } else if (action === WalkTNodeTreeAction.Detach) {
-      runLeaveAnimationsWithCallback(parentLView, (nodeHasLeaveAnimations: boolean) => {
-        // the nodeHasLeaveAnimations indicates to the renderer that the element needs to
-        // be removed synchronously and sets the requireSynchronousElementRemoval flag in
-        // the renderer.
-        nativeRemoveNode(renderer, rNode, isComponent, nodeHasLeaveAnimations);
-      });
+      if (parentLView?.[ANIMATIONS]?.leave?.has(tNode.index)) {
+        trackLeavingNodes(tNode, rNode as HTMLElement, parentLView);
+      }
+      reusedNodes.delete(rNode as HTMLElement);
+      runLeaveAnimationsWithCallback(
+        parentLView,
+        tNode,
+        injector,
+        (nodeHasLeaveAnimations: boolean) => {
+          if (reusedNodes.has(rNode as HTMLElement)) {
+            reusedNodes.delete(rNode as HTMLElement);
+            return;
+          }
+          // the nodeHasLeaveAnimations indicates to the renderer that the element needs to
+          // be removed synchronously and sets the requireSynchronousElementRemoval flag in
+          // the renderer.
+          nativeRemoveNode(renderer, rNode, isComponent, nodeHasLeaveAnimations);
+        },
+      );
     } else if (action === WalkTNodeTreeAction.Destroy) {
-      runLeaveAnimationsWithCallback(parentLView, () => {
+      reusedNodes.delete(rNode as HTMLElement);
+      runLeaveAnimationsWithCallback(parentLView, tNode, injector, () => {
         renderer.destroyNode!(rNode);
       });
     }
     if (lContainer != null) {
-      applyContainer(renderer, action, lContainer, parent, beforeNode);
+      applyContainer(renderer, action, injector, lContainer, tNode, parent, beforeNode);
     }
   }
 }
@@ -353,42 +384,6 @@ function cleanUpView(tView: TView, lView: LView): void {
   }
 }
 
-function hasLeaveAnimations(lView: LView | undefined): boolean {
-  return lView !== undefined && lView[ANIMATIONS] !== null && lView[ANIMATIONS].leave !== undefined;
-}
-
-function runLeaveAnimationsWithCallback(lView: LView | undefined, callback: Function) {
-  if (lView && lView[ANIMATIONS] && lView[ANIMATIONS].leave) {
-    if (lView[ANIMATIONS].skipLeaveAnimations) {
-      lView[ANIMATIONS].skipLeaveAnimations = false;
-    } else {
-      const leaveAnimations = lView[ANIMATIONS].leave;
-      const runningAnimations = [];
-      for (let index = 0; index < leaveAnimations.length; index++) {
-        const animateFn = leaveAnimations[index];
-        runningAnimations.push(animateFn());
-      }
-      lView[ANIMATIONS].running = Promise.allSettled(runningAnimations);
-      lView[ANIMATIONS].leave = undefined;
-    }
-  }
-  runAfterLeaveAnimations(lView, callback);
-}
-
-function runAfterLeaveAnimations(lView: LView | undefined, callback: Function) {
-  if (lView && lView[ANIMATIONS] && lView[ANIMATIONS].running) {
-    lView[ANIMATIONS].running.then(() => {
-      if (lView[ANIMATIONS] && lView[ANIMATIONS].running) {
-        lView[ANIMATIONS].running = undefined;
-      }
-      allLeavingAnimations.delete(lView);
-      callback(true);
-    });
-    return;
-  }
-  callback(false);
-}
-
 /** Removes listeners and unsubscribes from output subscriptions */
 function processCleanups(tView: TView, lView: LView): void {
   ngDevMode && assertNotReactive(processCleanups.name);
@@ -494,7 +489,30 @@ function executeOnDestroys(tView: TView, lView: LView): void {
  * @param tNode: `TNode` for which we wish to retrieve render parent.
  * @param lView: Current `LView`.
  */
-export function getParentRElement(tView: TView, tNode: TNode, lView: LView): RElement | null {
+export function getParentRElement(
+  tView: TView,
+  tNode: TNode | null,
+  lView: LView,
+): RElement | null {
+  // `tNode` can genuinely be null here, not just as a defensive type-widening measure. An
+  // `@if`/`@switch` branch's content is its own embedded view with its own `TView`, built the
+  // first time that branch is rendered. If an error interrupts that first creation pass (for
+  // example, a hydration mismatch on one of the branch's later nodes, after an earlier node's
+  // `TNode` was already created), `TView.firstCreatePass` still gets flipped to `false` before
+  // the error propagates (see `renderView()`'s `catch` block in `instructions/render.ts`),
+  // permanently marking the view's `TNode` data as "already created" even though it isn't.
+  // Unlike a component's `TView`, nothing rebuilds an embedded view's `TView` afterward, so the
+  // next time that same branch is selected, its instructions read directly from the still-null
+  // slot in `tView.data` instead of creating a fresh `TNode` — which is what surfaces here.
+  // Guard against it so production throws a coded RuntimeError instead of a raw TypeError when
+  // dereferencing `tNode.parent` below.
+  if (tNode === null) {
+    throw new RuntimeError(
+      RuntimeErrorCode.PARENT_NODE_NOT_FOUND,
+      ngDevMode &&
+        'getParentRElement() was called with a null TNode, so no parent element could be resolved. This usually means a TNode was never created for this node, or was already destroyed.',
+    );
+  }
   return getClosestRElement(tView, tNode.parent, lView);
 }
 
@@ -776,6 +794,7 @@ function applyNodes(
 ) {
   while (tNode != null) {
     ngDevMode && assertTNodeForLView(tNode, lView);
+    const injector = lView[INJECTOR];
 
     // Let declarations don't have corresponding DOM nodes so we skip over them.
     if (tNode.type === TNodeType.LetDeclaration) {
@@ -802,8 +821,10 @@ function applyNodes(
         applyToElementOrContainer(
           action,
           renderer,
+          injector,
           parentRElement,
           rawSlotValue,
+          tNode,
           beforeNode,
           lView,
         );
@@ -811,13 +832,24 @@ function applyNodes(
         const nextRNode = icuContainerIterate(tNode as TIcuContainerNode, lView);
         let rNode: RNode | null;
         while ((rNode = nextRNode())) {
-          applyToElementOrContainer(action, renderer, parentRElement, rNode, beforeNode, lView);
+          applyToElementOrContainer(
+            action,
+            renderer,
+            injector,
+            parentRElement,
+            rNode,
+            tNode,
+            beforeNode,
+            lView,
+          );
         }
         applyToElementOrContainer(
           action,
           renderer,
+          injector,
           parentRElement,
           rawSlotValue,
+          tNode,
           beforeNode,
           lView,
         );
@@ -835,8 +867,10 @@ function applyNodes(
         applyToElementOrContainer(
           action,
           renderer,
+          injector,
           parentRElement,
           rawSlotValue,
+          tNode,
           beforeNode,
           lView,
         );
@@ -869,7 +903,7 @@ function applyNodes(
  * @param parentRElement parent DOM element for insertion (Removal does not need it).
  * @param beforeNode Before which node the insertions should happen.
  */
-function applyView(
+export function applyView(
   tView: TView,
   lView: LView,
   renderer: Renderer,
@@ -877,7 +911,7 @@ function applyView(
   parentRElement: null,
   beforeNode: null,
 ): void;
-function applyView(
+export function applyView(
   tView: TView,
   lView: LView,
   renderer: Renderer,
@@ -885,7 +919,7 @@ function applyView(
   parentRElement: RElement | null,
   beforeNode: RNode | null,
 ): void;
-function applyView(
+export function applyView(
   tView: TView,
   lView: LView,
   renderer: Renderer,
@@ -893,7 +927,54 @@ function applyView(
   parentRElement: RElement | null,
   beforeNode: RNode | null,
 ): void {
-  applyNodes(renderer, action, tView.firstChild, lView, parentRElement, beforeNode, false);
+  if (tView.type === TViewType.Foreign) {
+    applyForeignNodes(renderer, action, lView, parentRElement, beforeNode);
+  } else {
+    applyNodes(renderer, action, tView.firstChild, lView, parentRElement, beforeNode, false);
+  }
+}
+
+function applyForeignNodes(
+  renderer: Renderer,
+  action: WalkTNodeTreeAction,
+  lView: LView,
+  parent: RElement | null,
+  beforeNode: RNode | null,
+) {
+  const tView = lView[TVIEW];
+  const headTNode = tView.firstChild!;
+  const tailTNode = headTNode.next!;
+  const head = unwrapRNode(lView[headTNode.index]);
+  const tail = unwrapRNode(lView[tailTNode.index]);
+
+  const fragmentSlotIndex = tailTNode.index + 1;
+  let fragment = lView[fragmentSlotIndex] as any;
+
+  if (action === WalkTNodeTreeAction.Insert || action === WalkTNodeTreeAction.Create) {
+    if (parent !== null) {
+      if (fragment && fragment.hasChildNodes()) {
+        nativeInsertBefore(renderer, parent, fragment, beforeNode, true);
+      } else {
+        nativeInsertBefore(renderer, parent, head!, beforeNode, true);
+        nativeInsertBefore(renderer, parent, tail!, beforeNode, true);
+      }
+    }
+  } else if (action === WalkTNodeTreeAction.Detach) {
+    if (!fragment) {
+      fragment = document.createDocumentFragment();
+      lView[fragmentSlotIndex] = fragment;
+    }
+    if (head && head.parentNode === fragment) {
+      return;
+    }
+    let current: RNode | null = head;
+    while (current !== null) {
+      const next: RNode | null = current.nextSibling;
+      fragment.appendChild(current);
+      if (current === tail) break;
+      current = next;
+    }
+  }
 }
 
 /**
@@ -956,7 +1037,16 @@ function applyProjectionRecursive(
     // This should be refactored and cleaned up.
     for (let i = 0; i < nodeToProjectOrRNodes.length; i++) {
       const rNode = nodeToProjectOrRNodes[i];
-      applyToElementOrContainer(action, renderer, parentRElement, rNode, beforeNode, lView);
+      applyToElementOrContainer(
+        action,
+        renderer,
+        lView[INJECTOR],
+        parentRElement,
+        rNode,
+        tProjectionNode,
+        beforeNode,
+        lView,
+      );
     }
   } else {
     let nodeToProject: TNode | null = nodeToProjectOrRNodes;
@@ -994,7 +1084,9 @@ function applyProjectionRecursive(
 function applyContainer(
   renderer: Renderer,
   action: WalkTNodeTreeAction,
+  injector: Injector,
   lContainer: LContainer,
+  tNode: TNode,
   parentRElement: RElement | null,
   beforeNode: RNode | null | undefined,
 ) {
@@ -1012,7 +1104,18 @@ function applyContainer(
     // don't see a reason why they should be different, but they are.
     //
     // If they are we need to process the second anchor as well.
-    applyToElementOrContainer(action, renderer, parentRElement, anchor, beforeNode);
+    applyToElementOrContainer(
+      action,
+      renderer,
+      injector,
+      parentRElement,
+      anchor,
+      tNode,
+      beforeNode,
+    );
+  }
+  if ((lContainer[FLAGS] & LContainerFlags.LogicalOnly) !== 0) {
+    return;
   }
   for (let i = CONTAINER_HEADER_OFFSET; i < lContainer.length; i++) {
     const lView = lContainer[i] as LView;

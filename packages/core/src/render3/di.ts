@@ -11,9 +11,9 @@ import {injectRootLimpMode, setInjectImplementation} from '../di/inject_switch';
 import {Injector} from '../di/injector';
 import {BackwardsCompatibleInjector, convertToBitFlags} from '../di/injector_compatibility';
 import {InjectorMarkers} from '../di/injector_marker';
-import {InternalInjectFlags, InjectOptions} from '../di/interface/injector';
+import {InjectOptions, InternalInjectFlags} from '../di/interface/injector';
 import {ProviderToken} from '../di/provider_token';
-import {Type} from '../interface/type';
+import {AbstractType, Type} from '../interface/type';
 import {assertDefined, assertEqual, assertIndexInRange} from '../util/assert';
 import {noSideEffects} from '../util/closure';
 
@@ -158,7 +158,7 @@ export function bloomAdd(
   let id: number | undefined;
   if (typeof type === 'string') {
     id = type.charCodeAt(0) || 0;
-  } else if (type.hasOwnProperty(NG_ELEMENT_ID)) {
+  } else if (Object.hasOwn(type, NG_ELEMENT_ID)) {
     id = (type as any)[NG_ELEMENT_ID];
   }
 
@@ -745,8 +745,9 @@ export function getNodeInjectable(
     const factory: NodeInjectorFactory = value;
     ngDevMode && injectionPath.push(factory.name ?? 'unknown');
     if (factory.resolving) {
-      const token = stringifyForError(tData[index]);
+      let token = '';
       if (ngDevMode) {
+        token = stringifyForError(tData[index]);
         throw cyclicDependencyErrorWithDetails(token, injectionPath);
       } else {
         throw cyclicDependencyError(token);
@@ -829,8 +830,8 @@ export function bloomHashBitOrFactory(
     return token.charCodeAt(0) || 0;
   }
   const tokenId: number | undefined =
-    // First check with `hasOwnProperty` so we don't get an inherited ID.
-    token.hasOwnProperty(NG_ELEMENT_ID) ? (token as any)[NG_ELEMENT_ID] : undefined;
+    // First check with `Object.hasOwn` so we don't get an inherited ID.
+    Object.hasOwn(token, NG_ELEMENT_ID) ? (token as any)[NG_ELEMENT_ID] : undefined;
   // Negative token IDs are used for special objects such as `Injector`
   if (typeof tokenId === 'number') {
     if (tokenId >= 0) {
@@ -883,10 +884,7 @@ export function getNodeInjectorTNode(
   nodeInjector: NodeInjector,
 ): TElementNode | TContainerNode | TElementContainerNode | null {
   return (nodeInjector as any)._tNode as
-    | TElementNode
-    | TContainerNode
-    | TElementContainerNode
-    | null;
+    TElementNode | TContainerNode | TElementContainerNode | null;
 }
 
 export class NodeInjector implements Injector {
@@ -914,7 +912,9 @@ export function createNodeInjector(): Injector {
 /**
  * @codeGenApi
  */
-export function ɵɵgetInheritedFactory<T>(type: Type<any>): (type: Type<T>) => T {
+export function ɵɵgetInheritedFactory<T>(
+  type: Type<any> | AbstractType<any>,
+): (type: Type<T>) => T {
   return noSideEffects(() => {
     const ownConstructor = type.prototype.constructor;
     const ownFactory = ownConstructor[NG_FACTORY_DEF] || getFactoryOf(ownConstructor);
@@ -1002,6 +1002,10 @@ function lookupTokenUsingEmbeddedInjector<T>(
     if (nodeInjectorValue !== NOT_FOUND) {
       return nodeInjectorValue;
     }
+
+    // The injector of the node we started from has been checked at this point, so everything
+    // we look at from here on is a parent and must not be skipped by the `SkipSelf` flag.
+    flags &= ~InternalInjectFlags.SkipSelf;
 
     // Has an explicit type due to a TS bug: https://github.com/microsoft/TypeScript/issues/33191
     let parentTNode: TElementNode | TContainerNode | null = currentTNode.parent;

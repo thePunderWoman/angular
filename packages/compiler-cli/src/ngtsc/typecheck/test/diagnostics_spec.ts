@@ -187,6 +187,21 @@ runInEachFileSystem(() => {
       ]);
     });
 
+    it('should disallow binding to event properties starting with on', () => {
+      const messages = diagnose(
+        `<div [onclick]="handler"></div>`,
+        `
+      class TestComponent {
+        handler: any;
+      }`,
+      );
+
+      expect(messages).toEqual([
+        `TestComponent.html(1, 6): Binding to event property 'onclick' is disallowed for security reasons, please use (click)=...
+If 'onclick' is a directive input, make sure the directive is imported by the current module.`,
+      ]);
+    });
+
     it('checks text attributes that are consumed by bindings with literal string types', () => {
       const messages = diagnose(
         `<div dir mode="drak"></div><div dir mode="light"></div>`,
@@ -245,6 +260,30 @@ runInEachFileSystem(() => {
       expect(messages).toEqual([
         `TestComponent.html(1, 35): Argument of type 'number' is not assignable to parameter of type 'string'.`,
       ]);
+    });
+
+    it('infers generic pipe return types correctly and avoids expanding to strict undefined errors', () => {
+      const messages = diagnose(
+        `<div>{{ person?.name | pipe:person?.age }}</div>`,
+        `
+        class Pipe<T> {
+          transform(value: T, a: number | undefined): T { return value; }
+        }
+        class TestComponent {
+          person?: {
+            name: string;
+            age: number;
+          };
+        }`,
+        [{type: 'pipe', name: 'Pipe', pipeName: 'pipe', isGeneric: true}],
+      );
+
+      // If the pipe was instantiated with explicit \`any\` generic bounds (e.g. \`var _pipe1 = null! as i0.Pipe<any>\`),
+      // the \`transform\` method evaluates the \`value: T\` parameter as \`value: any\`. This would break strict null
+      // checking against the optional chaining \`person?.name\` -> \`string | undefined\`.
+      // Instead, by dropping the generic arguments, TS evaluates the \`transform\` bound lazily, allowing the pipe to
+      // successfully extract \`string | undefined\` out of the first argument without union conflicts.
+      expect(messages).toEqual([]);
     });
 
     it('does not repeat diagnostics for missing pipes in directive inputs', () => {
@@ -709,7 +748,7 @@ class TestComponent {
       expect(messages).toEqual([]);
     });
 
-    it('disallows access to private members', () => {
+    it('allow access to private members', () => {
       const messages = diagnose(
         `<button (click)="doFoo()">{{ message }}</button>`,
         `
@@ -719,9 +758,24 @@ class TestComponent {
         }`,
       );
 
+      expect(messages).toEqual([]);
+    });
+
+    it('disallows access of a nested private member', () => {
+      const messages = diagnose(
+        `<div>{{ prop.a }}</div>`,
+        `
+        export class Model {
+          private a = 1;
+        }
+
+        export class TestComponent {
+          private prop =  new Model();
+        }      
+        `,
+      );
       expect(messages).toEqual([
-        `TestComponent.html(1, 18): Property 'doFoo' is private and only accessible within class 'TestComponent'.`,
-        `TestComponent.html(1, 30): Property 'message' is private and only accessible within class 'TestComponent'.`,
+        `TestComponent.html(1, 14): Property 'a' is private and only accessible within class 'Model'.`,
       ]);
     });
   });
@@ -1046,7 +1100,7 @@ class TestComponent {
       );
 
       expect(messages).toEqual([
-        `TestComponent.html(1, 1): Required input 'input' from directive Dir must be specified.`,
+        `TestComponent.html(1, 2): Required input 'input' from directive Dir must be specified.`,
       ]);
     });
 
@@ -1103,8 +1157,8 @@ class TestComponent {
       );
 
       expect(messages).toEqual([
-        `TestComponent.html(1, 1): Required inputs 'input', 'otherInput' from directive Dir must be specified.`,
-        `TestComponent.html(1, 1): Required input 'otherDirInput' from directive OtherDir must be specified.`,
+        `TestComponent.html(1, 2): Required inputs 'input', 'otherInput' from directive Dir must be specified.`,
+        `TestComponent.html(1, 2): Required input 'otherDirInput' from directive OtherDir must be specified.`,
       ]);
     });
 
@@ -1136,7 +1190,7 @@ class TestComponent {
       );
 
       expect(messages).toEqual([
-        `TestComponent.html(1, 1): Required input 'inputAlias' from directive Dir must be specified.`,
+        `TestComponent.html(1, 2): Required input 'inputAlias' from directive Dir must be specified.`,
       ]);
     });
 
@@ -1337,7 +1391,7 @@ class TestComponent {
       );
 
       expect(messages).toEqual([
-        `TestComponent.html(1, 1): Required input 'customAlias' from directive HostDir must be specified.`,
+        `TestComponent.html(1, 2): Required input 'customAlias' from directive HostDir must be specified.`,
       ]);
     });
 
@@ -1366,6 +1420,105 @@ class TestComponent {
             },
           },
         ],
+      );
+
+      expect(messages).toEqual([]);
+    });
+  });
+
+  describe('switch exhaustiveness', () => {
+    it('should report an error when a case is missing in a switch block', () => {
+      const messages = diagnose(
+        `
+          @switch (value) {
+            @case ('a') {}
+            @default never;
+          }
+        `,
+        `
+          export class TestComponent {
+            value: 'a' | 'b';
+          }
+        `,
+      );
+
+      expect(messages).toEqual([
+        `TestComponent.html(2, 20): Type '"b"' is not assignable to type 'never'.`,
+      ]);
+    });
+
+    it('should not report an error when all cases are handled', () => {
+      const messages = diagnose(
+        `
+          @switch (value) {
+            @case ('a') {}
+            @case ('b') {}
+            @default never;
+          }
+        `,
+        `
+          export class TestComponent {
+            value: 'a' | 'b';
+          }
+        `,
+      );
+
+      expect(messages).toEqual([]);
+    });
+
+    it('should not report an error when a default case is provided', () => {
+      const messages = diagnose(
+        `
+          @switch (value) {
+            @case ('a') {}
+            @default {}
+          }
+        `,
+        `
+          export class TestComponent {
+            value: 'a' | 'b';
+          }
+        `,
+      );
+
+      expect(messages).toEqual([]);
+    });
+
+    it('should narrow union when switching on a nested prop', () => {
+      const messages = diagnose(
+        `
+        @switch (state.mode) {
+          @case ('show') { {{ state.menu }}; }
+          @case ('hide') {}
+          @default never(state);
+        }
+        `,
+        `
+          export class TestComponent {
+            state: { mode: 'hide' } | { mode: 'show'; menu: number };
+          }
+        `,
+      );
+
+      expect(messages).toEqual([]);
+    });
+
+    it('should narrow a let declaration with the same name as a component property', () => {
+      const messages = diagnose(
+        `
+          @let state = this.state();
+          @switch (state.mode) {
+            @case ('show') { {{ state.menu }}; }
+            @case ('hide') {}
+            @default never(state);
+          }
+        `,
+        `
+          import {InputSignal} from '@angular/core';
+          export class TestComponent {
+            state: InputSignal<{ mode: 'hide' } | { mode: 'show'; menu: number }>;
+          }
+        `,
       );
 
       expect(messages).toEqual([]);

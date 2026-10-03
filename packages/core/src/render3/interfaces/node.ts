@@ -5,15 +5,24 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.dev/license
  */
-import {Type} from '../../interface/type';
+import {AbstractType, Type} from '../../interface/type';
 import {KeyValueArray} from '../../util/array_utils';
 import {TStylingRange} from '../interfaces/styling';
 import {AttributeMarker} from './attribute_marker';
+import {ForeignComponent} from '../../interface/foreign_component';
 
 import {TIcu} from './i18n';
 import {CssSelector} from './projection';
 import {RNode} from './renderer_dom';
 import type {LView, TView} from './view';
+
+/**
+ * Internal tag name used for a root host `TNode` when Angular creates a component against an
+ * existing host element. The concrete DOM tag is resolved from the native element at runtime.
+ */
+export const enum TNodeName {
+  DynamicHost = '#host',
+}
 
 /**
  * TNodeType corresponds to the {@link TNode} `type` property.
@@ -78,6 +87,11 @@ export const enum TNodeType {
    */
   LetDeclaration = 0b10000000,
 
+  /**
+   * The TNode contains a control directive's update function.
+   */
+  ControlDirective = 0b100000000,
+
   // Combined Types These should never be used for `TNode.type` only as a useful way to check
   // if `TNode.type` is one of several choices.
 
@@ -131,22 +145,22 @@ export function isLetDeclaration(tNode: TNode): boolean {
  */
 export const enum TNodeFlags {
   /** Bit #1 - This bit is set if the node is a host for any directive (including a component) */
-  isDirectiveHost = 0x1,
+  isDirectiveHost = 1 << 0,
 
   /** Bit #2 - This bit is set if the node has been projected */
-  isProjected = 0x2,
+  isProjected = 1 << 1,
 
   /** Bit #3 - This bit is set if any directive on this node has content queries */
-  hasContentQuery = 0x4,
+  hasContentQuery = 1 << 2,
 
   /** Bit #4 - This bit is set if the node has any "class" inputs */
-  hasClassInput = 0x8,
+  hasClassInput = 1 << 3,
 
   /** Bit #5 - This bit is set if the node has any "style" inputs */
-  hasStyleInput = 0x10,
+  hasStyleInput = 1 << 4,
 
   /** Bit #6 - This bit is set if the node has been detached by i18n */
-  isDetached = 0x20,
+  isDetached = 1 << 5,
 
   /**
    * Bit #7 - This bit is set if the node has directives with host bindings.
@@ -154,22 +168,43 @@ export const enum TNodeFlags {
    * This flags allows us to guard host-binding logic and invoke it only on nodes
    * that actually have directives with host bindings.
    */
-  hasHostBindings = 0x40,
+  hasHostBindings = 1 << 6,
 
   /**
    * Bit #8 - This bit is set if the node is a located inside skip hydration block.
    */
-  inSkipHydrationBlock = 0x80,
+  inSkipHydrationBlock = 1 << 7,
 
   /**
    * Bit #9 - This bit is set if the node is a start of a set of control flow blocks.
    */
-  isControlFlowStart = 0x100,
+  isControlFlowStart = 1 << 8,
 
   /**
    * Bit #10 - This bit is set if the node is within a set of control flow blocks.
    */
-  isInControlFlow = 0x200,
+  isInControlFlow = 1 << 9,
+
+  /**
+   * Bit #11 - This bit is set if the node hosts a custom control component.
+   *
+   * A custom control component's model property is named `value`.
+   */
+  isFormValueControl = 1 << 10,
+
+  /**
+   * Bit #12 - This bit is set if the node hosts a custom checkbox component.
+   *
+   * A custom checkbox component's model property is named `checked`.
+   */
+  isFormCheckboxControl = 1 << 11,
+
+  /**
+   * Bit #13 - This bit is set if the node hosts an interoperable control implementation.
+   *
+   * This is used to bind to a `ControlValueAccessor` from `@angular/forms`.
+   */
+  isPassThroughControl = 1 << 12,
 }
 
 /**
@@ -200,8 +235,9 @@ export type TAttributes = (string | AttributeMarker | CssSelector)[];
  * - Attribute arrays.
  * - Local definition arrays.
  * - Translated messages (i18n).
+ * - Foreign components.
  */
-export type TConstants = (TAttributes | string)[];
+export type TConstants = (TAttributes | string | ForeignComponent<any, any>)[];
 
 /**
  * Factory function that returns an array of consts. Consts can be represented as a function in
@@ -331,6 +367,18 @@ export interface TNode {
   componentOffset: number;
 
   /**
+   * Index at which the signal forms field directive is stored.
+   * Value is set to -1 if there are no field directives.
+   */
+  controlDirectiveIndex: number;
+
+  /**
+   * Index at which the custom control directive is stored.
+   * Value is set to -1 if there is no custom control directive.
+   */
+  customControlIndex: number;
+
+  /**
    * Stores the last directive which had a styling instruction.
    *
    * Initial value of this is `-1` which means that no `hostBindings` styling instruction has
@@ -377,6 +425,11 @@ export interface TNode {
    *   `TNodeType.ICUContainer`: `TIcu`
    */
   value: any;
+
+  /**
+   * The namespace associated with this node.
+   */
+  namespace: string | null;
 
   /**
    * Attributes associated with an element. We need to store attributes to support various
@@ -892,7 +945,7 @@ export type HostDirectiveOutputs = Record<string, (number | string)[]>;
  * ```
  */
 export type DirectiveIndexMap = Map<
-  Type<unknown>,
+  Type<unknown> | AbstractType<unknown>,
   number | [directiveIndex: number, hostDirectivesStart: number, hostDirectivesEnd: number]
 >;
 

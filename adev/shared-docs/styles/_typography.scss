@@ -39,6 +39,10 @@
     // Added fallback color due to browser idiosyncrasies with color-mix and ::selection
     background: color-mix(in srgb, var(--selection-background) 10%, var(--octonary-contrast));
     color: color-mix(in srgb, var(--selection-color) 40%, var(--primary-contrast));
+
+    .docs-dark-mode & {
+      background: color-mix(in srgb, var(--selection-background) 30%, var(--octonary-contrast));
+    }
   }
 
   h1,
@@ -49,7 +53,6 @@
   h6 {
     font-family: var(--inter-tight-font);
     font-weight: 500;
-    text-wrap: balance;
   }
 
   p {

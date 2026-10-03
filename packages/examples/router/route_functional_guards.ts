@@ -13,8 +13,8 @@ import {
   ActivatedRouteSnapshot,
   CanActivateChildFn,
   CanActivateFn,
-  CanDeactivateFn,
   CanMatchFn,
+  PartialMatchRouteSnapshot,
   provideRouter,
   ResolveFn,
   Route,
@@ -24,13 +24,11 @@ import {
 
 @Component({
   template: '',
-  standalone: false,
 })
 export class App {}
 
 @Component({
   template: '',
-  standalone: false,
 })
 export class TeamComponent {}
 
@@ -95,7 +93,6 @@ bootstrapApplication(App, {
 // #docregion CanDeactivateFn
 @Component({
   template: '',
-  standalone: false,
 })
 export class UserComponent {
   hasUnsavedChanges = true;
@@ -115,7 +112,11 @@ bootstrapApplication(App, {
 // #enddocregion
 
 // #docregion CanMatchFn
-const canMatchTeam: CanMatchFn = (route: Route, segments: UrlSegment[]) => {
+const canMatchTeam: CanMatchFn = (
+  route: Route,
+  segments: UrlSegment[],
+  currentSnapshot: PartialMatchRouteSnapshot,
+) => {
   return inject(PermissionsService).canMatch(inject(UserToken));
 };
 
@@ -135,7 +136,6 @@ bootstrapApplication(App, {
 // #docregion ResolveDataUse
 @Component({
   template: '',
-  standalone: false,
 })
 export class HeroDetailComponent {
   constructor(private activatedRoute: ActivatedRoute) {}

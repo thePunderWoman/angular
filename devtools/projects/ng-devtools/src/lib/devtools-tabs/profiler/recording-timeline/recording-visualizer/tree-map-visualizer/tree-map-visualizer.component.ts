@@ -8,12 +8,10 @@
 
 import {
   afterNextRender,
-  ChangeDetectionStrategy,
   Component,
   computed,
   effect,
   ElementRef,
-  inject,
   input,
   OnDestroy,
   viewChild,
@@ -29,7 +27,6 @@ import {TreeMapFormatter, TreeMapNode} from '../../record-formatter/tree-map-for
   selector: 'ng-tree-map-visualizer',
   templateUrl: './tree-map-visualizer.component.html',
   styleUrls: ['./tree-map-visualizer.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TreeMapVisualizerComponent implements OnDestroy {
   private _formatter = new TreeMapFormatter();
@@ -79,7 +76,7 @@ export class TreeMapVisualizerComponent implements OnDestroy {
   private _createTree(): void {
     render(this.tree().nativeElement, this.treeMapRecords(), {
       padding: [20, 5, 5, 5],
-      caption: (node) => `${node.id}: ${node.size.toFixed(3)} ms`,
+      caption: (node) => `${node.id}: ${node.size.toFixed(1)} ms`,
       showNode: () => true,
     });
   }

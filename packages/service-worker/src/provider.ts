@@ -26,7 +26,7 @@ import {SwUpdate} from './update';
 import {RuntimeErrorCode} from './errors';
 
 export const SCRIPT = new InjectionToken<string>(
-  typeof ngDevMode !== undefined && ngDevMode ? 'NGSW_REGISTER_SCRIPT' : '',
+  typeof ngDevMode !== 'undefined' && ngDevMode ? 'NGSW_REGISTER_SCRIPT' : '',
 );
 
 export function ngswAppInitializer(): void {
@@ -143,8 +143,9 @@ export function ngswCommChannelFactory(): NgswCommChannel {
  * You can use this token to define a provider that generates the registration options at runtime,
  * for example via a function call:
  *
- * {@example service-worker/registration-options/module.ts region="registration-options"
- *     header="app.module.ts"}
+ * {@example service-worker/registration-options/module.ts region="registration-options"}
+ *
+ * @see [Service worker configuration](ecosystem/service-workers/getting-started#service-worker-configuration)
  *
  * @publicApi
  */
@@ -229,6 +230,11 @@ export abstract class SwRegistrationOptions {
  *   ],
  * });
  * ```
+ *
+ * @see [Custom service worker script](ecosystem/service-workers/custom-service-worker-scripts)
+ *
+ * @see [Service worker configuration](ecosystem/service-workers/getting-started#service-worker-configuration)
+ *
  */
 export function provideServiceWorker(
   script: string,

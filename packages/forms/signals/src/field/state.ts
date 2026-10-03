@@ -7,10 +7,12 @@
  */
 
 import {computed, signal, Signal} from '@angular/core';
-import type {Control} from '../api/control_directive';
-import type {DisabledReason} from '../api/types';
+import type {FormField} from '../directive/form_field';
+import type {Debouncer, DisabledReason} from '../api/types';
+import {DEBOUNCER} from './debounce';
 import type {FieldNode} from './node';
-import {reduceChildren, shortCircuitTrue} from './util';
+import {shallowArrayEquals} from '../util/array';
+import {shortCircuitTrue} from './util';
 
 /**
  * The non-validation and non-submit state associated with a `FieldNode`, such as touched and dirty
@@ -61,8 +63,8 @@ export class FieldNodeState {
     this.selfTouched.set(false);
   }
 
-  /** The UI controls the field is currently bound to. */
-  readonly controls = signal<readonly Control<unknown>[]>([]);
+  /** The {@link FormField} directives that bind this field to a UI control. */
+  readonly formFieldBindings = signal<readonly FormField<unknown>[]>([]);
 
   constructor(private readonly node: FieldNode) {}
 
@@ -75,8 +77,7 @@ export class FieldNodeState {
    */
   readonly dirty: Signal<boolean> = computed(() => {
     const selfDirtyValue = this.selfDirty() && !this.isNonInteractive();
-    return reduceChildren(
-      this.node,
+    return this.node.structure.reduceChildren(
       selfDirtyValue,
       (child, value) => value || child.nodeState.dirty(),
       shortCircuitTrue,
@@ -92,8 +93,7 @@ export class FieldNodeState {
    */
   readonly touched: Signal<boolean> = computed(() => {
     const selfTouchedValue = this.selfTouched() && !this.isNonInteractive();
-    return reduceChildren(
-      this.node,
+    return this.node.structure.reduceChildren(
       selfTouchedValue,
       (child, value) => value || child.nodeState.touched(),
       shortCircuitTrue,
@@ -106,10 +106,13 @@ export class FieldNodeState {
    * The `field` property of the `DisabledReason` can be used to determine which field ultimately
    * caused the disablement.
    */
-  readonly disabledReasons: Signal<readonly DisabledReason[]> = computed(() => [
-    ...(this.node.structure.parent?.nodeState.disabledReasons() ?? []),
-    ...this.node.logicNode.logic.disabledReasons.compute(this.node.context),
-  ]);
+  readonly disabledReasons: Signal<readonly DisabledReason[]> = computed(
+    () => [
+      ...(this.node.structure.parent?.nodeState.disabledReasons() ?? []),
+      ...this.node.logicNode.logic.disabledReasons.compute(this.node.context),
+    ],
+    {equal: shallowArrayEquals},
+  );
 
   /**
    * Whether this field is considered disabled.
@@ -156,6 +159,28 @@ export class FieldNodeState {
 
     return `${parent.name()}.${this.node.structure.keyInParent()}`;
   });
+
+  /**
+   * An optional {@link Debouncer} factory for this field.
+   */
+  readonly debouncer: Signal<((signal: AbortSignal) => Promise<void> | void) | undefined> =
+    computed(() => {
+      if (this.node.logicNode.logic.hasMetadata(DEBOUNCER)) {
+        const debouncerLogic = this.node.logicNode.logic.getMetadata(DEBOUNCER);
+        const debouncer = debouncerLogic.compute(this.node.context);
+
+        // Even if this field has a `debounce()` rule, it could be applied conditionally and currently
+        // inactive, in which case `compute()` will return undefined.
+        if (debouncer) {
+          return (signal) => debouncer(this.node.context, signal);
+        }
+      }
+
+      // Fallback to the parent's debouncer, if any. If there is no debouncer configured all the way
+      // up to the root field, this simply returns `undefined` indicating that the operation should
+      // not be debounced.
+      return this.node.structure.parent?.nodeState.debouncer?.();
+    });
 
   /** Whether this field is considered non-interactive.
    *

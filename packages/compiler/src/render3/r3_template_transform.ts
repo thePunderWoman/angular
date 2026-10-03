@@ -25,6 +25,8 @@ import {BindingParser} from '../template_parser/binding_parser';
 import {PreparsedElementType, preparseElement} from '../template_parser/template_preparser';
 
 import * as t from './r3_ast';
+import {createBoundaryBlock, isConnectedBoundaryErrorBlock} from './r3_boundaries';
+import {createContentBlock} from './r3_content_blocks';
 import {
   createForLoop,
   createIfBlock,
@@ -216,9 +218,7 @@ class HtmlAstToIvyAst implements html.Visitor {
         attrs.bound,
         boundEvents,
         directives,
-        [
-          /* no template attributes */
-        ],
+        [/* no template attributes */],
         children,
         references,
         variables,
@@ -261,6 +261,12 @@ class HtmlAstToIvyAst implements html.Visitor {
         element.isVoid,
         element.i18n,
       );
+    }
+
+    if (this.options.collectCommentNodes) {
+      element.comments.forEach((comment) => {
+        this.commentNodes.push(new t.Comment(comment.value || '', comment.sourceSpan));
+      });
     }
 
     if (elementHasInlineTemplate) {
@@ -342,6 +348,13 @@ class HtmlAstToIvyAst implements html.Visitor {
   }
 
   visitComment(comment: html.Comment): null {
+    if (this.options.collectCommentNodes) {
+      this.commentNodes.push(new t.Comment(comment.value || '', comment.sourceSpan));
+    }
+    return null;
+  }
+
+  visitStartTagComment(comment: html.StartTagComment): null {
     if (this.options.collectCommentNodes) {
       this.commentNodes.push(new t.Comment(comment.value || '', comment.sourceSpan));
     }
@@ -431,6 +444,12 @@ class HtmlAstToIvyAst implements html.Visitor {
       component.i18n,
     );
 
+    if (this.options.collectCommentNodes) {
+      component.comments.forEach((comment) => {
+        this.commentNodes.push(new t.Comment(comment.value || '', comment.sourceSpan));
+      });
+    }
+
     if (elementHasInlineTemplate) {
       node = this.wrapInTemplate(
         node,
@@ -485,6 +504,10 @@ class HtmlAstToIvyAst implements html.Visitor {
         result = createSwitchBlock(block, this, this.bindingParser);
         break;
 
+      case 'content':
+        result = createContentBlock(block, this);
+        break;
+
       case 'for':
         result = createForLoop(
           block,
@@ -503,10 +526,22 @@ class HtmlAstToIvyAst implements html.Visitor {
         );
         break;
 
+      case 'boundary':
+        result = createBoundaryBlock(
+          block,
+          this.findConnectedBlocks(index, context, isConnectedBoundaryErrorBlock),
+          this,
+          this.bindingParser,
+        );
+        break;
+
       default:
         let errorMessage: string;
 
-        if (isConnectedDeferLoopBlock(block.name)) {
+        if (isConnectedBoundaryErrorBlock(block.name)) {
+          errorMessage = `@${block.name} block can only be used after an @defer or @boundary block.`;
+          this.processedNodes.add(block);
+        } else if (isConnectedDeferLoopBlock(block.name)) {
           errorMessage = `@${block.name} block can only be used after an @defer block.`;
           this.processedNodes.add(block);
         } else if (isConnectedForLoopBlock(block.name)) {
@@ -591,10 +626,11 @@ class HtmlAstToIvyAst implements html.Visitor {
         // Note that validation is skipped and property mapping is disabled
         // due to the fact that we need to make sure a given prop is not an
         // input of a directive and directive matching happens at runtime.
+        const isAttrOn = prop.name.toLowerCase().startsWith('attr.on');
         const bep = this.bindingParser.createBoundElementProperty(
           elementName,
           prop,
-          /* skipValidation */ true,
+          /* skipValidation */ !isAttrOn,
           /* mapPropertyName */ false,
         );
         bound.push(t.BoundAttribute.fromBoundElementProperty(bep, i18n));
@@ -619,7 +655,6 @@ class HtmlAstToIvyAst implements html.Visitor {
 
     for (const attribute of attrs) {
       let hasBinding = false;
-      const normalizedName = normalizeAttributeName(attribute.name);
 
       // `*attr` defines template bindings
       let isTemplateBinding = false;
@@ -628,7 +663,7 @@ class HtmlAstToIvyAst implements html.Visitor {
         i18nAttrsMeta[attribute.name] = attribute.i18n;
       }
 
-      if (normalizedName.startsWith(TEMPLATE_ATTR_PREFIX)) {
+      if (attribute.name.startsWith(TEMPLATE_ATTR_PREFIX)) {
         // *-attributes
         if (elementHasInlineTemplate) {
           this.reportError(
@@ -639,7 +674,7 @@ class HtmlAstToIvyAst implements html.Visitor {
         isTemplateBinding = true;
         elementHasInlineTemplate = true;
         const templateValue = attribute.value;
-        const templateKey = normalizedName.substring(TEMPLATE_ATTR_PREFIX.length);
+        const templateKey = attribute.name.substring(TEMPLATE_ATTR_PREFIX.length);
 
         const parsedVariables: ParsedVariable[] = [];
         const absoluteValueOffset = attribute.valueSpan
@@ -705,7 +740,7 @@ class HtmlAstToIvyAst implements html.Visitor {
     variables: t.Variable[],
     references: t.Reference[],
   ) {
-    const name = normalizeAttributeName(attribute.name);
+    const name = attribute.name;
     const value = attribute.value;
     const srcSpan = attribute.sourceSpan;
     const absoluteOffset = attribute.valueSpan
@@ -715,8 +750,7 @@ class HtmlAstToIvyAst implements html.Visitor {
     function createKeySpan(srcSpan: ParseSourceSpan, prefix: string, identifier: string) {
       // We need to adjust the start location for the keySpan to account for the removed 'data-'
       // prefix from `normalizeAttributeName`.
-      const normalizationAdjustment = attribute.name.length - name.length;
-      const keySpanStart = srcSpan.start.moveBy(prefix.length + normalizationAdjustment);
+      const keySpanStart = srcSpan.start.moveBy(prefix.length);
       const keySpanEnd = keySpanStart.moveBy(identifier.length);
       return new ParseSourceSpan(keySpanStart, keySpanEnd, keySpanStart, identifier);
     }
@@ -725,6 +759,7 @@ class HtmlAstToIvyAst implements html.Visitor {
 
     if (bindParts) {
       if (bindParts[KW_BIND_IDX] != null) {
+        // 3p-only-start
         const identifier = bindParts[IDENT_KW_IDX];
         const keySpan = createKeySpan(srcSpan, bindParts[KW_BIND_IDX], identifier);
         this.bindingParser.parsePropertyBinding(
@@ -739,6 +774,7 @@ class HtmlAstToIvyAst implements html.Visitor {
           parsedProperties,
           keySpan,
         );
+        // 3p-only-end
       } else if (bindParts[KW_LET_IDX]) {
         if (isTemplateElement) {
           const identifier = bindParts[IDENT_KW_IDX];
@@ -752,6 +788,7 @@ class HtmlAstToIvyAst implements html.Visitor {
         const keySpan = createKeySpan(srcSpan, bindParts[KW_REF_IDX], identifier);
         this.parseReference(identifier, value, srcSpan, keySpan, attribute.valueSpan, references);
       } else if (bindParts[KW_ON_IDX]) {
+        // 3p-only-start
         const events: ParsedEvent[] = [];
         const identifier = bindParts[IDENT_KW_IDX];
         const keySpan = createKeySpan(srcSpan, bindParts[KW_ON_IDX], identifier);
@@ -766,7 +803,9 @@ class HtmlAstToIvyAst implements html.Visitor {
           keySpan,
         );
         addEvents(events, boundEvents);
+        // 3p-only-end
       } else if (bindParts[KW_BINDON_IDX]) {
+        // 3p-only-start
         const identifier = bindParts[IDENT_KW_IDX];
         const keySpan = createKeySpan(srcSpan, bindParts[KW_BINDON_IDX], identifier);
         this.bindingParser.parsePropertyBinding(
@@ -791,6 +830,7 @@ class HtmlAstToIvyAst implements html.Visitor {
           keySpan,
           absoluteOffset,
         );
+        // 3p-only-end
       } else if (bindParts[KW_AT_IDX]) {
         const keySpan = createKeySpan(srcSpan, '', name);
         this.bindingParser.parseLiteralAttr(
@@ -1253,10 +1293,6 @@ class NonBindableVisitor implements html.Visitor {
 }
 
 const NON_BINDABLE_VISITOR = new NonBindableVisitor();
-
-function normalizeAttributeName(attrName: string): string {
-  return /^data-/i.test(attrName) ? attrName.substring(5) : attrName;
-}
 
 function addEvents(events: ParsedEvent[], boundEvents: t.BoundEvent[]) {
   boundEvents.push(...events.map((e) => t.BoundEvent.fromParsedEvent(e)));

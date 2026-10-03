@@ -35,6 +35,8 @@ export type InitialNavigation = 'disabled' | 'enabledBlocking' | 'enabledNonBloc
 /**
  * Extra configuration options that can be used with the `withRouterConfig` function.
  *
+ * @see [Router configuration options](guide/routing/customizing-route-behavior#router-configuration-options)
+ *
  * @publicApi
  */
 export interface RouterConfigOptions {
@@ -58,6 +60,9 @@ export interface RouterConfigOptions {
    * the browser history rather than simply resetting a portion of the URL.
    *
    * The default value is `replace` when not set.
+   *
+   * @see [Handle canceled navigations](guide/routing/customizing-route-behavior#handle-canceled-navigations)
+   *
    */
   canceledNavigationResolution?: 'replace' | 'computed';
 
@@ -67,6 +72,8 @@ export interface RouterConfigOptions {
    * If unset, the `Router` will use `'ignore'`.
    *
    * @see {@link OnSameUrlNavigation}
+   *
+   * @see [React to same-URL navigations](guide/routing/customizing-route-behavior#react-to-same-url-navigations)
    */
   onSameUrlNavigation?: OnSameUrlNavigation;
 
@@ -74,17 +81,19 @@ export interface RouterConfigOptions {
    * Defines how the router merges parameters, data, and resolved data from parent to child
    * routes.
    *
-   * By default ('emptyOnly'), a route inherits the parent route's parameters when the route itself
-   * has an empty path (meaning its configured with path: '') or when the parent route doesn't have
-   * any component set.
+   * By default ('always'), a route inherits all parameters from its parent routes.
    *
-   * Set to 'always' to enable unconditional inheritance of parent parameters.
+   * Set to 'emptyOnly' to preserve the legacy behavior where a route only inherits the parent
+   * route's parameters when the route itself has an empty path or when the parent route doesn't
+   * have any component set.
    *
    * Note that when dealing with matrix parameters, "parent" refers to the parent `Route`
    * config which does not necessarily mean the "URL segment to the left". When the `Route` `path`
    * contains multiple segments, the matrix parameters must appear on the last segment. For example,
    * matrix parameters for `{path: 'a/b', component: MyComp}` should appear as `a/b;foo=bar` and not
    * `a;foo=bar/b`.
+   *
+   * @see [Control parameter inheritance](guide/routing/customizing-route-behavior#control-parameter-inheritance)
    *
    */
   paramsInheritanceStrategy?: 'emptyOnly' | 'always';
@@ -95,6 +104,9 @@ export interface RouterConfigOptions {
    * Set to 'eager' if prefer to update the URL at the beginning of navigation.
    * Updating the URL early allows you to handle a failure of navigation by
    * showing an error message with the URL that failed.
+   *
+   * @see [Decide when the URL updates](guide/routing/customizing-route-behavior#decide-when-the-url-updates)
+   *
    */
   urlUpdateStrategy?: 'deferred' | 'eager';
 
@@ -109,6 +121,10 @@ export interface RouterConfigOptions {
    *
    * @see {@link Router#createUrlTree}
    * @see {@link QueryParamsHandling}
+   * 
+   * @see [Choose default query parameter handling](guide/routing/customizing-route-behavior#choose-default-query-parameter-handling)
+
+   * 
    */
   defaultQueryParamsHandling?: QueryParamsHandling;
 
@@ -124,9 +140,11 @@ export interface RouterConfigOptions {
 
 /**
  * Configuration options for the scrolling feature which can be used with `withInMemoryScrolling`
- * function.
+ * function or `RouterModule.forRoot`.
  *
  * @publicApi
+ * @see withInMemoryScrolling
+ * @see RouterModule#forRoot
  */
 export interface InMemoryScrollingOptions {
   /**
@@ -151,20 +169,20 @@ export interface InMemoryScrollingOptions {
    * in the following example.
    *
    * ```ts
-   * class AppComponent {
-   *   movieData: any;
+   * class App {
+   *   movieData = signal<MovieData | null>(null);
+   *   private router = inject(Router);
+   *   private viewportScroller = inject(ViewportScroller);
+   *   private changeDetectorRef = inject(ChangeDetectorRef);
    *
-   *   constructor(private router: Router, private viewportScroller: ViewportScroller,
-   * changeDetectorRef: ChangeDetectorRef) {
-   *   router.events.pipe(filter((event: Event): event is Scroll => event instanceof Scroll)
+   *   constructor() {
+   *    this.router.events.pipe(filter((event: Event): event is Scroll => event instanceof Scroll)
    *     ).subscribe(e => {
    *       fetch('http://example.com/movies.json').then(response => {
-   *         this.movieData = response.json();
-   *         // update the template with the data before restoring scroll
-   *         changeDetectorRef.detectChanges();
+   *         this.movieData.set(response.json());
    *
    *         if (e.position) {
-   *           viewportScroller.scrollToPosition(e.position);
+   *           this.viewportScroller.scrollToPosition(e.position);
    *         }
    *       });
    *     });
@@ -176,10 +194,38 @@ export interface InMemoryScrollingOptions {
 }
 
 /**
+ * Configuration options for the component input binding feature which can be used
+ * with `withComponentInputBinding` function or `RouterModule.forRoot`
+ *
+ * @publicApi
+ * @see withComponentInputBinding
+ * @see RouterModule#forRoot
+ * @see [Disable query parameter binding](guide/routing/common-router-tasks#disable-query-parameter-binding)
+ */
+export interface ComponentInputBindingOptions {
+  /**
+   * When true (default), will configure query parameters to bind to component
+   * inputs.
+   */
+  queryParams?: boolean;
+
+  /**
+   * Configures the behavior when an input is not matched by any key in the router data.
+   *
+   * - `'alwaysUndefined'`: (Default) Binds `undefined` to the input. This ensures that stale data
+   *   is not retained.
+   * - `'undefinedIfStale'`: Binds `undefined` only if the input was previously available
+   *   in the router data during the lifetime of the active route in this outlet. This avoids
+   *   setting `undefined` for inputs that were never expected to be set by the router.
+   */
+  unmatchedInputBehavior?: 'alwaysUndefined' | 'undefinedIfStale';
+}
+
+/**
  * A set of configuration options for a router module, provided in the
  * `forRoot()` method.
  *
- * @see {@link /api/router/routerModule#forRoot forRoot}
+ * @see {@link /api/router/RouterModule#forRoot forRoot}
  *
  *
  * @publicApi
@@ -213,9 +259,10 @@ export interface ExtraOptions extends InMemoryScrollingOptions, RouterConfigOpti
 
   /**
    * When true, enables binding information from the `Router` state directly to the inputs of the
-   * component in `Route` configurations.
+   * component in `Route` configurations. Can also accept an `ComponentInputBindingOptions` object
+   * to set whether to exclude queryParams from binding.
    */
-  bindToComponentInputs?: boolean;
+  bindToComponentInputs?: boolean | ComponentInputBindingOptions;
 
   /**
    * When true, enables view transitions in the Router by running the route activation and
@@ -261,7 +308,6 @@ export interface ExtraOptions extends InMemoryScrollingOptions, RouterConfigOpti
 export const ROUTER_CONFIGURATION = new InjectionToken<ExtraOptions>(
   typeof ngDevMode === 'undefined' || ngDevMode ? 'router config' : '',
   {
-    providedIn: 'root',
     factory: () => ({}),
   },
 );

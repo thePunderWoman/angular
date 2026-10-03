@@ -7,6 +7,7 @@
  */
 
 import {
+  ArrowFunction,
   AST,
   AstVisitor,
   ASTWithSource,
@@ -30,6 +31,7 @@ import {
   SafeCall,
   SafeKeyedRead,
   SafePropertyRead,
+  SpreadElement,
   TaggedTemplateLiteral,
   TemplateLiteral,
   TemplateLiteralElement,
@@ -52,7 +54,10 @@ class Unparser implements AstVisitor {
 
   visitPropertyRead(ast: PropertyRead, context: any) {
     this._visit(ast.receiver);
-    this._expression += ast.receiver instanceof ImplicitReceiver ? `${ast.name}` : `.${ast.name}`;
+    this._expression +=
+      ast.receiver instanceof ImplicitReceiver || ast.receiver instanceof ThisReceiver
+        ? `${ast.name}`
+        : `.${ast.name}`;
   }
 
   visitUnary(ast: Unary, context: any) {
@@ -158,8 +163,14 @@ class Unparser implements AstVisitor {
       if (!isFirst) this._expression += ', ';
       isFirst = false;
       const key = ast.keys[i];
-      this._expression += key.quoted ? JSON.stringify(key.key) : key.key;
-      this._expression += ': ';
+
+      if (key.kind === 'spread') {
+        this._expression += '...';
+      } else {
+        this._expression += key.quoted ? JSON.stringify(key.key) : key.key;
+        this._expression += ': ';
+      }
+
       this._visit(ast.values[i]);
     }
 
@@ -239,6 +250,21 @@ class Unparser implements AstVisitor {
     this._expression += `/${ast.body}/${ast.flags || ''}`;
   }
 
+  visitSpreadElement(ast: SpreadElement, context: any) {
+    this._expression += '...';
+    this._visit(ast.expression);
+  }
+
+  visitArrowFunction(ast: ArrowFunction, context: any) {
+    if (ast.parameters.length === 1) {
+      this._expression += ast.parameters[0].name;
+    } else {
+      this._expression += `(${ast.parameters.map((e) => e.name).join(', ')})`;
+    }
+    this._expression += ' => ';
+    this._visit(ast.body);
+  }
+
   private _visit(ast: AST) {
     ast.visit(this);
   }
@@ -266,10 +292,10 @@ export function unparseWithSpan(ast: ASTWithSource): UnparsedWithSpan[] {
 
     override visit(ast: AST, unparsedList: UnparsedWithSpan[]) {
       this.recordUnparsed(ast, 'span', unparsedList);
-      if (ast.hasOwnProperty('nameSpan')) {
+      if (Object.hasOwn(ast, 'nameSpan')) {
         this.recordUnparsed(ast, 'nameSpan', unparsedList);
       }
-      if (ast.hasOwnProperty('argumentSpan')) {
+      if (Object.hasOwn(ast, 'argumentSpan')) {
         this.recordUnparsed(ast, 'argumentSpan', unparsedList);
       }
       ast.visit(this, unparsedList);

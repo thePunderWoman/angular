@@ -15,11 +15,12 @@ import {
   TmplAstIfBlock,
   TmplAstNode,
   TmplAstRecursiveVisitor,
+  TmplAstSwitchBlockCase,
+  TmplAstBoundaryBlock,
   tmplAstVisitAll,
 } from '@angular/compiler';
-import {NgCompiler} from '@angular/compiler-cli/src/ngtsc/core';
-import {isExternalResource} from '@angular/compiler-cli/src/ngtsc/metadata';
-import {isNamedClassDeclaration} from '@angular/compiler-cli/src/ngtsc/reflection';
+import {isExternalResource, isNamedClassDeclaration, NgCompiler} from '@angular/compiler-cli';
+
 import ts from 'typescript';
 
 import {getFirstComponentForTemplateFile, isTypeScriptFile, toTextSpan} from './utils';
@@ -68,7 +69,11 @@ class BlockVisitor extends TmplAstRecursiveVisitor {
       // The source span of for loops and deferred blocks contain all parts (ForLoopBlockEmpty,
       // DeferredBlockLoading, etc.). The folding range should only include the main block span for
       // these.
-      if (block instanceof TmplAstForLoopBlock || block instanceof TmplAstDeferredBlock) {
+      if (
+        block instanceof TmplAstForLoopBlock ||
+        block instanceof TmplAstDeferredBlock ||
+        block instanceof TmplAstBoundaryBlock
+      ) {
         mainBlockSpan = block.mainBlockSpan;
       }
       return {
@@ -89,7 +94,9 @@ class BlockVisitor extends TmplAstRecursiveVisitor {
     if (
       node instanceof TmplAstBlockNode &&
       // Omit `IfBlock` because we include the branches individually
-      !(node instanceof TmplAstIfBlock)
+      !(node instanceof TmplAstIfBlock) &&
+      // Omit `SwitchBlockCase` because we include the groups
+      !(node instanceof TmplAstSwitchBlockCase)
     ) {
       this.blocks.push(node);
     }

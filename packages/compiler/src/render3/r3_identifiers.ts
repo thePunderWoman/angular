@@ -11,14 +11,8 @@ import * as o from '../output/output_ast';
 const CORE = '@angular/core';
 
 export class Identifiers {
-  /* Methods */
-  static NEW_METHOD = 'factory';
-  static TRANSFORM_METHOD = 'transform';
-  static PATCH_DEPS = 'patchedDeps';
-
   static core: o.ExternalReference = {name: null, moduleName: CORE};
 
-  /* Instructions */
   static namespaceHTML: o.ExternalReference = {name: 'ɵɵnamespaceHTML', moduleName: CORE};
 
   static namespaceMathML: o.ExternalReference = {name: 'ɵɵnamespaceMathML', moduleName: CORE};
@@ -30,6 +24,10 @@ export class Identifiers {
   static elementStart: o.ExternalReference = {name: 'ɵɵelementStart', moduleName: CORE};
 
   static elementEnd: o.ExternalReference = {name: 'ɵɵelementEnd', moduleName: CORE};
+
+  static foreignComponent: o.ExternalReference = {name: 'ɵɵforeignComponent', moduleName: CORE};
+  static foreignContent: o.ExternalReference = {name: 'ɵɵforeignContent', moduleName: CORE};
+  static foreignContentFn: o.ExternalReference = {name: 'ɵɵforeignContentFn', moduleName: CORE};
 
   static domElement: o.ExternalReference = {name: 'ɵɵdomElement', moduleName: CORE};
   static domElementStart: o.ExternalReference = {name: 'ɵɵdomElementStart', moduleName: CORE};
@@ -193,6 +191,10 @@ export class Identifiers {
     name: 'ɵɵdeferEnableTimerScheduling',
     moduleName: CORE,
   };
+  static enableIncrementalHydrationRuntime: o.ExternalReference = {
+    name: 'ɵɵenableIncrementalHydrationRuntime',
+    moduleName: CORE,
+  };
 
   static conditionalCreate: o.ExternalReference = {name: 'ɵɵconditionalCreate', moduleName: CORE};
   static conditionalBranchCreate: o.ExternalReference = {
@@ -200,6 +202,9 @@ export class Identifiers {
     moduleName: CORE,
   };
   static conditional: o.ExternalReference = {name: 'ɵɵconditional', moduleName: CORE};
+  static boundaryCreate: o.ExternalReference = {name: 'ɵɵboundaryCreate', moduleName: CORE};
+  static boundaryUpdate: o.ExternalReference = {name: 'ɵɵboundaryUpdate', moduleName: CORE};
+  static getBoundary: o.ExternalReference = {name: 'ɵɵgetBoundary', moduleName: CORE};
   static repeater: o.ExternalReference = {name: 'ɵɵrepeater', moduleName: CORE};
   static repeaterCreate: o.ExternalReference = {name: 'ɵɵrepeaterCreate', moduleName: CORE};
   static repeaterTrackByIndex: o.ExternalReference = {
@@ -255,6 +260,9 @@ export class Identifiers {
   static ariaProperty: o.ExternalReference = {name: 'ɵɵariaProperty', moduleName: CORE};
   static property: o.ExternalReference = {name: 'ɵɵproperty', moduleName: CORE};
 
+  static control: o.ExternalReference = {name: 'ɵɵcontrol', moduleName: CORE};
+  static controlCreate: o.ExternalReference = {name: 'ɵɵcontrolCreate', moduleName: CORE};
+
   static animationEnterListener: o.ExternalReference = {
     name: 'ɵɵanimateEnterListener',
     moduleName: CORE,
@@ -309,6 +317,9 @@ export class Identifiers {
     name: 'ɵɵInjectableDeclaration',
     moduleName: CORE,
   };
+
+  static defineService: o.ExternalReference = {name: 'ɵɵdefineService', moduleName: CORE};
+  static declareService: o.ExternalReference = {name: 'ɵɵngDeclareService', moduleName: CORE};
 
   static resolveWindow: o.ExternalReference = {name: 'ɵɵresolveWindow', moduleName: CORE};
   static resolveDocument: o.ExternalReference = {name: 'ɵɵresolveDocument', moduleName: CORE};
@@ -418,6 +429,8 @@ export class Identifiers {
   static storeLet: o.ExternalReference = {name: 'ɵɵstoreLet', moduleName: CORE};
   static readContextLet: o.ExternalReference = {name: 'ɵɵreadContextLet', moduleName: CORE};
 
+  static arrowFunction: o.ExternalReference = {name: 'ɵɵarrowFunction', moduleName: CORE};
+
   static attachSourceLocations: o.ExternalReference = {
     name: 'ɵɵattachSourceLocations',
     moduleName: CORE,
@@ -425,13 +438,13 @@ export class Identifiers {
 
   static NgOnChangesFeature: o.ExternalReference = {name: 'ɵɵNgOnChangesFeature', moduleName: CORE};
 
-  static InheritDefinitionFeature: o.ExternalReference = {
-    name: 'ɵɵInheritDefinitionFeature',
+  static ControlFeature: o.ExternalReference = {
+    name: 'ɵɵControlFeature',
     moduleName: CORE,
   };
 
-  static CopyDefinitionFeature: o.ExternalReference = {
-    name: 'ɵɵCopyDefinitionFeature',
+  static InheritDefinitionFeature: o.ExternalReference = {
+    name: 'ɵɵInheritDefinitionFeature',
     moduleName: CORE,
   };
 
@@ -457,6 +470,10 @@ export class Identifiers {
   // sanitization-related functions
   static sanitizeHtml: o.ExternalReference = {name: 'ɵɵsanitizeHtml', moduleName: CORE};
   static sanitizeStyle: o.ExternalReference = {name: 'ɵɵsanitizeStyle', moduleName: CORE};
+  static validateAttribute: o.ExternalReference = {
+    name: 'ɵɵvalidateAttribute',
+    moduleName: CORE,
+  };
   static sanitizeResourceUrl: o.ExternalReference = {
     name: 'ɵɵsanitizeResourceUrl',
     moduleName: CORE,
@@ -472,8 +489,15 @@ export class Identifiers {
     name: 'ɵɵtrustConstantResourceUrl',
     moduleName: CORE,
   };
-  static validateIframeAttribute: o.ExternalReference = {
-    name: 'ɵɵvalidateIframeAttribute',
+
+  // Decorators
+  static inputDecorator: o.ExternalReference = {name: 'Input', moduleName: CORE};
+  static outputDecorator: o.ExternalReference = {name: 'Output', moduleName: CORE};
+  static viewChildDecorator: o.ExternalReference = {name: 'ViewChild', moduleName: CORE};
+  static viewChildrenDecorator: o.ExternalReference = {name: 'ViewChildren', moduleName: CORE};
+  static contentChildDecorator: o.ExternalReference = {name: 'ContentChild', moduleName: CORE};
+  static contentChildrenDecorator: o.ExternalReference = {
+    name: 'ContentChildren',
     moduleName: CORE,
   };
 

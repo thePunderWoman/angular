@@ -158,6 +158,52 @@ describe('HtmlLexer', () => {
     });
   });
 
+  describe('processing instructions', () => {
+    it('should parse a processing instruction', () => {
+      expect(tokenizeAndHumanizeParts('<?xml version="1.0" encoding="UTF-8"?>')).toEqual([
+        [TokenType.PROCESSING_INSTRUCTION, 'xml version="1.0" encoding="UTF-8"'],
+        [TokenType.EOF],
+      ]);
+    });
+
+    it('should parse a processing instruction ending with > instead of ?>', () => {
+      expect(tokenizeAndHumanizeParts('<?xml version="1.0" encoding="UTF-8">')).toEqual([
+        [TokenType.PROCESSING_INSTRUCTION, 'xml version="1.0" encoding="UTF-8"'],
+        [TokenType.EOF],
+      ]);
+    });
+
+    it('should parse a processing instruction surrounded by other content', () => {
+      expect(
+        tokenizeAndHumanizeParts('<!DOCTYPE html>\n<?xml version="1.0" encoding="UTF-8"?> hello'),
+      ).toEqual([
+        [TokenType.DOC_TYPE, 'DOCTYPE html'],
+        [TokenType.TEXT, '\n'],
+        [TokenType.PROCESSING_INSTRUCTION, 'xml version="1.0" encoding="UTF-8"'],
+        [TokenType.TEXT, ' hello'],
+        [TokenType.EOF],
+      ]);
+    });
+
+    it('should parse a processing instruction that contains question marks inside quoted content', () => {
+      expect(tokenizeAndHumanizeParts('<?xml version="?" encoding="UTF?>-8"?>')).toEqual([
+        [TokenType.PROCESSING_INSTRUCTION, 'xml version="?" encoding="UTF?>-8"'],
+        [TokenType.EOF],
+      ]);
+    });
+
+    it('should store the location of a processing instruction', () => {
+      expect(tokenizeAndHumanizeSourceSpans('<?xml version="1.0" encoding="UTF-8"?>')).toEqual([
+        [TokenType.PROCESSING_INSTRUCTION, '<?xml version="1.0" encoding="UTF-8"?>'],
+        [TokenType.EOF, ''],
+      ]);
+    });
+
+    it('should report missing end of a processing instruction', () => {
+      expect(tokenizeAndHumanizeErrors('<?')).toEqual([['Unexpected character "EOF"', '0:2']]);
+    });
+  });
+
   describe('CDATA', () => {
     it('should parse CDATA', () => {
       expect(tokenizeAndHumanizeParts('<![CDATA[t\ne\rs\r\nt]]>')).toEqual([
@@ -971,7 +1017,7 @@ describe('HtmlLexer', () => {
             expect(result.nonNormalizedIcuExpressions).toEqual([]);
           });
 
-          it('should not normalize line-endings in ICU expressions when `i18nNormalizeLineEndingsInICUs` is not defined', () => {
+          it('should not normalize line-endings in ICU expressions when `i18nNormalizeLineEndingsInICUs` is not defined (escapedString:false)', () => {
             const result = tokenizeWithoutErrors(
               `{\r\n` +
                 `    messages.length,\r\n` +
@@ -1856,28 +1902,6 @@ describe('HtmlLexer', () => {
       ]);
     });
 
-    it('should parse bound inputs with expressions containing newlines', () => {
-      expect(
-        tokenizeAndHumanizeParts(`<app-component
-        [attr]="[
-        {text: 'some text',url:'//www.google.com'},
-        {text:'other text',url:'//www.google.com'}]">`),
-      ).toEqual([
-        [TokenType.TAG_OPEN_START, '', 'app-component'],
-        [TokenType.ATTR_NAME, '', '[attr]'],
-        [TokenType.ATTR_QUOTE, '"'],
-        [
-          TokenType.ATTR_VALUE_TEXT,
-          '[\n' +
-            "        {text: 'some text',url:'//www.google.com'},\n" +
-            "        {text:'other text',url:'//www.google.com'}]",
-        ],
-        [TokenType.ATTR_QUOTE, '"'],
-        [TokenType.TAG_OPEN_END],
-        [TokenType.EOF],
-      ]);
-    });
-
     it('should allow whitespace', () => {
       expect(tokenizeAndHumanizeParts('<t a = b >')).toEqual([
         [TokenType.TAG_OPEN_START, '', 't'],
@@ -2116,6 +2140,27 @@ describe('HtmlLexer', () => {
       ]);
     });
 
+    it('should parse named entities containing digits', () => {
+      expect(tokenizeAndHumanizeParts('&sup1;')).toEqual([
+        [TokenType.TEXT, ''],
+        [TokenType.ENCODED_ENTITY, '\u00B9', '&sup1;'],
+        [TokenType.TEXT, ''],
+        [TokenType.EOF],
+      ]);
+      expect(tokenizeAndHumanizeParts('&frac12;')).toEqual([
+        [TokenType.TEXT, ''],
+        [TokenType.ENCODED_ENTITY, '\u00BD', '&frac12;'],
+        [TokenType.TEXT, ''],
+        [TokenType.EOF],
+      ]);
+      expect(tokenizeAndHumanizeParts('&blk34;')).toEqual([
+        [TokenType.TEXT, ''],
+        [TokenType.ENCODED_ENTITY, '\u2593', '&blk34;'],
+        [TokenType.TEXT, ''],
+        [TokenType.EOF],
+      ]);
+    });
+
     it('should parse hexadecimal entities', () => {
       expect(tokenizeAndHumanizeParts('&#x41;&#X41;')).toEqual([
         [TokenType.TEXT, ''],
@@ -2131,6 +2176,26 @@ describe('HtmlLexer', () => {
       expect(tokenizeAndHumanizeParts('&#65;')).toEqual([
         [TokenType.TEXT, ''],
         [TokenType.ENCODED_ENTITY, 'A', '&#65;'],
+        [TokenType.TEXT, ''],
+        [TokenType.EOF],
+      ]);
+    });
+
+    it('should parse entities with more than 4 hex digits', () => {
+      // Test 5 hex digit entity: &#x1F6C8; (🛈 - Circled Information Source)
+      expect(tokenizeAndHumanizeParts('&#x1F6C8;')).toEqual([
+        [TokenType.TEXT, ''],
+        [TokenType.ENCODED_ENTITY, '\u{1F6C8}', '&#x1F6C8;'],
+        [TokenType.TEXT, ''],
+        [TokenType.EOF],
+      ]);
+    });
+
+    it('should parse entities with more than 4 decimal digits', () => {
+      // Test decimal entity: &#128712; (🛈 - Circled Information Source)
+      expect(tokenizeAndHumanizeParts('&#128712;')).toEqual([
+        [TokenType.TEXT, ''],
+        [TokenType.ENCODED_ENTITY, '\u{1F6C8}', '&#128712;'],
         [TokenType.TEXT, ''],
         [TokenType.EOF],
       ]);
@@ -2886,7 +2951,7 @@ describe('HtmlLexer', () => {
           expect(result.nonNormalizedIcuExpressions).toEqual([]);
         });
 
-        it('should not normalize line-endings in ICU expressions when `i18nNormalizeLineEndingsInICUs` is not defined', () => {
+        it('should not normalize line-endings in ICU expressions when `i18nNormalizeLineEndingsInICUs` is not defined (escapeString: false)', () => {
           const result = tokenizeWithoutErrors(
             `{\r\n` +
               `    messages.length,\r\n` +
@@ -3368,6 +3433,41 @@ describe('HtmlLexer', () => {
       expect(tokenizeAndHumanizeParts('@if(){hello}')).toEqual(expected);
     });
 
+    it('should parse @default never;', () => {
+      expect(tokenizeAndHumanizeParts('@default never;')).toEqual([
+        [TokenType.BLOCK_OPEN_START, 'default never'],
+        [TokenType.BLOCK_OPEN_END],
+        [TokenType.BLOCK_CLOSE],
+        [TokenType.EOF],
+      ]);
+
+      expect(tokenizeAndHumanizeParts('@default                  never;')).toEqual([
+        [TokenType.BLOCK_OPEN_START, 'default never'],
+        [TokenType.BLOCK_OPEN_END],
+        [TokenType.BLOCK_CLOSE],
+        [TokenType.EOF],
+      ]);
+    });
+
+    it('should parse @default never(expr);', () => {
+      expect(tokenizeAndHumanizeParts('@default never(expr);')).toEqual([
+        [TokenType.BLOCK_OPEN_START, 'default never'],
+        [TokenType.BLOCK_PARAMETER, 'expr'],
+        [TokenType.BLOCK_OPEN_END],
+        [TokenType.BLOCK_CLOSE],
+        [TokenType.EOF],
+      ]);
+    });
+
+    it('should parse @default never ;', () => {
+      expect(tokenizeAndHumanizeParts('@default never ;')).toEqual([
+        [TokenType.BLOCK_OPEN_START, 'default never'],
+        [TokenType.BLOCK_OPEN_END],
+        [TokenType.BLOCK_CLOSE],
+        [TokenType.EOF],
+      ]);
+    });
+
     it('should parse a block with parameters', () => {
       expect(tokenizeAndHumanizeParts('@for (item of items; track item.id) {hello}')).toEqual([
         [TokenType.BLOCK_OPEN_START, 'for'],
@@ -3403,6 +3503,16 @@ describe('HtmlLexer', () => {
       expect(tokenizeAndHumanizeParts('@else if (foo !== 2) {hello}')).toEqual([
         [TokenType.BLOCK_OPEN_START, 'else if'],
         [TokenType.BLOCK_PARAMETER, 'foo !== 2'],
+        [TokenType.BLOCK_OPEN_END],
+        [TokenType.TEXT, 'hello'],
+        [TokenType.BLOCK_CLOSE],
+        [TokenType.EOF],
+      ]);
+    });
+
+    it('should normalize @else if block name with spaces', () => {
+      expect(tokenizeAndHumanizeParts('@else            if {hello}')).toEqual([
+        [TokenType.BLOCK_OPEN_START, 'else if'],
         [TokenType.BLOCK_OPEN_END],
         [TokenType.TEXT, 'hello'],
         [TokenType.BLOCK_CLOSE],

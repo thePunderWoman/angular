@@ -7,10 +7,12 @@
  */
 
 import {ɵɵdefineInjectable} from '../di/interface/defs';
-import {SecurityContext} from './security';
+import {SecurityContext} from './dom_security_schema';
 
 /**
  * Sanitizer is used by the views to sanitize potentially dangerous values.
+ *
+ * @see [Sanitization and security contexts](best-practices/security#sanitization-and-security-contexts)
  *
  * @publicApi
  */

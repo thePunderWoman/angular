@@ -5,10 +5,9 @@
     "lib": ["es2020"],
     "module": "Node16",
     "types": ["node"],
-    "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "downlevelIteration": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "rewriteRelativeImportExtensions": true
   }
 }

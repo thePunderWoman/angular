@@ -1,7 +1,8 @@
 @if (!diDebugAPIsAvailable()) {
-  <p class="not-supported">
-    This feature is only available on version 17.0.0 or higher of Angular.
-  </p>
+  <div class="not-supported">
+    <ng-angie type="sad" size="lg" />
+    <p>This feature is only available on version 17.0.0 or higher of Angular.</p>
+  </div>
 } @else {
   <div class="wrapper">
     <div class="options">
@@ -37,6 +38,7 @@
                   #environmentTree
                   a11yTitle="Environment hierarchy visualization"
                   [root]="environmentInjectorTree()!"
+                  [nodeEqualityFn]="treeNodesEqualityFn"
                   [config]="environmentTreeConfig"
                   (nodeClick)="selectInjectorByNode($event)"
                   (render)="onTreeRender(environmentTree, $event)"
@@ -55,6 +57,7 @@
                   #elementTree
                   a11yTitle="Element hierarchy visualization"
                   [root]="elementInjectorTree()!"
+                  [nodeEqualityFn]="treeNodesEqualityFn"
                   [config]="elementTreeConfig"
                   (nodeClick)="selectInjectorByNode($event)"
                   (render)="onTreeRender(elementTree, $event)"

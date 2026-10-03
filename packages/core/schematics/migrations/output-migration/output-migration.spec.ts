@@ -6,10 +6,10 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {initMockFileSystem} from '@angular/compiler-cli/src/ngtsc/file_system/testing';
+import {absoluteFrom} from '@angular/compiler-cli';
+import {initMockFileSystem} from '@angular/compiler-cli/private/testing';
 import {runTsurgeMigration} from '../../utils/tsurge/testing';
 import {diffText} from '../../utils/tsurge/testing/diff';
-import {absoluteFrom} from '@angular/compiler-cli';
 import {OutputMigration} from './output-migration';
 
 describe('outputs', () => {
@@ -189,6 +189,35 @@ describe('outputs', () => {
               @Directive()
               export class TestDir {
                 readonly someChange = output();
+
+                someMethod(): void {
+                  this.someChange.emit();
+                }
+              }
+            `,
+        });
+      });
+
+      it('should not insert a TODO comment for emit function with void type', async () => {
+        await verify({
+          before: `
+              import {Directive, Output, EventEmitter} from '@angular/core';
+
+              @Directive()
+              export class TestDir {
+                @Output() someChange = new EventEmitter<void>();
+
+                someMethod(): void {
+                  this.someChange.emit();
+                }
+              }
+            `,
+          after: `
+              import {Directive, output} from '@angular/core';
+
+              @Directive()
+              export class TestDir {
+                readonly someChange = output<void>();
 
                 someMethod(): void {
                   this.someChange.emit();

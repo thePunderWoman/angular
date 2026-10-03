@@ -7,11 +7,9 @@ Get started with Angular quickly with online starters or locally with your termi
 
 If you just want to play around with Angular in your browser without setting up a project, you can use our online sandbox:
 
-<docs-card-container>
-  <docs-card title="" href="/playground" link="Open on Playground">
-  The fastest way to play with an Angular app. No setup required.
-  </docs-card>
-</docs-card-container>
+<docs-card title="Playground" href="/playground" link="Open on Playground" iconImgSrc="adev/src/assets/icons/playground.svg" titleInline>
+The fastest way to play with an Angular app. No setup required.
+</docs-card>
 
 ## Set up a new project locally
 
@@ -19,9 +17,9 @@ If you're starting a new project, you'll most likely want to create a local proj
 
 ### Prerequisites
 
-- **Node.js** - [v20.19.0 or newer](/reference/versions)
+- **Node.js** - [v22.22.3 or newer](/reference/versions)
 - **Text editor** - We recommend [Visual Studio Code](https://code.visualstudio.com/)
-- **Terminal** - Required for running Angular CLI commands
+- **Terminal** - Required for running [Angular CLI](/tools/cli) commands
 - **Development Tool** - To improve your development workflow, we recommend the [Angular Language Service](/tools/language-service)
 
 ### Instructions
@@ -35,38 +33,39 @@ Open a terminal (if you're using [Visual Studio Code](https://code.visualstudio.
 <docs-code-multifile>
   <docs-code
     header="npm"
+    language="shell"
     >
     npm install -g @angular/cli
     </docs-code>
   <docs-code
     header="pnpm"
+    language="shell"
     >
     pnpm install -g @angular/cli
     </docs-code>
   <docs-code
     header="yarn"
+    language="shell"
     >
     yarn global add @angular/cli
     </docs-code>
   <docs-code
     header="bun"
+    language="shell"
     >
     bun install -g @angular/cli
     </docs-code>
-
 </docs-code-multifile>
 
 If you are having issues running this command in Windows or Unix, check out the [CLI docs](/tools/cli/setup-local#install-the-angular-cli) for more info.
 
 #### Create a new project
 
-In your terminal, run the CLI command `ng new` with the desired project name. In the following examples, we'll be using the example project name of `my-first-angular-app`.
+In your terminal, run the CLI command [`ng new`](cli/new) with the desired project name. In the following examples, we'll be using the example project name of `my-first-angular-app`.
 
-<docs-code language="shell">
-
+```shell
 ng new <project-name>
-
-</docs-code>
+```
 
 You will be presented with some configuration options for your project. Use the arrow and enter keys to navigate and select which options you desire.
 
@@ -74,7 +73,7 @@ If you don't have any preferences, just hit the enter key to take the default op
 
 After you select the configuration options and the CLI runs through the setup, you should see the following message:
 
-```shell
+```text
 ✔ Packages installed successfully.
     Successfully initialized git.
 ```
@@ -85,23 +84,19 @@ At this point, you're now ready to run your project locally!
 
 In your terminal, switch to your new Angular project.
 
-<docs-code language="shell">
-
+```shell
 cd my-first-angular-app
-
-</docs-code>
+```
 
 All of your dependencies should be installed at this point (which you can verify by checking for the existence of a `node_modules` folder in your project), so you can start your project by running the command:
 
-<docs-code language="shell">
-
+```shell
 npm start
-
-</docs-code>
+```
 
 If everything is successful, you should see a similar confirmation message in your terminal:
 
-```shell
+```text
 Watch mode enabled. Watching for file changes...
 NOTE: Raw file sizes do not reflect development server per-request transformations.
   ➜  Local:   http://localhost:4200/

@@ -16,7 +16,7 @@ import {
   Provider,
 } from '../di';
 import {inject} from '../di/injector_compatibility';
-import {formatRuntimeError, RuntimeError, RuntimeErrorCode} from '../errors';
+import {formatRuntimeError, RuntimeErrorCode} from '../errors';
 import {enableLocateOrCreateContainerRefImpl} from '../linker/view_container_ref';
 import {enableLocateOrCreateI18nNodeImpl} from '../render3/i18n/i18n_apply';
 import {enableLocateOrCreateElementNodeImpl} from '../render3/instructions/element';
@@ -24,12 +24,18 @@ import {enableLocateOrCreateElementContainerNodeImpl} from '../render3/instructi
 import {enableApplyRootElementTransformImpl} from '../render3/instructions/shared';
 import {enableLocateOrCreateContainerAnchorImpl} from '../render3/instructions/template';
 import {enableLocateOrCreateTextNodeImpl} from '../render3/instructions/text';
-import {getDocument} from '../render3/interfaces/document';
 import {TransferState} from '../transfer_state';
 import {performanceMarkFeature} from '../util/performance';
 import {NgZone} from '../zone';
 import {withEventReplay} from './event_replay';
 
+import {
+  ChangeDetectionScheduler,
+  NotificationSource,
+} from '../change_detection/scheduling/zoneless_scheduling';
+import {DEHYDRATED_BLOCK_REGISTRY} from '../defer/registry';
+import {DOCUMENT} from '../document';
+import {DOC_PAGE_BASE_URL} from '../error_details_base_url';
 import {cleanupDehydratedViews} from './cleanup';
 import {
   enableClaimDehydratedIcuCaseImpl,
@@ -37,25 +43,24 @@ import {
   setIsI18nHydrationSupportEnabled,
 } from './i18n';
 import {
+  createDehydratedBlockRegistry,
+  INCREMENTAL_HYDRATION_BOOTSTRAP,
+  runIncrementalHydrationBootstrap,
+} from './incremental_runtime';
+import {
   IS_HYDRATION_DOM_REUSE_ENABLED,
   IS_I18N_HYDRATION_ENABLED,
   IS_INCREMENTAL_HYDRATION_ENABLED,
   PRESERVE_HOST_CONTENT,
 } from './tokens';
 import {
-  appendDeferBlocksToJSActionMap,
   countBlocksSkippedByHydration,
-  enableRetrieveDeferBlockDataImpl,
   enableRetrieveHydrationInfoImpl,
   isIncrementalHydrationEnabled,
   NGH_DATA_KEY,
-  processBlockData,
   verifySsrContentsIntegrity,
 } from './utils';
 import {enableFindMatchingDehydratedViewImpl} from './views';
-import {DEHYDRATED_BLOCK_REGISTRY, DehydratedBlockRegistry} from '../defer/registry';
-import {gatherDeferBlocksCommentNodes} from './node_lookup_utils';
-import {processAndInitTriggers} from '../defer/triggering';
 
 /**
  * Indicates whether the hydration-related code was added,
@@ -74,16 +79,10 @@ let isHydrationSupportEnabled = false;
 let isI18nHydrationRuntimeSupportEnabled = false;
 
 /**
- * Indicates whether the incremental hydration code was added,
- * prevents adding it multiple times.
- */
-let isIncrementalHydrationRuntimeSupportEnabled = false;
-
-/**
  * Defines a period of time that Angular waits for the `ApplicationRef.isStable` to emit `true`.
  * If there was no event with the `true` value during this time, Angular reports a warning.
  */
-const APPLICATION_IS_STABLE_TIMEOUT = 10_000;
+export const APPLICATION_IS_STABLE_TIMEOUT = 10_000;
 
 /**
  * Brings the necessary hydration code in tree-shakable manner.
@@ -125,18 +124,6 @@ function enableI18nHydrationRuntimeSupport() {
 }
 
 /**
- * Brings the necessary incremental hydration code in tree-shakable manner.
- * Similar to `enableHydrationRuntimeSupport`, the code is only
- * present when `enableIncrementalHydrationRuntimeSupport` is invoked.
- */
-function enableIncrementalHydrationRuntimeSupport() {
-  if (!isIncrementalHydrationRuntimeSupportEnabled) {
-    isIncrementalHydrationRuntimeSupportEnabled = true;
-    enableRetrieveDeferBlockDataImpl();
-  }
-}
-
-/**
  * Outputs a message with hydration stats into a console.
  */
 function printHydrationStats(injector: Injector) {
@@ -148,7 +135,7 @@ function printHydrationStats(injector: Injector) {
     (isIncrementalHydrationEnabled(injector)
       ? `${ngDevMode!.deferBlocksWithIncrementalHydration} defer block(s) were configured to use incremental hydration. `
       : '') +
-    `Learn more at https://angular.dev/guide/hydration.`;
+    `Learn more at ${DOC_PAGE_BASE_URL}/guide/hydration.`;
   // tslint:disable-next-line:no-console
   console.log(message);
 }
@@ -186,8 +173,7 @@ export const CLIENT_RENDER_MODE_FLAG = 'ngcm';
 /**
  * Checks whether the `RenderMode.Client` was defined for the current route.
  */
-function isClientRenderModeEnabled(): boolean {
-  const doc = getDocument();
+function isClientRenderModeEnabled(doc: Document): boolean {
   return (
     (typeof ngServerMode === 'undefined' || !ngServerMode) &&
     doc.body.hasAttribute(CLIENT_RENDER_MODE_FLAG)
@@ -237,10 +223,15 @@ export function withDomHydration(): EnvironmentProviders {
           return;
         }
 
+        const doc = inject(DOCUMENT);
         if (inject(IS_HYDRATION_DOM_REUSE_ENABLED)) {
-          verifySsrContentsIntegrity(getDocument());
+          verifySsrContentsIntegrity(doc);
           enableHydrationRuntimeSupport();
-        } else if (typeof ngDevMode !== 'undefined' && ngDevMode && !isClientRenderModeEnabled()) {
+        } else if (
+          typeof ngDevMode !== 'undefined' &&
+          ngDevMode &&
+          !isClientRenderModeEnabled(doc)
+        ) {
           const console = inject(Console);
           const message = formatRuntimeError(
             RuntimeErrorCode.MISSING_HYDRATION_ANNOTATIONS,
@@ -272,6 +263,7 @@ export function withDomHydration(): EnvironmentProviders {
       {
         provide: APP_BOOTSTRAP_LISTENER,
         useFactory: () => {
+          const scheduler = inject(ChangeDetectionScheduler);
           if (inject(IS_HYDRATION_DOM_REUSE_ENABLED)) {
             const appRef = inject(ApplicationRef);
 
@@ -299,6 +291,8 @@ export function withDomHydration(): EnvironmentProviders {
                   countBlocksSkippedByHydration(appRef.injector);
                   printHydrationStats(appRef.injector);
                 }
+                // We need to schedule the execution of the render hooks because the hydration cleanup alters the DOM.
+                scheduler.notify(NotificationSource.RenderHook);
               });
             };
           }
@@ -315,6 +309,7 @@ export function withDomHydration(): EnvironmentProviders {
 /**
  * Returns a set of providers required to setup support for i18n hydration.
  * Requires hydration to be enabled separately.
+ * @see [I18N](guide/hydration#i18n)
  */
 export function withI18nSupport(): Provider[] {
   return [
@@ -340,6 +335,10 @@ export function withI18nSupport(): Provider[] {
  * Returns a set of providers required to setup support for incremental hydration.
  * Requires hydration to be enabled separately.
  * Enabling incremental hydration also enables event replay for the entire app.
+ * @see [Incremental Hydration](guide/incremental-hydration#how-do-you-enable-incremental-hydration-in-angular)
+ *
+ * @deprecated Since v22.0.0, incremental hydration is enabled by default with `provideClientHydration`.
+ * Intent to remove in v24.
  */
 export function withIncrementalHydration(): Provider[] {
   const providers: Provider[] = [
@@ -350,34 +349,36 @@ export function withIncrementalHydration(): Provider[] {
     },
     {
       provide: DEHYDRATED_BLOCK_REGISTRY,
-      useClass: DehydratedBlockRegistry,
-    },
-    {
-      provide: ENVIRONMENT_INITIALIZER,
-      useValue: () => {
-        enableIncrementalHydrationRuntimeSupport();
-        performanceMarkFeature('NgIncrementalHydration');
-      },
-      multi: true,
+      useFactory: createDehydratedBlockRegistry,
     },
   ];
 
   if (typeof ngServerMode === 'undefined' || !ngServerMode) {
-    providers.push({
-      provide: APP_BOOTSTRAP_LISTENER,
-      useFactory: () => {
-        const injector = inject(Injector);
-        const doc = getDocument();
-
-        return () => {
-          const deferBlockData = processBlockData(injector);
-          const commentsByBlockId = gatherDeferBlocksCommentNodes(doc, doc.body);
-          processAndInitTriggers(injector, deferBlockData, commentsByBlockId);
-          appendDeferBlocksToJSActionMap(doc, injector);
-        };
+    providers.push(
+      {
+        provide: INCREMENTAL_HYDRATION_BOOTSTRAP,
+        useFactory: () => ({
+          requested: false,
+          activated: false,
+          injector: inject(Injector),
+          document: inject(DOCUMENT),
+        }),
       },
-      multi: true,
-    });
+      {
+        provide: APP_BOOTSTRAP_LISTENER,
+        useFactory: () => {
+          const state = inject(INCREMENTAL_HYDRATION_BOOTSTRAP);
+
+          return () => {
+            if (!state.requested) {
+              state.requested = true;
+              runIncrementalHydrationBootstrap(state);
+            }
+          };
+        },
+        multi: true,
+      },
+    );
   }
 
   return providers;
