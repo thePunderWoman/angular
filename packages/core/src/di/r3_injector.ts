@@ -9,7 +9,7 @@
 import '../util/ng_dev_mode';
 
 import {RuntimeError, RuntimeErrorCode} from '../errors';
-import {OnDestroy} from '../interface/lifecycle_hooks';
+import {OnDestroy} from '../change_detection/lifecycle_hooks';
 import {Type} from '../interface/type';
 import {
   emitInjectorToCreateInstanceEvent,
@@ -122,6 +122,8 @@ interface Record<T> {
 /**
  * An `Injector` that's part of the environment injector hierarchy, which exists outside of the
  * component tree.
+ *
+ * @see [Types of injector hierarchies](guide/di/hierarchical-dependency-injection#types-of-injector-hierarchies)
  *
  * @publicApi
  */
@@ -325,7 +327,7 @@ export class R3Injector extends EnvironmentInjector implements PrimitivesInjecto
   ): T {
     assertNotDestroyed(this);
 
-    if (token.hasOwnProperty(NG_ENV_ID)) {
+    if (Object.hasOwn(token, NG_ENV_ID)) {
       return (token as any)[NG_ENV_ID](this);
     }
 
@@ -453,12 +455,16 @@ export class R3Injector extends EnvironmentInjector implements PrimitivesInjecto
   }
 
   override toString() {
-    const tokens: string[] = [];
-    const records = this.records;
-    for (const token of records.keys()) {
-      tokens.push(stringify(token));
+    if (ngDevMode) {
+      const tokens: string[] = [];
+      const records = this.records;
+      for (const token of records.keys()) {
+        tokens.push(stringify(token));
+      }
+      return `R3Injector[${tokens.join(', ')}]`;
     }
-    return `R3Injector[${tokens.join(', ')}]`;
+
+    return 'R3Injector[...]';
   }
 
   /**
@@ -519,7 +525,7 @@ export class R3Injector extends EnvironmentInjector implements PrimitivesInjecto
     const prevConsumer = setActiveConsumer(null);
     try {
       if (record.value === CIRCULAR) {
-        throw cyclicDependencyError(stringify(token));
+        throw cyclicDependencyError(ngDevMode ? stringify(token) : '');
       } else if (record.value === NOT_YET) {
         record.value = CIRCULAR;
 

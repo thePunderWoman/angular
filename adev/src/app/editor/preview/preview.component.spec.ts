@@ -50,8 +50,6 @@ describe('Preview', () => {
     const component = fixture.componentInstance;
     const iframeElement = fixture.debugElement.query(By.css('iframe'));
 
-    fixture.detectChanges();
-
     return {
       fixture,
       component,
@@ -64,27 +62,28 @@ describe('Preview', () => {
     };
   };
 
-  it('should set iframe src', () => {
+  it('should set iframe src', async () => {
     const {fixture, PREVIEW_URL} = beforeEach();
+    await fixture.whenStable();
     const iframeElement = fixture.debugElement.query(By.css('iframe'));
     expect(iframeElement?.nativeElement?.src).toBe(PREVIEW_URL);
   });
 
-  it('should not render loading elements if the loadingStep is READY or ERROR', () => {
+  it('should not render loading elements if the loadingStep is READY or ERROR', async () => {
     const {fixture, fakeNodeRuntimeState, getLoadingElementsWrapper} = beforeEach();
 
     fakeNodeRuntimeState.loadingStep.set(LoadingStep.READY);
-    fixture.detectChanges();
+    await fixture.whenStable();
 
     expect(getLoadingElementsWrapper()).toBeNull();
 
     fakeNodeRuntimeState.loadingStep.set(LoadingStep.ERROR);
-    fixture.detectChanges();
+    await fixture.whenStable();
 
     expect(getLoadingElementsWrapper()).toBeNull();
   });
 
-  it('should render the correct loading element based on loadingStep', () => {
+  it('should render the correct loading element based on loadingStep', async () => {
     const {fixture, fakeNodeRuntimeState} = beforeEach();
 
     function getDebugElements(): Record<number, DebugElement | null> {
@@ -113,7 +112,7 @@ describe('Preview', () => {
       componentLoadingStep++
     ) {
       fakeNodeRuntimeState.loadingStep.set(componentLoadingStep);
-      fixture.detectChanges();
+      await fixture.whenStable();
 
       const loadingElements = getDebugElements();
 
@@ -131,13 +130,36 @@ describe('Preview', () => {
     }
   });
 
+  it('should show the matching Angie pose for each loading step', async () => {
+    const {fixture, fakeNodeRuntimeState} = beforeEach();
+
+    const poseByStep: Record<number, string> = {
+      [LoadingStep.NOT_STARTED]: 'greeting',
+      [LoadingStep.BOOT]: 'greeting',
+      [LoadingStep.LOAD_FILES]: 'greeting',
+      [LoadingStep.INSTALL]: 'coding-01',
+      [LoadingStep.START_DEV_SERVER]: 'superhero',
+    };
+
+    for (const step of Object.keys(poseByStep).map(Number)) {
+      fakeNodeRuntimeState.loadingStep.set(step);
+      await fixture.whenStable();
+
+      const angie = fixture.debugElement.query(
+        By.css('.adev-embedded-editor-preview-loading-angie'),
+      );
+      expect(angie).not.toBeNull();
+      expect(angie.nativeElement.getAttribute('src')).toBe(
+        `assets/images/angie/${poseByStep[step]}.svg`,
+      );
+    }
+  });
+
   it('should render the error component and hide the iframe and loading element if loadingStep is ERROR', async () => {
     const {fixture, fakeNodeRuntimeState, iframeElement, getLoadingElementsWrapper} = beforeEach();
 
     fakeNodeRuntimeState.loadingStep.set(LoadingStep.ERROR);
     fakeNodeRuntimeState.error.set({message: 'Error message', type: undefined});
-    fixture.detectChanges();
-
     await fixture.whenStable();
 
     expect(fixture.debugElement.query(By.directive(PreviewError))).toBeDefined();

@@ -1,6 +1,6 @@
 # Caretaker
 
-The *caretaker* is a role responsible for merging PRs and syncing into Google's
+The _caretaker_ is a role responsible for merging PRs and syncing into Google's
 internal code repository. The caretaker role rotates weekly.
 
 ## Responsibilities
@@ -26,7 +26,7 @@ pnpm ng-dev pr merge <pr number>
 Some directories in the Angular codebase have additional protections or rules. For example, code
 under `//packages/core/primitives` must be merged and synced into Google separately from other
 changes. Attempting to combine changes in `primitives` with other changes results in an error. This
-practices makes it significantly easier to rollback or revert changes in the event of a breakage or
+practice makes it significantly easier to rollback or revert changes in the event of a breakage or
 outage.
 
 ## PRs that require global presubmits
@@ -40,6 +40,7 @@ tested. The `requires: TGP` label is automatically added to PRs that affect file
 matching `separateFilePatterns` in [`.ng-dev/google-sync-config.json`](https://github.com/angular/angular/blob/main/.ng-dev/google-sync-config.json).
 
 An example of specifying a `TESTED=` comment:
+
 ```
 TESTED=docs only update and does not need a TGP
 ```

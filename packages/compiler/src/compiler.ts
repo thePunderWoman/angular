@@ -32,7 +32,6 @@ import {publishFacade} from './jit_compiler_facade';
 import * as outputAst from './output/output_ast';
 import {global} from './util';
 
-export {SECURITY_SCHEMA} from './schema/dom_security_schema';
 export {CUSTOM_ELEMENTS_SCHEMA, NO_ERRORS_SCHEMA, SchemaMetadata} from './core';
 export {core};
 
@@ -48,17 +47,24 @@ export * from './expression_parser/lexer';
 export * from './expression_parser/parser';
 export * from './i18n/index';
 export * from './injectable_compiler_2';
+export * from './service_compiler';
 export {publishFacade} from './jit_compiler_facade';
 export * from './ml_parser/ast';
-export {DEFAULT_INTERPOLATION_CONFIG, InterpolationConfig} from './ml_parser/defaults';
 export * from './ml_parser/html_parser';
 export * from './ml_parser/html_tags';
+export {
+  ClassPropertyMapping,
+  ClassPropertyName,
+  InputOrOutput,
+  BindingPropertyName,
+} from './property_mapping';
+export {MatchSource} from './render3/view/t2_api';
 export {LexerRange} from './ml_parser/lexer';
 export {ParseTreeResult, TreeError} from './ml_parser/parser';
 export * from './ml_parser/tags';
 export {TokenType as LexerTokenType} from './ml_parser/tokens';
 export * from './ml_parser/xml_parser';
-export {EmitterVisitorContext} from './output/abstract_emitter';
+export {EmitterVisitorContext, AbstractEmitterVisitor} from './output/abstract_emitter';
 export {
   ArrayType,
   ArrowFunctionExpr,
@@ -99,6 +105,7 @@ export {
   ReadKeyExpr,
   ReadPropExpr,
   ReadVarExpr,
+  RegularExpressionLiteralExpr,
   ReturnStatement,
   Statement,
   StatementVisitor,
@@ -116,6 +123,9 @@ export {
   UnaryOperatorExpr,
   VoidExpr,
   WrappedNodeExpr,
+  LiteralMapPropertyAssignment,
+  LiteralMapSpreadAssignment,
+  SpreadElementExpr,
 } from './output/output_ast';
 export {JitEvaluator} from './output/output_jit';
 export {SourceMap} from './output/source_map';
@@ -132,6 +142,7 @@ export {
 export {compileDeclareDirectiveFromMetadata} from './render3/partial/directive';
 export {compileDeclareFactoryFunction} from './render3/partial/factory';
 export {compileDeclareInjectableFromMetadata} from './render3/partial/injectable';
+export {compileDeclareServiceFromMetadata} from './render3/partial/service';
 export {compileDeclareInjectorFromMetadata} from './render3/partial/injector';
 export {compileDeclareNgModuleFromMetadata} from './render3/partial/ng_module';
 export {compileDeclarePipeFromMetadata} from './render3/partial/pipe';
@@ -141,6 +152,8 @@ export {
   BoundDeferredTrigger as TmplAstBoundDeferredTrigger,
   BoundEvent as TmplAstBoundEvent,
   BoundText as TmplAstBoundText,
+  BoundaryBlock as TmplAstBoundaryBlock,
+  BoundaryErrorBlock as TmplAstBoundaryErrorBlock,
   Content as TmplAstContent,
   DeferredBlock as TmplAstDeferredBlock,
   DeferredBlockError as TmplAstDeferredBlockError,
@@ -165,6 +178,8 @@ export {
   Reference as TmplAstReference,
   SwitchBlock as TmplAstSwitchBlock,
   SwitchBlockCase as TmplAstSwitchBlockCase,
+  SwitchBlockCaseGroup as TmplAstSwitchBlockCaseGroup,
+  SwitchExhaustiveCheck as TmplAstSwitchExhaustiveCheck,
   Template as TmplAstTemplate,
   Text as TmplAstText,
   TextAttribute as TmplAstTextAttribute,
@@ -175,6 +190,7 @@ export {
   HostElement as TmplAstHostElement,
   Component as TmplAstComponent,
   Directive as TmplAstDirective,
+  ContentBlock as TmplAstContentBlock,
   visitAll as tmplAstVisitAll,
   Visitor as TmplAstVisitor,
 } from './render3/r3_ast';
@@ -185,6 +201,7 @@ export {
   compileComponentClassMetadata,
   compileOpaqueAsyncClassMetadata,
   R3ClassMetadata,
+  R3ClassMetadataCtorParameter,
 } from './render3/r3_class_metadata_compiler';
 export {
   compileFactoryFunction,
@@ -215,6 +232,7 @@ export {
   MaybeForwardRefExpression,
   R3CompiledExpression,
   R3Reference,
+  isUnsafeObjectKey,
 } from './render3/util';
 export * from './render3/view/api';
 export {
@@ -250,7 +268,16 @@ export {outputAst};
 export {CompilerFacadeImpl} from './jit_compiler_facade';
 export {FactoryTarget} from './compiler_facade_interface';
 export {QueryFlags} from './render3/view/query_generation';
-export {setEnableTemplateSourceLocations} from './render3/view/config';
+
+export * from './typecheck/api';
+export * from './typecheck/host_bindings';
+export {CommentTriviaType, ExpressionIdentifier} from './typecheck/comments';
+export {OutOfBandDiagnosticRecorder, OutOfBandDiagnosticCategory} from './typecheck/oob';
+export {DomSchemaChecker} from './typecheck/schema';
+export {generateTypeCheckBlock} from './typecheck/type_check_block';
+export {TcbExpr} from './typecheck/ops/codegen';
+export {TcbGenericContextBehavior} from './typecheck/ops/context';
+export {LEGACY_OPTIONAL_CHAINING_DEFAULT} from './legacy_optional_chaining_default';
 
 // This file only reexports content of the `src` folder. Keep it that way.
 

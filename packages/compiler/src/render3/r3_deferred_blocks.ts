@@ -46,6 +46,9 @@ const WHEN_PARAMETER_PATTERN = /^when\s/;
 /** Pattern to identify a `on` parameter in a block. */
 const ON_PARAMETER_PATTERN = /^on\s/;
 
+/** Pattern to identify a `name` parameter in a block. */
+const NAME_PARAMETER_PATTERN = /^name\s+/;
+
 /**
  * Predicate function that determines if a block with
  * a specific name cam be connected to a `defer` block.
@@ -63,7 +66,7 @@ export function createDeferredBlock(
 ): {node: t.DeferredBlock; errors: ParseError[]} {
   const errors: ParseError[] = [];
   const {placeholder, loading, error} = parseConnectedBlocks(connectedBlocks, errors, visitor);
-  const {triggers, prefetchTriggers, hydrateTriggers} = parsePrimaryTriggers(
+  const {triggers, prefetchTriggers, hydrateTriggers, definedName} = parsePrimaryTriggers(
     ast,
     bindingParser,
     errors,
@@ -97,6 +100,7 @@ export function createDeferredBlock(
     ast.sourceSpan,
     ast.startSourceSpan,
     lastEndSourceSpan,
+    definedName,
     ast.i18n,
   );
 
@@ -272,6 +276,7 @@ function parsePrimaryTriggers(
   const triggers: t.DeferredBlockTriggers = {};
   const prefetchTriggers: t.DeferredBlockTriggers = {};
   const hydrateTriggers: t.DeferredBlockTriggers = {};
+  let definedName: string | null = null;
 
   for (const param of ast.parameters) {
     // The lexer ignores the leading spaces so we can assume
@@ -279,17 +284,37 @@ function parsePrimaryTriggers(
     if (WHEN_PARAMETER_PATTERN.test(param.expression)) {
       parseWhenTrigger(param, bindingParser, triggers, errors);
     } else if (ON_PARAMETER_PATTERN.test(param.expression)) {
-      parseOnTrigger(param, triggers, errors, placeholder);
+      parseOnTrigger(param, bindingParser, triggers, errors, placeholder);
     } else if (PREFETCH_WHEN_PATTERN.test(param.expression)) {
       parseWhenTrigger(param, bindingParser, prefetchTriggers, errors);
     } else if (PREFETCH_ON_PATTERN.test(param.expression)) {
-      parseOnTrigger(param, prefetchTriggers, errors, placeholder);
+      parseOnTrigger(param, bindingParser, prefetchTriggers, errors, placeholder);
     } else if (HYDRATE_WHEN_PATTERN.test(param.expression)) {
       parseWhenTrigger(param, bindingParser, hydrateTriggers, errors);
     } else if (HYDRATE_ON_PATTERN.test(param.expression)) {
-      parseOnTrigger(param, hydrateTriggers, errors, placeholder);
+      parseOnTrigger(param, bindingParser, hydrateTriggers, errors, placeholder);
     } else if (HYDRATE_NEVER_PATTERN.test(param.expression)) {
       parseNeverTrigger(param, hydrateTriggers, errors);
+    } else if (NAME_PARAMETER_PATTERN.test(param.expression)) {
+      if (definedName !== null) {
+        errors.push(new ParseError(param.sourceSpan, 'Cannot specify multiple name parameters'));
+      } else {
+        const name = param.expression.slice(5).trim();
+        if (
+          name.startsWith("'") ||
+          name.startsWith('"') ||
+          name.endsWith("'") ||
+          name.endsWith('"')
+        ) {
+          errors.push(
+            new ParseError(param.sourceSpan, 'Block names cannot be quoted in @defer blocks'),
+          );
+        } else if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name)) {
+          errors.push(new ParseError(param.sourceSpan, `Invalid block name "${name}"`));
+        } else {
+          definedName = name;
+        }
+      }
     } else {
       errors.push(new ParseError(param.sourceSpan, 'Unrecognized trigger'));
     }
@@ -304,5 +329,5 @@ function parsePrimaryTriggers(
     );
   }
 
-  return {triggers, prefetchTriggers, hydrateTriggers};
+  return {triggers, prefetchTriggers, hydrateTriggers, definedName};
 }

@@ -92,9 +92,9 @@ export interface R3DirectiveMetadata {
   usesInheritance: boolean;
 
   /**
-   * Whether or not the component or directive inherits its entire decorator from its base class.
+   * Whether or not the component or directive uses the private `ɵngControlCreate` hook.
    */
-  fullInheritance: boolean;
+  controlCreate: {passThroughInput: string | null} | null;
 
   /**
    * Reference name under which to export the directive's type in a template,
@@ -121,6 +121,11 @@ export interface R3DirectiveMetadata {
    * Additional directives applied to the directive host.
    */
   hostDirectives: R3HostDirectiveMetadata[] | null;
+
+  /**
+   * Whether null should be used instead of undefined for optional chaining.
+   */
+  legacyOptionalChaining: boolean;
 }
 
 /**
@@ -197,8 +202,9 @@ export const enum DeclarationListEmitMode {
 /**
  * Information needed to compile a component for the render3 runtime.
  */
-export interface R3ComponentMetadata<DeclarationT extends R3TemplateDependency>
-  extends R3DirectiveMetadata {
+export interface R3ComponentMetadata<
+  DeclarationT extends R3TemplateDependency,
+> extends R3DirectiveMetadata {
   /**
    * Information about the component's template.
    */
@@ -299,6 +305,17 @@ export interface R3ComponentMetadata<DeclarationT extends R3TemplateDependency>
    * not be set. If component has empty array imports then this field is not set.
    */
   rawImports?: o.Expression;
+
+  /**
+   * Foreign components imported by the component.
+   */
+  foreignImports: R3ForeignComponentMetadata[] | null;
+
+  /**
+   * Whether to generate additional code that adds the source location
+   * of elements to the DOM as an attribute.
+   */
+  enableTemplateSourceLocations?: boolean;
 }
 
 /**
@@ -353,9 +370,7 @@ export interface R3TemplateDependency {
  * A dependency that's used within a component template
  */
 export type R3TemplateDependencyMetadata =
-  | R3DirectiveDependencyMetadata
-  | R3PipeDependencyMetadata
-  | R3NgModuleDependencyMetadata;
+  R3DirectiveDependencyMetadata | R3PipeDependencyMetadata | R3NgModuleDependencyMetadata;
 
 /**
  * Information about a directive that is used in a component template. Only the stable, public
@@ -398,6 +413,21 @@ export interface R3PipeDependencyMetadata extends R3TemplateDependency {
 
 export interface R3NgModuleDependencyMetadata extends R3TemplateDependency {
   kind: R3TemplateDependencyKind.NgModule;
+}
+
+/**
+ * Information about a foreign component that is used in a component template.
+ */
+export interface R3ForeignComponentMetadata {
+  /**
+   * The foreign component's name.
+   */
+  name: string;
+
+  /**
+   * The expression used to refer to this foreign component.
+   */
+  component: o.Expression;
 }
 
 /**

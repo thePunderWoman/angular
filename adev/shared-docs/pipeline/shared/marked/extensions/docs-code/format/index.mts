@@ -7,7 +7,6 @@
  */
 
 import {Tokens} from 'marked';
-import {DiffMetadata, calculateDiff} from './diff.mjs';
 import {highlightCode} from './highlight.mjs';
 import {extractRegions} from './region.mjs';
 import {JSDOM} from 'jsdom';
@@ -26,39 +25,38 @@ export interface CodeToken extends Tokens.Generic {
   path?: string;
   /* The example display header */
   header?: string;
-  /* Whether stling should include line numbers */
+  /* Whether styling should include line numbers */
   linenums?: boolean;
-  /* The example path to determine diff (lines added/removed) */
-  diff?: string;
   /* The lines viewable in collapsed view */
   visibleLines?: string;
-  /* The name of the viewable region in the collapsed view */
-  visibleRegion?: string;
+  /* The name of the region to show in the code snippet */
+  region?: string;
   /* Whether we should display preview */
   preview?: boolean;
   /** Whether to hide code example by default. */
   hideCode?: boolean;
   /* The lines to display highlighting on */
   highlight?: string;
-
-  /** The generated diff metadata if created in the code formating process. */
-  diffMetadata?: DiffMetadata;
+  /** Whether to hide the copy button */
+  hideCopy?: boolean;
+  /** Whether to hide the dollar sign in the shell code */
+  hideDollar?: boolean;
 
   // additional classes for the element
   classes?: string[];
 }
 
 export function formatCode(token: CodeToken, context: RendererContext): string {
-  if (token.visibleLines !== undefined && token.visibleRegion !== undefined) {
-    throw Error('Cannot define visible lines and visible region at the same time');
+  if (token.visibleLines !== undefined && token.region !== undefined) {
+    throw Error('Cannot define visible lines and region at the same time');
   }
 
   extractRegions(token);
-  calculateDiff(token);
-  highlightCode(context.highlighter, token);
+  token.code = deindent(token.code).trim();
+  highlightCode(context.highlighter, token, context);
 
   const containerEl = JSDOM.fragment(`
-  <div class="docs-code">
+  <div class="docs-code${token.style ? ' docs-code-' + token.style : ''}">
     ${buildHeaderElement(token)}
     ${token.code}
   </div>
@@ -98,17 +96,30 @@ export function processForApiLinks(fragment: Element, apiEntries: ApiEntries): v
   });
 }
 
+/** Escapes text that is interpolated into an HTML string. */
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 /** Build the header element if a header is provided in the token. */
 function buildHeaderElement(token: CodeToken) {
-  return token.header ? `<div class="docs-code-header"><h3>${token.header}</h3></div>` : '';
+  let header = '';
+  if (token.style) {
+    header += `<span class="docs-code-header-style ">${token.style === 'prefer' ? 'Prefer' : 'Avoid'}</span>`;
+  }
+
+  if (token.header) {
+    header += `<h3>${escapeHtml(token.header)}</h3>`;
+  }
+
+  if (!header) return '';
+
+  return `<div class="docs-code-header">${header}</div>`;
 }
 
 function applyContainerAttributesAndClasses(el: Element, token: CodeToken) {
   // Attributes
   // String value attributes
-  if (token.diff) {
-    el.setAttribute('path', token.diff);
-  }
   if (token.path) {
     el.setAttribute('path', token.path);
   }
@@ -126,16 +137,42 @@ function applyContainerAttributesAndClasses(el: Element, token: CodeToken) {
   if (token.hideCode) {
     el.setAttribute('hideCode', 'true');
   }
-  if (token.language === 'mermaid') {
+  if (token.hideCopy) {
+    el.setAttribute('hideCopy', 'true');
+  }
+  if (token.hideDollar) {
+    el.setAttribute('hideDollar', 'true');
+  }
+
+  const language = token.language;
+
+  if (language === 'mermaid') {
     el.setAttribute('mermaid', 'true');
   }
 
   // Classes
-  if (token.language === 'shell') {
+  if (language === 'shell' || language === 'bash') {
     el.classList.add('shell');
   }
 
   if (token.classes) {
     el.classList.add(...token.classes);
   }
+}
+
+/**
+ * Removes leading indentation from code blocks.
+ */
+function deindent(str: string): string {
+  const lines = str.split('\n');
+  let minIndent = Infinity;
+  for (const line of lines) {
+    if (line.trim()) {
+      minIndent = Math.min(line.match(/^(\s*)/)?.[1].length ?? 0, minIndent);
+    }
+  }
+  if (minIndent === Infinity || minIndent === 0) {
+    return str;
+  }
+  return lines.map((line) => line.slice(minIndent)).join('\n');
 }

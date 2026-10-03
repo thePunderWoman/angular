@@ -212,9 +212,7 @@ export class Driver implements Debuggable, UpdateSource {
     this.scope.addEventListener('notificationclick', (event) => this.onClick(event));
     this.scope.addEventListener('notificationclose', (event) => this.onClose(event));
     this.scope.addEventListener('pushsubscriptionchange', (event) =>
-      // This is a bug in TypeScript, where they removed `PushSubscriptionChangeEvent`
-      // based on the incorrect assumption that browsers don't support it.
-      this.onPushSubscriptionChange(event as PushSubscriptionChangeEvent),
+      this.onPushSubscriptionChange(event),
     );
     this.scope.addEventListener('messageerror', (event) => this.onMessageError(event));
     this.scope.addEventListener('unhandledrejection', (event) => this.onUnhandledRejection(event));
@@ -355,7 +353,7 @@ export class Driver implements Debuggable, UpdateSource {
     event.waitUntil(this.handlePushSubscriptionChange(event));
   }
 
-  private onMessageError(event: MessageEvent): void {
+  private onMessageError(event: ExtendableMessageEvent): void {
     // Handle message deserialization errors that occur when receiving messages
     // that cannot be deserialized, typically due to corrupted data or unsupported formats.
     this.debugger.log(
@@ -419,7 +417,7 @@ export class Driver implements Debuggable, UpdateSource {
     }
     const desc = data.notification as {[key: string]: string | undefined};
     let options: {[key: string]: string | undefined} = {};
-    NOTIFICATION_OPTION_NAMES.filter((name) => desc.hasOwnProperty(name)).forEach(
+    NOTIFICATION_OPTION_NAMES.filter((name) => Object.hasOwn(desc, name)).forEach(
       (name) => (options[name] = desc[name]),
     );
     await this.scope.registration.showNotification(desc['title']!, options);
@@ -673,7 +671,7 @@ export class Driver implements Debuggable, UpdateSource {
 
       // Make sure latest manifest is correctly installed. If not (e.g. corrupted data),
       // it could stay locked in EXISTING_CLIENTS_ONLY or SAFE_MODE state.
-      if (!this.versions.has(latest.latest) && !manifests.hasOwnProperty(latest.latest)) {
+      if (!this.versions.has(latest.latest) && !Object.hasOwn(manifests, latest.latest)) {
         this.debugger.log(
           `Missing manifest for latest version hash ${latest.latest}`,
           'initialize: read from DB',
@@ -992,8 +990,7 @@ export class Driver implements Debuggable, UpdateSource {
     // Therefore, we keep clients on their current version (even if broken) and ensure that no new
     // clients will be assigned to it.
 
-    // Notify clients that are using this broken version about the failure.
-    await this.notifyClientsAboutVersionFailure(brokenHash, err);
+    // TODO: notify affected apps.
 
     // The action taken depends on whether the broken manifest is the active (latest) or not.
     // - If the broken version is not the latest, no further action is necessary, since new clients
@@ -1331,29 +1328,6 @@ export class Driver implements Debuggable, UpdateSource {
         };
 
         client.postMessage(notice);
-      }),
-    );
-  }
-
-  async notifyClientsAboutVersionFailure(brokenHash: string, error: Error): Promise<void> {
-    await this.initialized;
-
-    // Find all clients using the broken version
-    const affectedClients = Array.from(this.clientVersionMap.entries())
-      .filter(([clientId, hash]) => hash === brokenHash)
-      .map(([clientId]) => clientId);
-
-    await Promise.all(
-      affectedClients.map(async (clientId) => {
-        const client = await this.scope.clients.get(clientId);
-        if (client) {
-          const brokenVersion = this.versions.get(brokenHash);
-          client.postMessage({
-            type: 'VERSION_FAILED',
-            version: this.mergeHashWithAppData(brokenVersion!.manifest, brokenHash),
-            error: errorToString(error),
-          });
-        }
       }),
     );
   }

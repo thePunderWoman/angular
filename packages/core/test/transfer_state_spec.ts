@@ -9,11 +9,15 @@
 import {APP_ID as APP_ID_TOKEN, PLATFORM_ID} from '../src/core';
 import {TestBed} from '../testing';
 
-import {getDocument} from '../src/render3/interfaces/document';
+import {DOCUMENT} from '../src/document';
 import {makeStateKey, TransferState} from '../src/transfer_state';
 
 function removeScriptTag(doc: Document, id: string) {
-  doc.getElementById(id)?.remove();
+  let node = doc.getElementById(id);
+  while (node) {
+    node.remove();
+    node = doc.getElementById(id);
+  }
 }
 
 function addScriptTag(doc: Document, appId: string, data: object | string) {
@@ -38,13 +42,13 @@ describe('TransferState', () => {
   const DELAYED_KEY = makeStateKey<string>('delayed');
 
   beforeEach(() => {
-    doc = getDocument();
     TestBed.configureTestingModule({
       providers: [
         {provide: APP_ID_TOKEN, useValue: APP_ID},
         {provide: PLATFORM_ID, useValue: 'browser'},
       ],
     });
+    doc = TestBed.inject(DOCUMENT);
   });
 
   afterEach(() => {
@@ -57,6 +61,24 @@ describe('TransferState', () => {
     expect(transferState.get(TEST_KEY, 0)).toBe(10);
   });
 
+  it('ignores non-script elements that clobber the transfer state id', () => {
+    const id = APP_ID + '-state';
+
+    const clobberingNode = doc.createElement('div');
+    clobberingNode.id = id;
+    clobberingNode.textContent = '{"test":999}';
+    doc.body.appendChild(clobberingNode);
+
+    const script = doc.createElement('script');
+    script.id = id;
+    script.setAttribute('type', 'application/json');
+    script.textContent = '{"test":10}';
+    doc.body.appendChild(script);
+
+    const transferState: TransferState = TestBed.inject(TransferState);
+    expect(transferState.get(TEST_KEY, 0)).toBe(0);
+  });
+
   it('is initialized to empty state if script tag not found', () => {
     const transferState: TransferState = TestBed.inject(TransferState);
     expect(transferState.get(TEST_KEY, 0)).toBe(0);
@@ -67,6 +89,31 @@ describe('TransferState', () => {
     transferState.set(TEST_KEY, 20);
     expect(transferState.get(TEST_KEY, 0)).toBe(20);
     expect(transferState.hasKey(TEST_KEY)).toBe(true);
+  });
+
+  it('does not read inherited properties', () => {
+    const transferState = TestBed.inject(TransferState);
+    const constructorKey = makeStateKey<unknown>('constructor');
+    const store = (transferState as unknown as {store: Record<string, unknown>}).store;
+    Object.setPrototypeOf(store, {constructor: 'inherited'});
+
+    expect(transferState.get(constructorKey, 'default')).toBe('default');
+    expect(transferState.hasKey(constructorKey)).toBeFalse();
+  });
+
+  it('supports keys that name object prototype properties', () => {
+    const transferState = TestBed.inject(TransferState);
+    const prototypeKey = makeStateKey<{cached: boolean}>('__proto__');
+    const value = {cached: true};
+
+    transferState.set(prototypeKey, value);
+
+    expect(transferState.get(prototypeKey, {cached: false})).toBe(value);
+    expect(transferState.hasKey(prototypeKey)).toBeTrue();
+
+    transferState.remove(prototypeKey);
+
+    expect(transferState.get(prototypeKey, null!)).toBeNull();
   });
 
   it("supports setting and accessing value '0' via get", () => {
@@ -115,6 +162,16 @@ describe('TransferState', () => {
     expect(transferState.toJson()).toBe('{"test":20,"delayed":"changed"}');
   });
 
+  it('calls onSerialize callbacks whose keys name object prototype properties', () => {
+    const transferState = TestBed.inject(TransferState);
+    const prototypeKey = makeStateKey<string>('__proto__');
+
+    transferState.onSerialize(prototypeKey, () => 'serialized');
+
+    expect(transferState.toJson()).toBe('{"__proto__":"serialized"}');
+    expect(transferState.get(prototypeKey, null!)).toBe('serialized');
+  });
+
   it('should provide an ability to detect whether the state is empty', () => {
     const transferState = TestBed.inject(TransferState);
 
@@ -136,12 +193,18 @@ describe('TransferState', () => {
 
     transferState.set(DELAYED_KEY, '</script><script>alert(\'Hello&\' + "World");');
     expect(transferState.toJson()).toBe(
-      `{"delayed":"\\u003C/script>\\u003Cscript>alert('Hello&' + \\"World\\");"}`,
+      `{"delayed":"\\u003C\\u002Fscript>\\u003Cscript>alert('Hello&' + \\"World\\");"}`,
     );
   });
 
-  it('should decode `\\u003C` (<) when restoring stating', () => {
-    const encodedState = `{"delayed":"\\u003C/script>\\u003Cscript>alert('Hello&' + \\"World\\");"}`;
+  it('should encode `/` to avoid crawler indexing of inline JSON', () => {
+    const transferState = TestBed.inject(TransferState);
+    transferState.set(DELAYED_KEY, '/foo/bar');
+    expect(transferState.toJson()).toBe(`{"delayed":"\\u002Ffoo\\u002Fbar"}`);
+  });
+
+  it('should decode `\\u003C` (<) and `\\u002F` (/) when restoring stating', () => {
+    const encodedState = `{"delayed":"\\u003C\\u002Fscript>\\u003Cscript>alert('Hello&' + \\"World\\");"}`;
     addScriptTag(doc, APP_ID, encodedState);
     const transferState = TestBed.inject(TransferState);
 
@@ -149,5 +212,27 @@ describe('TransferState', () => {
     expect(transferState.get(DELAYED_KEY, null)).toBe(
       '</script><script>alert(\'Hello&\' + "World");',
     );
+  });
+
+  it('should properly encode and decode relative links in JSON', () => {
+    const relativeLink = '/about/us?query=1';
+    const encodedState = `{"delayed":"\\u002Fabout\\u002Fus?query=1"}`;
+
+    // Ensure restoring from the encoded state correctly decodes the relative link
+    addScriptTag(doc, APP_ID, encodedState);
+    const transferState = TestBed.inject(TransferState);
+
+    expect(transferState.get(DELAYED_KEY, null)).toBe(relativeLink);
+    expect(transferState.toJson()).toBe(encodedState);
+  });
+
+  it('restores keys that name object prototype properties into a dictionary', () => {
+    addScriptTag(doc, APP_ID, '{"__proto__":{"cached":true},"constructor":"state"}');
+    const transferState = TestBed.inject(TransferState);
+
+    expect(transferState.get(makeStateKey<{cached: boolean}>('__proto__'), null)).toEqual({
+      cached: true,
+    });
+    expect(transferState.get(makeStateKey<string>('constructor'), null)).toBe('state');
   });
 });

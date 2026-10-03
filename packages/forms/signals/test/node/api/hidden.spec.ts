@@ -7,8 +7,8 @@
  */
 
 import {Injector, signal} from '@angular/core';
-import {form, hidden, validate, customError} from '@angular/forms/signals';
 import {TestBed} from '@angular/core/testing';
+import {form, hidden, validate} from '@angular/forms/signals';
 
 describe('hidden', () => {
   it('should initially be false', () => {
@@ -16,8 +16,10 @@ describe('hidden', () => {
     const f = form(
       cat,
       (p) => {
-        hidden(p, ({value}) => {
-          return value.name === 'hidden-cat';
+        hidden(p, {
+          when: ({value}) => {
+            return value.name === 'hidden-cat';
+          },
         });
       },
       {injector: TestBed.inject(Injector)},
@@ -32,8 +34,10 @@ describe('hidden', () => {
     const f = form(
       cat,
       (p) => {
-        hidden(p.name, ({value}) => {
-          return value() === 'hidden-cat';
+        hidden(p.name, {
+          when: ({value}) => {
+            return value() === 'hidden-cat';
+          },
         });
       },
       {injector: TestBed.inject(Injector)},
@@ -48,8 +52,10 @@ describe('hidden', () => {
     const f = form(
       cat,
       (p) => {
-        hidden(p, ({value}) => {
-          return value().name === 'hidden-cat';
+        hidden(p, {
+          when: ({value}) => {
+            return value().name === 'hidden-cat';
+          },
         });
       },
       {injector: TestBed.inject(Injector)},
@@ -65,19 +71,21 @@ describe('hidden', () => {
     const f = form(
       cat,
       (p) => {
-        hidden(p.name, ({value}) => {
-          return value() === 'hidden-cat';
+        hidden(p.name, {
+          when: ({value}) => {
+            return value() === 'hidden-cat';
+          },
         });
 
         validate(p.name, () => {
-          return customError({kind: 'dog'});
+          return {kind: 'dog'};
         });
       },
       {injector: TestBed.inject(Injector)},
     );
 
-    expect(f.name().valid()).withContext('Name is intially invalid').toBeFalse();
-    expect(f().valid()).withContext('Form is intially invalid').toBeFalse();
+    expect(f.name().valid()).withContext('Name is initially invalid').toBeFalse();
+    expect(f().valid()).withContext('Form is initially invalid').toBeFalse();
 
     f.name().value.set('hidden-cat');
     expect(f.name().hidden()).toBeTrue();
@@ -89,20 +97,22 @@ describe('hidden', () => {
     expect(f().valid()).toBeFalse();
   });
 
-  xit('disables touch state propagation?', () => {
+  it('disables touch state propagation', () => {
     const cat = signal({name: 'Pirojok-the-cat', age: 5});
     const f = form(
       cat,
       (p) => {
-        hidden(p.name, ({value}) => {
-          return value() === 'hidden-cat';
+        hidden(p.name, {
+          when: ({value}) => {
+            return value() === 'hidden-cat';
+          },
         });
       },
       {injector: TestBed.inject(Injector)},
     );
 
-    expect(f.name().touched()).withContext('Name is intially untouched').toBeFalse();
-    expect(f().touched()).withContext('Form is intially intouched').toBeFalse();
+    expect(f.name().touched()).withContext('Name is initially untouched').toBeFalse();
+    expect(f().touched()).withContext('Form is initially untouched').toBeFalse();
 
     f.name().markAsTouched();
     expect(f.name().touched()).toBeTrue();
@@ -114,5 +124,35 @@ describe('hidden', () => {
     expect(f().touched())
       .withContext('form with a hidden touched field is not touched')
       .toBeFalse();
+  });
+
+  it('supports deprecated function syntax', () => {
+    const cat = signal({name: 'Pirojok-the-cat', age: 5});
+    const f = form(
+      cat,
+      (p) => {
+        hidden(p.name, ((ctx: any) => ctx.value() === 'hidden-cat') as any);
+      },
+      {injector: TestBed.inject(Injector)},
+    );
+
+    f.name().value.set('hidden-cat');
+    expect(f.name().hidden()).toBe(true);
+  });
+
+  it('it returns true when configOrLogic is omitted', () => {
+    const cat = signal({name: 'Pirojok-the-cat', age: 5});
+    const f = form(
+      cat,
+      (p) => {
+        hidden(p.name);
+      },
+      {injector: TestBed.inject(Injector)},
+    );
+
+    expect(f.name().hidden()).withContext('Name is permanently hidden').toBeTrue();
+
+    f.name().value.set('some-other-cat');
+    expect(f.name().hidden()).toBeTrue();
   });
 });

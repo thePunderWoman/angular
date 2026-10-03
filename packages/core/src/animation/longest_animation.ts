@@ -6,11 +6,11 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {LView} from '../render3/interfaces/view';
 import {LongestAnimation} from './interfaces';
 
 /** Parses a CSS time value to milliseconds. */
-function parseCssTimeUnitsToMs(value: string): number {
+function parseCssTimeUnitsToMs(value: string | undefined): number {
+  if (!value) return 0;
   // Some browsers will return it in seconds, whereas others will return milliseconds.
   const multiplier = value.toLowerCase().indexOf('ms') > -1 ? 1 : 1000;
   return parseFloat(value) * multiplier;
@@ -42,10 +42,12 @@ function getLongestComputedAnimation(computedStyle: CSSStyleDeclaration): Longes
   const rawNames = parseCssPropertyValue(computedStyle, 'animation-name');
   const rawDelays = parseCssPropertyValue(computedStyle, 'animation-delay');
   const rawDurations = parseCssPropertyValue(computedStyle, 'animation-duration');
+  const rawIterationCounts = parseCssPropertyValue(computedStyle, 'animation-iteration-count');
   const longest: LongestAnimation = {animationName: '', propertyName: undefined, duration: 0};
   for (let i = 0; i < rawNames.length; i++) {
     const duration = parseCssTimeUnitsToMs(rawDelays[i]) + parseCssTimeUnitsToMs(rawDurations[i]);
-    if (duration > longest.duration) {
+    const iterationCount = rawIterationCounts[i];
+    if (duration > longest.duration && iterationCount !== 'infinite') {
       longest.animationName = rawNames[i];
       longest.duration = duration;
     }
@@ -65,6 +67,24 @@ function longestExists(longest: LongestAnimation): boolean {
     (longest.animationName != undefined || longest.propertyName != undefined) &&
     longest.duration > 0
   );
+}
+
+/** Gets an animation's total duration, including its delay and playback rate. */
+export function getAnimationDuration(animation: Animation): number | undefined {
+  const timing = animation.effect?.getTiming();
+  if (timing === undefined) return undefined;
+
+  // duration can be a string 'auto' or a number.
+  const animationDuration = typeof timing.duration === 'number' ? timing.duration : 0;
+  let duration = (timing.delay ?? 0) + animationDuration;
+
+  // Account for playback rate if it is set.
+  const playbackRate = animation.playbackRate;
+  if (playbackRate !== undefined && playbackRate !== 0 && playbackRate !== 1) {
+    duration /= Math.abs(playbackRate);
+  }
+
+  return duration;
 }
 
 /**
@@ -122,9 +142,10 @@ function determineLongestAnimationFromElementAnimations(
   };
   for (const animation of animations) {
     const timing = animation.effect?.getTiming();
-    // duration can be a string 'auto' or a number.
-    const animDuration = typeof timing?.duration === 'number' ? timing.duration : 0;
-    let duration = (timing?.delay ?? 0) + animDuration;
+    if (timing?.iterations === Infinity) {
+      continue;
+    }
+    const duration = getAnimationDuration(animation) ?? 0;
 
     let propertyName: string | undefined;
     let animationName: string | undefined;
@@ -146,4 +167,5 @@ function determineLongestAnimationFromElementAnimations(
   }
 }
 
-export const allLeavingAnimations = new Set<LView>();
+/** Tracks the IDs of LViews with leaving animations. */
+export const allLeavingAnimations = new Set<number>();

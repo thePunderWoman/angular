@@ -6,13 +6,13 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {ChangeDetectionStrategy, Component, effect, inject, input, Renderer2} from '@angular/core';
+import {DOCUMENT, isPlatformBrowser} from '@angular/common';
+import {Component, effect, inject, input, PLATFORM_ID, Renderer2} from '@angular/core';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {DocContent, DocViewer} from '@angular/docs';
 import {ActivatedRoute} from '@angular/router';
-import {DOCUMENT} from '@angular/common';
-import {ReferenceScrollHandler} from '../services/reference-scroll-handler.service';
 import {API_SECTION_CLASS_NAME} from '../constants/api-reference-prerender.constants';
+import {ReferenceScrollHandler} from '../services/reference-scroll-handler.service';
 
 const HIGHLIGHTED_CARD_CLASS = 'docs-highlighted-card';
 
@@ -22,13 +22,13 @@ const HIGHLIGHTED_CARD_CLASS = 'docs-highlighted-card';
   templateUrl: './api-reference-details-page.component.html',
   styleUrls: ['./api-reference-details-page.component.scss'],
   providers: [ReferenceScrollHandler],
-  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export default class ApiReferenceDetailsPage {
   private readonly referenceScrollHandler = inject(ReferenceScrollHandler);
   private readonly route = inject(ActivatedRoute);
   private readonly document = inject(DOCUMENT);
   private readonly renderer = inject(Renderer2);
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
   private highlightedElement: HTMLElement | null = null;
 
@@ -40,9 +40,11 @@ export default class ApiReferenceDetailsPage {
   }
 
   onContentLoaded() {
-    this.referenceScrollHandler.setupListeners(API_SECTION_CLASS_NAME);
-    this.scrollToSectionLegacy();
-    this.highlightCard();
+    if (this.isBrowser) {
+      this.referenceScrollHandler.setupListeners(API_SECTION_CLASS_NAME);
+      this.scrollToSectionLegacy();
+      this.highlightCard();
+    }
   }
 
   /** Handle legacy URLs with a `tab` query param from the old tab layout  */

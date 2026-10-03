@@ -21,13 +21,15 @@ export const enum RuntimeErrorCode {
     // (undocumented)
     MISSING_CONTROL = 1001,
     // (undocumented)
-    MISSING_CONTROL_VALUE = 1002,
+    MISSING_CONTROL_VALUE = -1002,
     // (undocumented)
     NAME_AND_FORM_CONTROL_NAME_MUST_MATCH = 1202,
     // (undocumented)
     NG_MISSING_VALUE_ACCESSOR = -1203,
     // (undocumented)
     NG_VALUE_ACCESSOR_NOT_PROVIDED = 1200,
+    // (undocumented)
+    NGMODEL_IN_CHILD_COMPONENT = -1354,
     // (undocumented)
     NGMODEL_IN_FORM_GROUP = 1350,
     // (undocumented)

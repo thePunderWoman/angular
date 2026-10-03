@@ -64,7 +64,7 @@ export class SwPush {
     // (undocumented)
     static ɵfac: i0.ɵɵFactoryDeclaration<SwPush, never>;
     // (undocumented)
-    static ɵprov: i0.ɵɵInjectableDeclaration<SwPush>;
+    static ɵprov: i0.ɵɵInjectableDeclaration<any>;
 }
 
 // @public
@@ -87,7 +87,7 @@ export class SwUpdate {
     // (undocumented)
     static ɵfac: i0.ɵɵFactoryDeclaration<SwUpdate, never>;
     // (undocumented)
-    static ɵprov: i0.ɵɵInjectableDeclaration<SwUpdate>;
+    static ɵprov: i0.ɵɵInjectableDeclaration<any>;
 }
 
 // @public
@@ -110,7 +110,7 @@ export interface VersionDetectedEvent {
 }
 
 // @public
-export type VersionEvent = VersionDetectedEvent | VersionInstallationFailedEvent | VersionReadyEvent | VersionFailedEvent | NoNewVersionDetectedEvent;
+export type VersionEvent = VersionDetectedEvent | VersionInstallationFailedEvent | VersionReadyEvent | NoNewVersionDetectedEvent;
 
 // @public
 export interface VersionInstallationFailedEvent {

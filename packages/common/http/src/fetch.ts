@@ -8,11 +8,12 @@
 
 import {
   DestroyRef,
+  ɵformatRuntimeError as formatRuntimeError,
   inject,
-  Injectable,
   InjectionToken,
   NgZone,
-  ɵformatRuntimeError as formatRuntimeError,
+  ɵRuntimeError as RuntimeError,
+  Service,
 } from '@angular/core';
 import {Observable, Observer} from 'rxjs';
 import {RuntimeErrorCode} from './errors';
@@ -35,12 +36,27 @@ import type {} from 'zone.js';
 
 const XSSI_PREFIX = /^\)\]\}',?\n/;
 
+let uploadProgressWarningLogged = false;
+
+// 1 MB by default
+const DEFAULT_SSR_MAX_RESPONSE_BODY_SIZE = 1024 * 1024;
+
 /**
- * An internal injection token to reference `FetchBackend` implementation
- * in a tree-shakable way.
+ * Configures the maximum buffered response body size for `FetchBackend`.
+ *
+ * The limit is only enabled by default in SSR mode to prevent unbounded buffering
+ * when a response stream never terminates.
+ *
+ * Set to `null` to disable the limit.
  */
-export const FETCH_BACKEND = new InjectionToken<FetchBackend>(
-  typeof ngDevMode === 'undefined' || ngDevMode ? 'FETCH_BACKEND' : '',
+export const HTTP_FETCH_MAX_RESPONSE_SIZE = new InjectionToken<number | null>(
+  typeof ngDevMode !== 'undefined' && ngDevMode ? 'HTTP_FETCH_MAX_RESPONSE_SIZE' : '',
+  {
+    factory: () =>
+      typeof ngServerMode !== 'undefined' && ngServerMode
+        ? DEFAULT_SSR_MAX_RESPONSE_BODY_SIZE
+        : null,
+  },
 );
 
 /**
@@ -54,7 +70,7 @@ export const FETCH_BACKEND = new InjectionToken<FetchBackend>(
  *
  * @publicApi
  */
-@Injectable()
+@Service()
 export class FetchBackend implements HttpBackend {
   // We use an arrow function to always reference the current global implementation of `fetch`.
   // This is helpful for cases when the global `fetch` implementation is modified by external code,
@@ -63,20 +79,31 @@ export class FetchBackend implements HttpBackend {
     inject(FetchFactory, {optional: true})?.fetch ?? ((...args) => globalThis.fetch(...args));
   private readonly ngZone = inject(NgZone);
   private readonly destroyRef = inject(DestroyRef);
-  private destroyed = false;
-
-  constructor() {
-    this.destroyRef.onDestroy(() => {
-      this.destroyed = true;
-    });
-  }
+  private readonly maxResponseSize = inject(HTTP_FETCH_MAX_RESPONSE_SIZE);
 
   handle(request: HttpRequest<any>): Observable<HttpEvent<any>> {
     return new Observable((observer) => {
       const aborter = new AbortController();
+      let done = false;
+      const wrappedObserver: Observer<HttpEvent<any>> = {
+        next: (val) => {
+          if (val.type === HttpEventType.Response) {
+            done = true;
+          }
+          observer.next(val);
+        },
+        error: (err) => {
+          done = true;
+          observer.error(err);
+        },
+        complete: () => {
+          done = true;
+          observer.complete();
+        },
+      };
 
-      this.doRequest(request, aborter.signal, observer).then(noop, (error) =>
-        observer.error(new HttpErrorResponse({error})),
+      this.doRequest(request, aborter.signal, wrappedObserver).then(noop, (error) =>
+        wrappedObserver.error(new HttpErrorResponse({error})),
       );
 
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -96,7 +123,9 @@ export class FetchBackend implements HttpBackend {
         if (timeoutId !== undefined) {
           clearTimeout(timeoutId);
         }
-        aborter.abort();
+        if (!done && !aborter.signal.aborted) {
+          aborter.abort();
+        }
       };
     });
   }
@@ -145,13 +174,27 @@ export class FetchBackend implements HttpBackend {
     let status = response.status;
     let body: string | ArrayBuffer | Blob | object | null = null;
 
-    if (request.reportProgress) {
+    const reportDownloadProgress = request.reportProgress || request.reportDownloadProgress;
+    if (reportDownloadProgress) {
       observer.next(new HttpHeaderResponse({headers, status, statusText, url}));
     }
 
     if (response.body) {
+      const contentType = response.headers.get(CONTENT_TYPE_HEADER) ?? '';
+
       // Read Progress
       const contentLength = response.headers.get('content-length');
+      const contentLengthValue = contentLength !== null ? Number(contentLength) : NaN;
+
+      if (
+        this.maxResponseSize !== null &&
+        Number.isFinite(contentLengthValue) &&
+        contentLengthValue > this.maxResponseSize
+      ) {
+        await response.body.cancel();
+        throwBodyTooLargeError(this.maxResponseSize);
+      }
+
       const chunks: Uint8Array[] = [];
       const reader = response.body.getReader();
       let receivedLength = 0;
@@ -174,7 +217,7 @@ export class FetchBackend implements HttpBackend {
           // unnecessary work or triggering side effects after teardown.
           // This may happen if the app was explicitly destroyed before
           // the response returned entirely.
-          if (this.destroyed) {
+          if (this.destroyRef.destroyed) {
             // Streams left in a pending state (due to `break` without cancel) may
             // continue consuming or holding onto data behind the scenes.
             // Calling `reader.cancel()` allows the browser or the underlying
@@ -193,17 +236,22 @@ export class FetchBackend implements HttpBackend {
           chunks.push(value);
           receivedLength += value.length;
 
-          if (request.reportProgress) {
+          if (this.maxResponseSize !== null && receivedLength > this.maxResponseSize) {
+            await reader.cancel();
+            throwBodyTooLargeError(this.maxResponseSize);
+          }
+
+          if (reportDownloadProgress) {
             partialText =
               request.responseType === 'text'
                 ? (partialText ?? '') +
-                  (decoder ??= new TextDecoder()).decode(value, {stream: true})
+                  (decoder ??= getTextDecoder(contentType)).decode(value, {stream: true})
                 : undefined;
 
             const reportProgress = () =>
               observer.next({
                 type: HttpEventType.DownloadProgress,
-                total: contentLength ? +contentLength : undefined,
+                total: Number.isFinite(contentLengthValue) ? contentLengthValue : undefined,
                 loaded: receivedLength,
                 partialText,
               } as HttpDownloadProgressEvent);
@@ -224,7 +272,6 @@ export class FetchBackend implements HttpBackend {
       // Combine all chunks.
       const chunksAll = this.concatChunks(chunks, receivedLength);
       try {
-        const contentType = response.headers.get(CONTENT_TYPE_HEADER) ?? '';
         body = this.parseBody(request, chunksAll, contentType, status);
       } catch (error) {
         // Body loading or parsing failed
@@ -313,7 +360,7 @@ export class FetchBackend implements HttpBackend {
           throw e;
         }
       case 'text':
-        return new TextDecoder().decode(binContent);
+        return getTextDecoder(contentType).decode(binContent);
       case 'blob':
         return new Blob([binContent], {type: contentType});
       case 'arraybuffer':
@@ -322,8 +369,15 @@ export class FetchBackend implements HttpBackend {
   }
 
   private createRequestInit(req: HttpRequest<any>): RequestInit {
-    // We could share some of this logic with the XhrBackend
+    if (req.reportUploadProgress) {
+      throw new RuntimeError(
+        RuntimeErrorCode.FETCH_UPLOAD_PROGRESS_NOT_SUPPORTED,
+        ngDevMode &&
+          'The FetchBackend does not support upload progress reporting. Please use `withXhr()` on your `provideHttpClient()` configuration if you want to report upload progress.',
+      );
+    }
 
+    // We could share some of this logic with the XhrBackend
     const headers: Record<string, string> = {};
     let credentials: RequestCredentials | undefined;
 
@@ -367,6 +421,7 @@ export class FetchBackend implements HttpBackend {
       redirect: req.redirect,
       referrer: req.referrer,
       integrity: req.integrity,
+      referrerPolicy: req.referrerPolicy,
     };
   }
 
@@ -410,4 +465,33 @@ function warningOptionsMessage(req: HttpRequest<any>) {
  */
 function silenceSuperfluousUnhandledPromiseRejection(promise: Promise<unknown>) {
   promise.then(noop, noop);
+}
+
+function throwBodyTooLargeError(maxResponseSize: number): never {
+  throw new RuntimeError(
+    RuntimeErrorCode.FETCH_RESPONSE_BODY_TOO_LARGE,
+    ngDevMode &&
+      `Fetch response body exceeded the configured buffer limit (${maxResponseSize} bytes).`,
+  );
+}
+
+const CHARSET_REGEX = /charset=\s*["']?([^;"'\s]+)["']?/i;
+
+/**
+ * Creates a `TextDecoder` instance using the charset extracted from the `Content-Type` header,
+ * falling back to the default (`utf-8`) if no valid charset is specified or supported.
+ */
+function getTextDecoder(contentType: string): TextDecoder {
+  const match = contentType.match(CHARSET_REGEX);
+  if (match !== null) {
+    try {
+      return new TextDecoder(match[1]);
+    } catch {
+      // Catching `RangeError` thrown by `new TextDecoder(...)` when the encoding label is invalid or
+      // unsupported. There is no synchronous inspection API on `TextDecoder` to verify whether an
+      // encoding is supported without executing the constructor, so catching the error is required
+      // before falling back to default UTF-8.
+    }
+  }
+  return new TextDecoder();
 }

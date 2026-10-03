@@ -20,7 +20,6 @@ import {ChangesByFile, ChangeTracker, ImportRemapper} from '../../utils/change_t
 import {getAngularDecorators, NgDecorator} from '../../utils/ng_decorators';
 import {getImportSpecifier} from '../../utils/typescript/imports';
 import {closestNode} from '../../utils/typescript/nodes';
-import {isReferenceToImport} from '../../utils/typescript/symbol';
 
 import {
   findClassDeclaration,
@@ -32,7 +31,7 @@ import {
 } from './util';
 
 /**
- * Function that can be used to prcess the dependencies that
+ * Function that can be used to process the dependencies that
  * are going to be added to the imports of a declaration.
  */
 export type DeclarationImportsRemapper = (imports: PotentialImport[]) => PotentialImport[];
@@ -88,6 +87,7 @@ export function toStandalone(
       declarations,
       tracker,
       templateTypeChecker,
+      program.getTsProgram(),
       declarationImportRemapper,
     );
   }
@@ -119,6 +119,7 @@ export function convertNgModuleDeclarationToStandalone(
   allDeclarations: Set<ts.ClassDeclaration>,
   tracker: ChangeTracker,
   typeChecker: TemplateTypeChecker,
+  program: ts.Program,
   importRemapper?: DeclarationImportsRemapper,
 ): void {
   const directiveMeta = typeChecker.getDirectiveMetadata(decl);
@@ -132,6 +133,7 @@ export function convertNgModuleDeclarationToStandalone(
         allDeclarations,
         tracker,
         typeChecker,
+        program,
         importRemapper,
       );
 
@@ -175,9 +177,10 @@ function getComponentImportExpressions(
   allDeclarations: Set<ts.ClassDeclaration>,
   tracker: ChangeTracker,
   typeChecker: TemplateTypeChecker,
+  program: ts.Program,
   importRemapper?: DeclarationImportsRemapper,
 ): ts.Expression[] {
-  const templateDependencies = findTemplateDependencies(decl, typeChecker);
+  const templateDependencies = findTemplateDependencies(decl, typeChecker, program);
   const usedDependenciesInMigration = new Set(
     templateDependencies.filter((dep) => allDeclarations.has(dep.node)),
   );
@@ -314,33 +317,43 @@ function moveDeclarationsToImports(
   );
 
   // Separate the declarations that we want to keep and ones we need to copy into the `imports`.
-  if (ts.isPropertyAssignment(declarationsProp)) {
-    // If the declarations are an array, we can analyze it to
-    // find any classes from the current migration.
-    if (ts.isArrayLiteralExpression(declarationsProp.initializer)) {
-      for (const el of declarationsProp.initializer.elements) {
-        if (ts.isIdentifier(el)) {
-          const correspondingClass = findClassDeclaration(el, typeChecker);
+  if (
+    ts.isPropertyAssignment(declarationsProp) ||
+    ts.isShorthandPropertyAssignment(declarationsProp)
+  ) {
+    // Handle both regular and shorthand property assignments
+    if (ts.isPropertyAssignment(declarationsProp)) {
+      // If the declarations are an array, we can analyze it to
+      // find any classes from the current migration.
+      if (ts.isArrayLiteralExpression(declarationsProp.initializer)) {
+        for (const el of declarationsProp.initializer.elements) {
+          if (ts.isIdentifier(el)) {
+            const correspondingClass = findClassDeclaration(el, typeChecker);
 
-          if (
-            !correspondingClass ||
-            // Check whether the declaration is either standalone already or is being converted
-            // in this migration. We need to check if it's standalone already, in order to correct
-            // some cases where the main app and the test files are being migrated in separate
-            // programs.
-            isStandaloneDeclaration(correspondingClass, allDeclarations, templateTypeChecker)
-          ) {
-            declarationsToCopy.push(el);
+            if (
+              !correspondingClass ||
+              // Check whether the declaration is either standalone already or is being converted
+              // in this migration. We need to check if it's standalone already, in order to correct
+              // some cases where the main app and the test files are being migrated in separate
+              // programs.
+              isStandaloneDeclaration(correspondingClass, allDeclarations, templateTypeChecker)
+            ) {
+              declarationsToCopy.push(el);
+            } else {
+              declarationsToPreserve.push(el);
+            }
           } else {
-            declarationsToPreserve.push(el);
+            declarationsToCopy.push(el);
           }
-        } else {
-          declarationsToCopy.push(el);
         }
+      } else {
+        // Otherwise create a spread that will be copied into the `imports`.
+        declarationsToCopy.push(ts.factory.createSpreadElement(declarationsProp.initializer));
       }
     } else {
-      // Otherwise create a spread that will be copied into the `imports`.
-      declarationsToCopy.push(ts.factory.createSpreadElement(declarationsProp.initializer));
+      // For shorthand properties, treat them as unanalyzable and use spread syntax
+      // shorthand properties were being ignored, now they're detected and treated as spreads
+      declarationsToCopy.push(ts.factory.createSpreadElement(declarationsProp.name));
     }
   }
 
@@ -360,7 +373,7 @@ function moveDeclarationsToImports(
   }
 
   for (const prop of literal.properties) {
-    if (!isNamedPropertyAssignment(prop)) {
+    if (!isNamedPropertyAssignment(prop) && !ts.isShorthandPropertyAssignment(prop)) {
       properties.push(prop);
       continue;
     }
@@ -368,12 +381,13 @@ function moveDeclarationsToImports(
     // If we have declarations to preserve, update the existing property, otherwise drop it.
     if (prop === declarationsProp) {
       if (declarationsToPreserve.length > 0) {
-        const hasTrailingComma = ts.isArrayLiteralExpression(prop.initializer)
-          ? prop.initializer.elements.hasTrailingComma
-          : hasAnyArrayTrailingComma;
+        const hasTrailingComma =
+          ts.isPropertyAssignment(prop) && ts.isArrayLiteralExpression(prop.initializer)
+            ? prop.initializer.elements.hasTrailingComma
+            : hasAnyArrayTrailingComma;
+
         properties.push(
-          ts.factory.updatePropertyAssignment(
-            prop,
+          ts.factory.createPropertyAssignment(
             prop.name,
             ts.factory.createArrayLiteralExpression(
               ts.factory.createNodeArray(
@@ -390,29 +404,32 @@ function moveDeclarationsToImports(
     // If we have an `imports` array and declarations
     // that should be copied, we merge the two arrays.
     if (prop === importsProp && declarationsToCopy.length > 0) {
-      let initializer: ts.Expression;
+      // Only regular property assignments have initializers that we can merge
+      if (ts.isPropertyAssignment(prop)) {
+        let initializer: ts.Expression;
 
-      if (ts.isArrayLiteralExpression(prop.initializer)) {
-        initializer = ts.factory.updateArrayLiteralExpression(
-          prop.initializer,
-          ts.factory.createNodeArray(
-            [...prop.initializer.elements, ...declarationsToCopy],
-            prop.initializer.elements.hasTrailingComma,
-          ),
-        );
-      } else {
-        initializer = ts.factory.createArrayLiteralExpression(
-          ts.factory.createNodeArray(
-            [ts.factory.createSpreadElement(prop.initializer), ...declarationsToCopy],
-            // Expect the declarations to be greater than 1 since
-            // we have the pre-existing initializer already.
-            hasAnyArrayTrailingComma && declarationsToCopy.length > 1,
-          ),
-        );
+        if (ts.isArrayLiteralExpression(prop.initializer)) {
+          initializer = ts.factory.updateArrayLiteralExpression(
+            prop.initializer,
+            ts.factory.createNodeArray(
+              [...prop.initializer.elements, ...declarationsToCopy],
+              prop.initializer.elements.hasTrailingComma,
+            ),
+          );
+        } else {
+          initializer = ts.factory.createArrayLiteralExpression(
+            ts.factory.createNodeArray(
+              [ts.factory.createSpreadElement(prop.initializer), ...declarationsToCopy],
+              // Expect the declarations to be greater than 1 since
+              // we have the pre-existing initializer already.
+              hasAnyArrayTrailingComma && declarationsToCopy.length > 1,
+            ),
+          );
+        }
+
+        properties.push(ts.factory.updatePropertyAssignment(prop, prop.name, initializer));
+        continue;
       }
-
-      properties.push(ts.factory.updatePropertyAssignment(prop, prop.name, initializer));
-      continue;
     }
 
     // Retain any remaining properties.
@@ -566,11 +583,17 @@ export function findImportLocation(
  * E.g. `declarations: [Foo]` or `declarations: SOME_VAR` would match this description,
  * but not `declarations: []`.
  */
-function hasNgModuleMetadataElements(node: ts.Node): node is ts.PropertyAssignment {
-  return (
-    ts.isPropertyAssignment(node) &&
-    (!ts.isArrayLiteralExpression(node.initializer) || node.initializer.elements.length > 0)
-  );
+function hasNgModuleMetadataElements(
+  node: ts.Node,
+): node is ts.PropertyAssignment | ts.ShorthandPropertyAssignment {
+  if (ts.isPropertyAssignment(node)) {
+    return !ts.isArrayLiteralExpression(node.initializer) || node.initializer.elements.length > 0;
+  }
+  if (ts.isShorthandPropertyAssignment(node)) {
+    // For shorthand properties, we assume they have elements since they reference a variable
+    return true;
+  }
+  return false;
 }
 
 /** Finds all modules whose declarations can be migrated. */
@@ -636,6 +659,7 @@ export function findTestObjectsToMigrate(sourceFile: ts.SourceFile, typeChecker:
 export function findTemplateDependencies(
   decl: ts.ClassDeclaration,
   typeChecker: TemplateTypeChecker,
+  program: ts.Program,
 ): Reference<NamedClassDeclaration>[] {
   const results: Reference<NamedClassDeclaration>[] = [];
   const usedDirectives = typeChecker.getUsedDirectives(decl);
@@ -643,9 +667,7 @@ export function findTemplateDependencies(
 
   if (usedDirectives !== null) {
     for (const dir of usedDirectives) {
-      if (ts.isClassDeclaration(dir.ref.node)) {
-        results.push(dir.ref as Reference<NamedClassDeclaration>);
-      }
+      results.push(dir.ref as Reference<NamedClassDeclaration>);
     }
   }
 
@@ -653,11 +675,17 @@ export function findTemplateDependencies(
     const potentialPipes = typeChecker.getPotentialPipes(decl);
 
     for (const pipe of potentialPipes) {
-      if (
-        ts.isClassDeclaration(pipe.ref.node) &&
-        usedPipes.some((current) => pipe.name === current)
-      ) {
-        results.push(pipe.ref as Reference<NamedClassDeclaration>);
+      const sourceFile = program.getSourceFile(pipe.ref.filePath);
+      const node = sourceFile ? findTightestNode(sourceFile, pipe.ref.position) : null;
+      const classDecl = node ? closestNode(node, ts.isClassDeclaration) : null;
+      if (classDecl && usedPipes.some((current) => pipe.name === current)) {
+        const owningModule = pipe.ref.moduleSpecifier
+          ? {
+              specifier: pipe.ref.moduleSpecifier,
+              resolutionContext: decl.getSourceFile().fileName,
+            }
+          : null;
+        results.push(new Reference(classDecl as NamedClassDeclaration, owningModule));
       }
     }
   }
@@ -817,6 +845,7 @@ function analyzeTestingModules(
     const importElements =
       importsProp &&
       hasNgModuleMetadataElements(importsProp) &&
+      ts.isPropertyAssignment(importsProp) &&
       ts.isArrayLiteralExpression(importsProp.initializer)
         ? importsProp.initializer.elements.filter((el) => {
             // Filter out calls since they may be a `ModuleWithProviders`.
@@ -879,6 +908,7 @@ function extractDeclarationsFromTestObject(
   if (
     declarations &&
     hasNgModuleMetadataElements(declarations) &&
+    ts.isPropertyAssignment(declarations) &&
     ts.isArrayLiteralExpression(declarations.initializer)
   ) {
     for (const element of declarations.initializer.elements) {
@@ -924,4 +954,11 @@ function isStandaloneDeclaration(
   const metadata =
     templateTypeChecker.getDirectiveMetadata(node) || templateTypeChecker.getPipeMetadata(node);
   return metadata != null && metadata.isStandalone;
+}
+
+function findTightestNode(node: ts.Node, position: number): ts.Node | undefined {
+  if (position < node.getStart() || position > node.getEnd()) {
+    return undefined;
+  }
+  return node.forEachChild((c) => findTightestNode(c, position)) ?? node;
 }

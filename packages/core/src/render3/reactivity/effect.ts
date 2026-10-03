@@ -7,28 +7,27 @@
  */
 
 import {
+  BASE_EFFECT_NODE,
+  BaseEffectNode,
   SIGNAL,
   consumerDestroy,
   isInNotificationPhase,
-  setActiveConsumer,
-  BaseEffectNode,
-  BASE_EFFECT_NODE,
   runEffect,
+  setActiveConsumer,
 } from '../../../primitives/signals';
-import {FLAGS, LViewFlags, LView, EFFECTS} from '../interfaces/view';
-import {markAncestorsForTraversal} from '../util/view_utils';
-import {inject} from '../../di/injector_compatibility';
-import {Injector} from '../../di/injector';
-import {assertNotInReactiveContext} from './asserts';
-import {assertInInjectionContext} from '../../di/contextual';
-import {DestroyRef, NodeInjectorDestroyRef} from '../../linker/destroy_ref';
-import {ViewContext} from '../view_context';
-import {noop} from '../../util/noop';
 import {
   ChangeDetectionScheduler,
   NotificationSource,
 } from '../../change_detection/scheduling/zoneless_scheduling';
+import {assertInInjectionContext} from '../../di/contextual';
+import {Injector} from '../../di/injector';
+import {inject} from '../../di/injector_compatibility';
+import {DestroyRef, NodeInjectorDestroyRef} from '../../linker/destroy_ref';
+import {EFFECTS, FLAGS, LView, LViewFlags} from '../interfaces/view';
 import {setIsRefreshingViews} from '../state';
+import {markAncestorsForTraversal} from '../util/view_utils';
+import {ViewContext} from '../view_context';
+import {assertNotInReactiveContext} from './asserts';
 import {EffectScheduler, SchedulableEffect} from './root_effect_scheduler';
 
 import {emitEffectCreatedEvent, setInjectorProfilerContext} from '../debug/injector_profiler';
@@ -37,6 +36,8 @@ import {emitEffectCreatedEvent, setInjectorProfilerContext} from '../debug/injec
  * A global reactive effect, which can be manually destroyed.
  *
  * @publicApi 20.0
+ *
+ * @see [Destroying effects](guide/signals/effect#destroying-effects)
  */
 export interface EffectRef {
   /**
@@ -98,12 +99,16 @@ export interface CreateEffectOptions {
  * before the next effect run. The cleanup function makes it possible to "cancel" any work that the
  * previous effect run might have started.
  *
+ * @see [Effect cleanup functions](guide/signals/effect#effect-cleanup-functions)
+ *
  * @publicApi 20.0
  */
 export type EffectCleanupFn = () => void;
 
 /**
  * A callback passed to the effect function that makes it possible to register cleanup logic.
+ *
+ * @see [Effect cleanup functions](guide/signals/effect#effect-cleanup-functions)
  *
  * @publicApi 20.0
  */
@@ -124,6 +129,8 @@ export type EffectCleanupRegisterFn = (cleanupFn: EffectCleanupFn) => void;
  * and have no connection to the component tree or change detection.
  *
  * `effect()` must be run in injection context, unless the `injector` option is manually specified.
+ *
+ * @see [Effects](guide/signals/effect)
  *
  * @publicApi 20.0
  */
@@ -171,7 +178,7 @@ export function effect(
 
   if (destroyRef !== null) {
     // If we need to register for cleanup, do that here.
-    node.onDestroyFn = destroyRef.onDestroy(() => node.destroy());
+    node.onDestroyFns = [destroyRef.onDestroy(() => node.destroy())];
   }
 
   const effectRef = new EffectRefImpl(node);
@@ -194,7 +201,9 @@ export interface EffectNode extends BaseEffectNode, SchedulableEffect {
   injector: Injector;
   notifier: ChangeDetectionScheduler;
 
-  onDestroyFn: () => void;
+  userFn: (onCleanup: EffectCleanupRegisterFn) => void;
+
+  onDestroyFns: (() => void)[] | null;
 }
 
 export interface ViewEffectNode extends EffectNode {
@@ -205,12 +214,12 @@ export interface RootEffectNode extends EffectNode {
   scheduler: EffectScheduler;
 }
 
-export const EFFECT_NODE: Omit<EffectNode, 'fn' | 'destroy' | 'injector' | 'notifier'> =
+export const EFFECT_NODE: Omit<EffectNode, 'fn' | 'userFn' | 'destroy' | 'injector' | 'notifier'> =
   /* @__PURE__ */ (() => ({
     ...BASE_EFFECT_NODE,
     cleanupFns: undefined,
     zone: null,
-    onDestroyFn: noop,
+    onDestroyFns: null,
     run(this: EffectNode): void {
       if (ngDevMode && isInNotificationPhase()) {
         throw new Error(`Schedulers cannot synchronously execute watches while scheduling.`);
@@ -244,36 +253,52 @@ export const EFFECT_NODE: Omit<EffectNode, 'fn' | 'destroy' | 'injector' | 'noti
     },
   }))();
 
-export const ROOT_EFFECT_NODE: Omit<RootEffectNode, 'fn' | 'scheduler' | 'notifier' | 'injector'> =
-  /* @__PURE__ */ (() => ({
-    ...EFFECT_NODE,
-    consumerMarkedDirty(this: RootEffectNode) {
-      this.scheduler.schedule(this);
-      this.notifier.notify(NotificationSource.RootEffect);
-    },
-    destroy(this: RootEffectNode) {
-      consumerDestroy(this);
-      this.onDestroyFn();
-      this.cleanup();
-      this.scheduler.remove(this);
-    },
-  }))();
+export const ROOT_EFFECT_NODE: Omit<
+  RootEffectNode,
+  'fn' | 'userFn' | 'scheduler' | 'notifier' | 'injector'
+> = /* @__PURE__ */ (() => ({
+  ...EFFECT_NODE,
+  consumerMarkedDirty(this: RootEffectNode) {
+    this.scheduler.schedule(this);
+    this.notifier.notify(NotificationSource.RootEffect);
+  },
+  destroy(this: RootEffectNode) {
+    consumerDestroy(this);
 
-export const VIEW_EFFECT_NODE: Omit<ViewEffectNode, 'fn' | 'view' | 'injector' | 'notifier'> =
-  /* @__PURE__ */ (() => ({
-    ...EFFECT_NODE,
-    consumerMarkedDirty(this: ViewEffectNode): void {
-      this.view[FLAGS] |= LViewFlags.HasChildViewsToRefresh;
-      markAncestorsForTraversal(this.view);
-      this.notifier.notify(NotificationSource.ViewEffect);
-    },
-    destroy(this: ViewEffectNode): void {
-      consumerDestroy(this);
-      this.onDestroyFn();
-      this.cleanup();
-      this.view[EFFECTS]?.delete(this);
-    },
-  }))();
+    if (this.onDestroyFns !== null) {
+      for (const fn of this.onDestroyFns) {
+        fn();
+      }
+    }
+
+    this.cleanup();
+    this.scheduler.remove(this);
+  },
+}))();
+
+export const VIEW_EFFECT_NODE: Omit<
+  ViewEffectNode,
+  'fn' | 'userFn' | 'view' | 'injector' | 'notifier'
+> = /* @__PURE__ */ (() => ({
+  ...EFFECT_NODE,
+  consumerMarkedDirty(this: ViewEffectNode): void {
+    this.view[FLAGS] |= LViewFlags.HasChildViewsToRefresh;
+    markAncestorsForTraversal(this.view);
+    this.notifier.notify(NotificationSource.ViewEffect);
+  },
+  destroy(this: ViewEffectNode): void {
+    consumerDestroy(this);
+
+    if (this.onDestroyFns !== null) {
+      for (const fn of this.onDestroyFns) {
+        fn();
+      }
+    }
+
+    this.cleanup();
+    this.view[EFFECTS]?.delete(this);
+  },
+}))();
 
 export function createViewEffect(
   view: LView,
@@ -284,6 +309,7 @@ export function createViewEffect(
   node.view = view;
   node.zone = typeof Zone !== 'undefined' ? Zone.current : null;
   node.notifier = notifier;
+  node.userFn = fn;
   node.fn = createEffectFn(node, fn);
 
   view[EFFECTS] ??= new Set();
@@ -299,6 +325,7 @@ export function createRootEffect(
   notifier: ChangeDetectionScheduler,
 ): RootEffectNode {
   const node = Object.create(ROOT_EFFECT_NODE) as RootEffectNode;
+  node.userFn = fn;
   node.fn = createEffectFn(node, fn);
   node.scheduler = scheduler;
   node.notifier = notifier;

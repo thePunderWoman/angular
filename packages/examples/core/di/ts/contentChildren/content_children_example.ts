@@ -7,11 +7,18 @@
  */
 
 // #docregion Component
-import {Component, ContentChildren, Directive, input, QueryList, signal} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ContentChildren,
+  Directive,
+  input,
+  QueryList,
+  signal,
+} from '@angular/core';
 
 @Directive({
   selector: 'pane',
-  standalone: false,
 })
 export class Pane {
   id = input.required<string>();
@@ -23,7 +30,7 @@ export class Pane {
     <div class="top-level">Top level panes: {{ serializedPanes }}</div>
     <div class="nested">Arbitrary nested panes: {{ serializedNestedPanes }}</div>
   `,
-  standalone: false,
+  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class Tab {
   @ContentChildren(Pane) topLevelPanes!: QueryList<Pane>;
@@ -39,11 +46,12 @@ export class Tab {
 
 @Component({
   selector: 'example-app',
+  imports: [Tab, Pane],
   template: `
     <tab>
       <pane id="1"></pane>
       <pane id="2"></pane>
-      @if(shouldShow()) {
+      @if (shouldShow()) {
         <pane id="3">
           <tab>
             <pane id="3_1"></pane>
@@ -55,7 +63,7 @@ export class Tab {
 
     <button (click)="show()">Show 3</button>
   `,
-  standalone: false,
+  changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class ContentChildrenComp {
   shouldShow = signal(false);

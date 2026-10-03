@@ -6,9 +6,10 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {Injectable, ɵRuntimeError as RuntimeError} from '@angular/core';
+import {computed, ɵRuntimeError as RuntimeError, Service, Signal} from '@angular/core';
 
 import {RuntimeErrorCode} from './errors';
+import type {Router} from './router';
 import {convertToParamMap, ParamMap, Params, PRIMARY_OUTLET} from './shared';
 import {equalArraysOrString, shallowEqual} from './utils/collection';
 
@@ -17,7 +18,7 @@ import {equalArraysOrString, shallowEqual} from './utils/collection';
  * for the current router state.
  *
  * @publicApi
- * @see {@link Router#isActive}
+ * @see {@link isActive}
  */
 export interface IsActiveMatchOptions {
   /**
@@ -79,15 +80,84 @@ const paramCompareMap: Record<ParamMatchOptions, ParamCompareFn> = {
   'ignored': () => true,
 };
 
+/**
+ * The equivalent `IsActiveMatchOptions` options for `isActive` is called with `true`
+ * (exact = true).
+ */
+export const exactMatchOptions: IsActiveMatchOptions = {
+  paths: 'exact',
+  fragment: 'ignored',
+  matrixParams: 'ignored',
+  queryParams: 'exact',
+};
+
+/**
+ * The equivalent `IsActiveMatchOptions` options for `isActive` is called with `false`
+ * (exact = false).
+ */
+export const subsetMatchOptions: IsActiveMatchOptions = {
+  paths: 'subset',
+  fragment: 'ignored',
+  matrixParams: 'ignored',
+  queryParams: 'subset',
+};
+
+/**
+ * Returns a computed signal of whether the given url is activated in the Router.
+ *
+ * As the router state changes, the signal will update to reflect whether the url is active.
+ *
+ * When using the `matchOptions` argument, any missing properties fall back to the following defaults:
+ * - `paths`: 'subset'
+ * - `queryParams`: 'subset'
+ * - `matrixParams`: 'ignored'
+ * - `fragment`: 'ignored'
+ *
+ * @see [Check if a URL is active](guide/routing/read-route-state#check-if-a-url-is-active)
+ * @publicApi 21.1
+ */
+export function isActive(
+  url: string | UrlTree,
+  router: Router,
+  matchOptions?: Partial<IsActiveMatchOptions>,
+): Signal<boolean> {
+  const urlTree = url instanceof UrlTree ? url : router.parseUrl(url);
+  return computed(() =>
+    containsTree(
+      router.lastSuccessfulNavigation()?.finalUrl ?? new UrlTree(),
+      urlTree,
+      matchOptions,
+    ),
+  );
+}
+
+/**
+ * Determines if a `UrlTree` is contained within another `UrlTree` based on the provided matching options.
+ *
+ * @param container The outer or reference `UrlTree`.
+ * @param containee The target `UrlTree` to test against the container.
+ * @param options Optional, matching options:
+ * - `paths`: Defines how to compare URL segments ('exact' or 'subset'). Defaults to 'subset'.
+ * - `matrixParams`: Defines how to compare matrix parameters ('exact', 'subset', or 'ignored'). Defaults to 'ignored'.
+ * - `queryParams`: Defines how to compare query parameters ('exact', 'subset', or 'ignored'). Defaults to 'subset'.
+ * - `fragment`: Defines how to compare URL fragments ('exact' or 'ignored'). Defaults to 'ignored'.
+ *
+ * @publicApi
+ */
 export function containsTree(
   container: UrlTree,
   containee: UrlTree,
-  options: IsActiveMatchOptions,
+  options?: Partial<IsActiveMatchOptions>,
 ): boolean {
+  const matchOptions: IsActiveMatchOptions = {
+    ...subsetMatchOptions,
+    ...(options || {}),
+  };
+
   return (
-    pathCompareMap[options.paths](container.root, containee.root, options.matrixParams) &&
-    paramCompareMap[options.queryParams](container.queryParams, containee.queryParams) &&
-    !(options.fragment === 'exact' && container.fragment !== containee.fragment)
+    pathCompareMap[matchOptions.paths](container.root, containee.root, matchOptions.matrixParams) &&
+    paramCompareMap[matchOptions.queryParams](container.queryParams, containee.queryParams) &&
+    !(matchOptions.fragment === 'exact' && container.fragment !== containee.fragment)
   );
 }
 
@@ -234,7 +304,7 @@ export class UrlTree {
     return this._queryParamMap;
   }
 
-  /** @docsNotRequired */
+  /** @docs-private */
   toString(): string {
     return DEFAULT_SERIALIZER.serialize(this);
   }
@@ -272,7 +342,7 @@ export class UrlSegmentGroup {
     return Object.keys(this.children).length;
   }
 
-  /** @docsNotRequired */
+  /** @docs-private */
   toString(): string {
     return serializePaths(this);
   }
@@ -321,7 +391,7 @@ export class UrlSegment {
     return this._parameterMap;
   }
 
-  /** @docsNotRequired */
+  /** @docs-private */
   toString(): string {
     return serializePath(this);
   }
@@ -366,7 +436,7 @@ export function mapChildrenIntoArray<T>(
  *
  * @publicApi
  */
-@Injectable({providedIn: 'root', useFactory: () => new DefaultUrlSerializer()})
+@Service({factory: () => new DefaultUrlSerializer()})
 export abstract class UrlSerializer {
   /** Parse a url into a `UrlTree` */
   abstract parse(url: string): UrlTree;
@@ -530,6 +600,23 @@ function serializeQueryParams(params: {[key: string]: any}): string {
   return strParams.length ? `?${strParams.join('&')}` : '';
 }
 
+// Above V8's threshold for requiring dictionary elements.
+const SLOW_ELEMENTS_SENTINEL = 0x40000000;
+
+/**
+ * Avoids oversized V8 backing stores for numeric URL keys.
+ * Setting then deleting the sentinel keeps indexed properties in dictionary storage.
+ * Indices below 32 use little space, so leave them alone.
+ */
+function setUrlDerivedKey<T>(target: {[key: string]: T}, key: string, value: T): void {
+  // Preserve URL keys that happen to equal the sentinel.
+  if (Number(key) >= 32 && !Object.hasOwn(target, SLOW_ELEMENTS_SENTINEL)) {
+    target[SLOW_ELEMENTS_SENTINEL] = value;
+    delete target[SLOW_ELEMENTS_SENTINEL];
+  }
+  target[key] = value;
+}
+
 const SEGMENT_RE = /^[^\/()?;#]+/;
 function matchSegments(str: string): string {
   const match = str.match(SEGMENT_RE);
@@ -564,7 +651,11 @@ class UrlParser {
   }
 
   parseRootSegment(): UrlSegmentGroup {
-    this.consumeOptional('/');
+    // Consume all leading slashes. Multiple consecutive leading slashes (e.g. `///path`)
+    // are not meaningful and would otherwise produce a `//path`-style serialized URL,
+    // which browsers interpret as protocol-relative (resolving to a different origin)
+    // and reject with a SecurityError when passed to `history.pushState`/`replaceState`.
+    while (this.consumeOptional('/')) {}
 
     if (this.remaining === '' || this.peekStartsWith('?') || this.peekStartsWith('#')) {
       return new UrlSegmentGroup([], {});
@@ -588,7 +679,13 @@ class UrlParser {
     return this.consumeOptional('#') ? decodeURIComponent(this.remaining) : null;
   }
 
-  private parseChildren(): {[outlet: string]: UrlSegmentGroup} {
+  private parseChildren(depth = 0): {[outlet: string]: UrlSegmentGroup} {
+    if (depth > 50) {
+      throw new RuntimeError(
+        RuntimeErrorCode.UNPARSABLE_URL,
+        (typeof ngDevMode === 'undefined' || ngDevMode) && 'URL is too deep',
+      );
+    }
     if (this.remaining === '') {
       return {};
     }
@@ -608,12 +705,12 @@ class UrlParser {
     let children: {[outlet: string]: UrlSegmentGroup} = {};
     if (this.peekStartsWith('/(')) {
       this.capture('/');
-      children = this.parseParens(true);
+      children = this.parseParens(true, depth);
     }
 
     let res: {[outlet: string]: UrlSegmentGroup} = {};
     if (this.peekStartsWith('(')) {
-      res = this.parseParens(false);
+      res = this.parseParens(false, depth);
     }
 
     if (segments.length > 0 || Object.keys(children).length > 0) {
@@ -653,7 +750,7 @@ class UrlParser {
       return;
     }
     this.capture(key);
-    let value: any = '';
+    let value = '';
     if (this.consumeOptional('=')) {
       const valueMatch = matchSegments(this.remaining);
       if (valueMatch) {
@@ -662,7 +759,7 @@ class UrlParser {
       }
     }
 
-    params[decode(key)] = decode(value);
+    setUrlDerivedKey(params, decode(key), decode(value));
   }
 
   // Parse a single query parameter `name[=value]`
@@ -672,7 +769,7 @@ class UrlParser {
       return;
     }
     this.capture(key);
-    let value: any = '';
+    let value = '';
     if (this.consumeOptional('=')) {
       const valueMatch = matchUrlQueryParamValue(this.remaining);
       if (valueMatch) {
@@ -684,7 +781,7 @@ class UrlParser {
     const decodedKey = decodeQuery(key);
     const decodedVal = decodeQuery(value);
 
-    if (params.hasOwnProperty(decodedKey)) {
+    if (Object.hasOwn(params, decodedKey)) {
       // Append to existing values
       let currentVal = params[decodedKey];
       if (!Array.isArray(currentVal)) {
@@ -699,8 +796,12 @@ class UrlParser {
   }
 
   // parse `(a/b//outlet_name:c/d)`
-  private parseParens(allowPrimary: boolean): {[outlet: string]: UrlSegmentGroup} {
-    const segments: {[key: string]: UrlSegmentGroup} = {};
+  private parseParens(allowPrimary: boolean, depth: number): {[outlet: string]: UrlSegmentGroup} {
+    // The outlet name is taken verbatim from the URL, so it can be `__proto__`. Indexing a plain
+    // object with that key assigns through the inherited `__proto__` setter instead of creating an
+    // outlet, which drops the outlet and mutates the map's prototype (and throws under Node's
+    // `--disable-proto=throw`). A null-prototype map makes `__proto__` an ordinary key.
+    const segments: {[key: string]: UrlSegmentGroup} = Object.create(null);
     this.capture('(');
 
     while (!this.consumeOptional(')') && this.remaining.length > 0) {
@@ -717,7 +818,7 @@ class UrlParser {
         );
       }
 
-      let outletName: string = undefined!;
+      let outletName: string | undefined;
       if (path.indexOf(':') > -1) {
         outletName = path.slice(0, path.indexOf(':'));
         this.capture(outletName);
@@ -726,11 +827,12 @@ class UrlParser {
         outletName = PRIMARY_OUTLET;
       }
 
-      const children = this.parseChildren();
-      segments[outletName] =
-        Object.keys(children).length === 1
+      const children = this.parseChildren(depth + 1);
+      const child =
+        Object.keys(children).length === 1 && children[PRIMARY_OUTLET]
           ? children[PRIMARY_OUTLET]
           : new UrlSegmentGroup([], children);
+      setUrlDerivedKey(segments, outletName ?? PRIMARY_OUTLET, child);
       this.consumeOptional('//');
     }
 
@@ -777,7 +879,8 @@ export function createRoot(rootCandidate: UrlSegmentGroup): UrlSegmentGroup {
  * root but the `a` route lives under an empty path primary route.
  */
 export function squashSegmentGroup(segmentGroup: UrlSegmentGroup): UrlSegmentGroup {
-  const newChildren: Record<string, UrlSegmentGroup> = {};
+  // Keyed by outlet name, which can be `__proto__`, so use a null-prototype map (see `parseParens`).
+  const newChildren: Record<string, UrlSegmentGroup> = Object.create(null);
   for (const [childOutlet, child] of Object.entries(segmentGroup.children)) {
     const childCandidate = squashSegmentGroup(child);
     // moves named children in an empty path primary child into this group
@@ -787,11 +890,11 @@ export function squashSegmentGroup(segmentGroup: UrlSegmentGroup): UrlSegmentGro
       childCandidate.hasChildren()
     ) {
       for (const [grandChildOutlet, grandChild] of Object.entries(childCandidate.children)) {
-        newChildren[grandChildOutlet] = grandChild;
+        setUrlDerivedKey(newChildren, grandChildOutlet, grandChild);
       }
     } // don't add empty children
     else if (childCandidate.segments.length > 0 || childCandidate.hasChildren()) {
-      newChildren[childOutlet] = childCandidate;
+      setUrlDerivedKey(newChildren, childOutlet, childCandidate);
     }
   }
   const s = new UrlSegmentGroup(segmentGroup.segments, newChildren);

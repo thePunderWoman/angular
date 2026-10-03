@@ -10,6 +10,8 @@ import {
   ChangeDetectorRef,
   ComponentRef,
   Directive,
+  effect,
+  EffectRef,
   EnvironmentInjector,
   EventEmitter,
   inject,
@@ -31,10 +33,12 @@ import {combineLatest, of, Subscription} from 'rxjs';
 import {switchMap} from 'rxjs/operators';
 
 import {RuntimeErrorCode} from '../errors';
+import type {RouterResourcesFeatureImplementation} from '../router_resource_feature';
 import {Data} from '../models';
 import {ChildrenOutletContexts} from '../router_outlet_context';
 import {ActivatedRoute} from '../router_state';
 import {PRIMARY_OUTLET} from '../shared';
+import {ComponentInputBindingOptions} from '../router_config';
 
 /**
  * An `InjectionToken` provided by the `RouterOutlet` and can be set using the `routerOutletData`
@@ -55,9 +59,10 @@ import {PRIMARY_OUTLET} from '../shared';
  * ```
  *
  * @publicApi
+ * @see [Page routerOutletData](guide/routing/show-routes-with-outlets#passing-contextual-data-to-routed-components)
  */
 export const ROUTER_OUTLET_DATA = new InjectionToken<Signal<unknown | undefined>>(
-  typeof ngDevMode !== undefined && ngDevMode ? 'RouterOutlet data' : '',
+  typeof ngDevMode !== 'undefined' && ngDevMode ? 'RouterOutlet data' : '',
 );
 
 /**
@@ -198,6 +203,7 @@ export interface RouterOutletContract {
  *
  * @see {@link RouterLink}
  * @see {@link Route}
+ * @see [Show routes with outlets](guide/routing/show-routes-with-outlets)
  * @ngModule RouterModule
  *
  * @publicApi
@@ -237,7 +243,7 @@ export class RouterOutlet implements OnDestroy, OnInit, RouterOutletContract {
    *
    * When unset, the value of the token is `undefined` by default.
    */
-  readonly routerOutletData = input<unknown>(undefined);
+  readonly routerOutletData = input<unknown>();
 
   private parentContexts = inject(ChildrenOutletContexts);
   private location = inject(ViewContainerRef);
@@ -361,7 +367,7 @@ export class RouterOutlet implements OnDestroy, OnInit, RouterOutletContract {
     this.activated = ref;
     this._activatedRoute = activatedRoute;
     this.location.insert(ref.hostView);
-    this.inputBinder?.bindActivatedRouteToOutletComponent(this);
+    this.inputBinder?.bindActivatedRouteToOutletComponent(this, this.location.injector);
     this.attachEvents.emit(ref.instance);
   }
 
@@ -403,7 +409,7 @@ export class RouterOutlet implements OnDestroy, OnInit, RouterOutletContract {
     // Calling `markForCheck` to make sure we will run the change detection when the
     // `RouterOutlet` is inside a `ChangeDetectionStrategy.OnPush` component.
     this.changeDetector.markForCheck();
-    this.inputBinder?.bindActivatedRouteToOutletComponent(this);
+    this.inputBinder?.bindActivatedRouteToOutletComponent(this, this.location.injector);
     this.activateEvents.emit(this.activated.instance);
   }
 }
@@ -433,7 +439,9 @@ class OutletInjector implements Injector {
   }
 }
 
-export const INPUT_BINDER = new InjectionToken<RoutedComponentInputBinder>('');
+export const INPUT_BINDER = new InjectionToken<RoutedComponentInputBinder>(
+  typeof ngDevMode !== 'undefined' && ngDevMode ? 'Router Input Binder' : '',
+);
 
 /**
  * Injectable used as a tree-shakable provider for opting in to binding router data to component
@@ -443,8 +451,9 @@ export const INPUT_BINDER = new InjectionToken<RoutedComponentInputBinder>('');
  * activated. When this happens, the service subscribes to the `ActivatedRoute` observables (params,
  * queryParams, data) and sets the inputs of the component using `ComponentRef.setInput`.
  * Importantly, when an input does not have an item in the route data with a matching key, this
- * input is set to `undefined`. If it were not done this way, the previous information would be
+ * input is set to `undefined` by default. If it were not done this way, the previous information would be
  * retained if the data got removed from the route (i.e. if a query parameter is removed).
+ * The `unmatchedInputBehavior` option can be used to configure this behavior.
  *
  * The `RouterOutlet` should unregister itself when destroyed via `unsubscribeFromRouteData` so that
  * the subscriptions are cleaned up.
@@ -452,27 +461,63 @@ export const INPUT_BINDER = new InjectionToken<RoutedComponentInputBinder>('');
 @Injectable()
 export class RoutedComponentInputBinder {
   private outletDataSubscriptions = new Map<RouterOutlet, Subscription>();
+  private outletSeenKeys = new Map<RouterOutlet, Set<string>>();
+  private outletEffects = new Map<RouterOutlet, EffectRef[]>();
 
-  bindActivatedRouteToOutletComponent(outlet: RouterOutlet): void {
+  constructor(
+    private options: ComponentInputBindingOptions,
+    private feature: RouterResourcesFeatureImplementation | null = null,
+  ) {
+    this.options.queryParams ??= true;
+  }
+
+  bindActivatedRouteToOutletComponent(outlet: RouterOutlet, injector: Injector): void {
     this.unsubscribeFromRouteData(outlet);
-    this.subscribeToRouteData(outlet);
+    this.subscribeToRouteData(outlet, injector);
   }
 
   unsubscribeFromRouteData(outlet: RouterOutlet): void {
     this.outletDataSubscriptions.get(outlet)?.unsubscribe();
     this.outletDataSubscriptions.delete(outlet);
+    this.outletSeenKeys.delete(outlet);
+    this.outletEffects.get(outlet)?.forEach((effect) => effect.destroy());
+    this.outletEffects.delete(outlet);
   }
 
-  private subscribeToRouteData(outlet: RouterOutlet) {
+  private subscribeToRouteData(outlet: RouterOutlet, injector: Injector) {
     const {activatedRoute} = outlet;
+
+    const effects: EffectRef[] = [];
+    let keysBoundToBlockingResources: string[] = [];
+
+    if (this.feature?.createResourceOutletBindingEffects && outlet.activatedComponentRef) {
+      const {handledKeys, createdEffects} = this.feature.createResourceOutletBindingEffects(
+        outlet.activatedComponentRef,
+        activatedRoute,
+      );
+      effects.push(...createdEffects);
+      keysBoundToBlockingResources = handledKeys;
+    }
+
+    if (effects.length > 0) {
+      this.outletEffects.set(outlet, effects);
+    }
+
     const dataSubscription = combineLatest([
-      activatedRoute.queryParams,
+      this.options.queryParams ? activatedRoute.queryParams : of({}),
       activatedRoute.params,
       activatedRoute.data,
     ])
       .pipe(
         switchMap(([queryParams, params, data], index) => {
-          data = {...queryParams, ...params, ...data};
+          // Precedence when keys collide is determined by the spread order:
+          // resources > data (including resolvers) > path params > query params
+          data = {
+            ...queryParams,
+            ...params,
+            ...data,
+            ...activatedRoute.resources,
+          };
           // Get the first result from the data subscription synchronously so it's available to
           // the component as soon as possible (and doesn't require a second change detection).
           if (index === 0) {
@@ -497,14 +542,32 @@ export class RoutedComponentInputBinder {
           return;
         }
 
-        const mirror = reflectComponentType(activatedRoute.component);
-        if (!mirror) {
+        const currentMirror = reflectComponentType(activatedRoute.component);
+        if (!currentMirror) {
           this.unsubscribeFromRouteData(outlet);
           return;
         }
 
-        for (const {templateName} of mirror.inputs) {
-          outlet.activatedComponentRef.setInput(templateName, data[templateName]);
+        let seenKeys = this.outletSeenKeys.get(outlet);
+        if (!seenKeys) {
+          seenKeys = new Set<string>();
+          this.outletSeenKeys.set(outlet, seenKeys);
+        }
+
+        for (const key of Object.keys(data)) {
+          seenKeys.add(key);
+        }
+
+        const behavior = this.options.unmatchedInputBehavior ?? 'alwaysUndefined';
+
+        for (const {templateName} of currentMirror.inputs) {
+          if (keysBoundToBlockingResources.includes(templateName)) {
+            continue;
+          }
+          const value = data[templateName];
+          if (value !== undefined || behavior === 'alwaysUndefined' || seenKeys.has(templateName)) {
+            outlet.activatedComponentRef.setInput(templateName, value);
+          }
         }
       });
 

@@ -6,13 +6,13 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {TestBed} from '@angular/core/testing';
-import {AppComponent} from './app.component';
-import {provideRouter, withComponentInputBinding} from '@angular/router';
-import {routes} from './routing/routes';
-import {Search, WINDOW} from '@angular/docs';
 import {provideHttpClient} from '@angular/common/http';
 import {provideHttpClientTesting} from '@angular/common/http/testing';
+import {TestBed} from '@angular/core/testing';
+import {Search, WINDOW} from '@angular/docs';
+import {provideRouter, withComponentInputBinding} from '@angular/router';
+import {AppComponent} from './app.component';
+import {routes} from './routing/routes';
 
 describe('AppComponent', () => {
   const fakeSearch = {};
@@ -20,6 +20,7 @@ describe('AppComponent', () => {
 
   it('should create the app', () => {
     TestBed.configureTestingModule({
+      imports: [AppComponent],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -34,6 +35,7 @@ describe('AppComponent', () => {
         },
       ],
     });
+
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
     expect(app).toBeTruthy();

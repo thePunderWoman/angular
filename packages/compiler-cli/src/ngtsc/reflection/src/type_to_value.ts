@@ -43,6 +43,11 @@ export function typeToValue(
 
   const {local, decl} = symbols;
 
+  // Whether we got here without being able to confirm that the symbol has a value at runtime. A
+  // value reference is still emitted in that case, but consumers may need to guard it (see the
+  // `@ts-ignore` that gets attached to constructor parameter types in `extractClassMetadata`).
+  let valueUnverified = false;
+
   // It's only valid to convert a type reference to a value reference if the type actually
   // has a value declaration associated with it. Note that const enums are an exception,
   // because while they do have a value declaration, they don't exist at runtime.
@@ -65,6 +70,10 @@ export function typeToValue(
     ) {
       return noValueDeclaration(typeNode, typeOnlyDecl);
     }
+
+    // Local compilation couldn't prove that this is a type-only symbol, so it falls through and
+    // gets emitted as a value even though it may not exist at runtime.
+    valueUnverified = true;
   }
 
   // The type points to a valid value declaration. Rewrite the TypeReference into an
@@ -78,7 +87,7 @@ export function typeToValue(
       // This is a default import.
       //   import Foo from 'foo';
 
-      if (firstDecl.isTypeOnly) {
+      if (firstDecl.phaseModifier === ts.SyntaxKind.TypeKeyword) {
         // Type-only imports cannot be represented as value.
         return typeOnlyImport(typeNode, firstDecl);
       }
@@ -91,6 +100,7 @@ export function typeToValue(
         kind: TypeValueReferenceKind.LOCAL,
         expression: firstDecl.name,
         defaultImportStatement: firstDecl.parent,
+        valueUnverified,
       };
     } else if (ts.isImportSpecifier(firstDecl)) {
       // The symbol was imported by name
@@ -103,7 +113,7 @@ export function typeToValue(
         return typeOnlyImport(typeNode, firstDecl);
       }
 
-      if (firstDecl.parent.parent.isTypeOnly) {
+      if (firstDecl.parent.parent.phaseModifier === ts.SyntaxKind.TypeKeyword) {
         // The import specifier can't be inside a type-only import clause
         // (e.g. `import type {Foo} from '...')`.
         return typeOnlyImport(typeNode, firstDecl.parent.parent);
@@ -128,13 +138,14 @@ export function typeToValue(
         valueDeclaration: decl.valueDeclaration ?? null,
         moduleName,
         importedName,
+        valueUnverified,
         nestedPath,
       };
     } else if (ts.isNamespaceImport(firstDecl)) {
       // The import is a namespace import
       //   import * as Foo from 'foo';
 
-      if (firstDecl.parent.isTypeOnly) {
+      if (firstDecl.parent.phaseModifier === ts.SyntaxKind.TypeKeyword) {
         // Type-only imports cannot be represented as value.
         return typeOnlyImport(typeNode, firstDecl.parent);
       }
@@ -160,6 +171,7 @@ export function typeToValue(
         valueDeclaration: decl.valueDeclaration ?? null,
         moduleName,
         importedName,
+        valueUnverified,
         nestedPath,
       };
     }
@@ -172,6 +184,7 @@ export function typeToValue(
       kind: TypeValueReferenceKind.LOCAL,
       expression,
       defaultImportStatement: null,
+      valueUnverified,
     };
   } else {
     return unsupportedType(typeNode);

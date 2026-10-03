@@ -12,6 +12,8 @@ import {LView} from '../render3/interfaces/view';
 import {getCurrentTNode, getLView} from '../render3/state';
 import {getNativeByTNode} from '../render3/util/view_utils';
 
+import {registerSpecialProvider} from '../render3/debug/special_providers';
+
 /**
  * Creates an ElementRef from the most recent node.
  *
@@ -42,6 +44,8 @@ export function createElementRef(tNode: TNode, lView: LView): ElementRef {
  * XSS attacks. Carefully review any use of `ElementRef` in your code. For more detail, see the
  * [Security Guide](https://g.co/ng/security).
  *
+ * @see [Using DOM APIs](guide/components/dom-apis)
+ *
  * @publicApi
  */
 // Note: We don't expose things like `Injector`, `ViewContainer`, ... here,
@@ -70,6 +74,10 @@ export class ElementRef<T = any> {
    * @nocollapse
    */
   static __NG_ELEMENT_ID__: () => ElementRef = injectElementRef;
+}
+
+if (typeof ngDevMode === 'undefined' || ngDevMode) {
+  registerSpecialProvider(ElementRef);
 }
 
 /**

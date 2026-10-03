@@ -8,15 +8,14 @@ Components are the main building blocks of Angular applications. Each component 
 
 Every component has a few main parts:
 
-1. A `@Component`[decorator](https://www.typescriptlang.org/docs/handbook/decorators.html) that contains some configuration used by Angular.
+1. A `@Component` [decorator](https://www.typescriptlang.org/docs/handbook/decorators.html) that contains some configuration used by Angular.
 2. An HTML template that controls what renders into the DOM.
 3. A [CSS selector](https://developer.mozilla.org/docs/Learn/CSS/Building_blocks/Selectors) that defines how the component is used in HTML.
 4. A TypeScript class with behaviors, such as handling user input or making requests to a server.
 
 Here is a simplified example of a `UserProfile` component.
 
-```angular-ts
-// user-profile.ts
+```angular-ts {header: "user-profile.ts"}
 @Component({
   selector: 'user-profile',
   template: `
@@ -24,30 +23,36 @@ Here is a simplified example of a `UserProfile` component.
     <p>This is the user profile page</p>
   `,
 })
-export class UserProfile { /* Your component code goes here */ }
+export class UserProfile {
+  /* Your component code goes here */
+}
 ```
 
 The `@Component` decorator also optionally accepts a `styles` property for any CSS you want to apply to your template:
 
-```angular-ts
-// user-profile.ts
+```angular-ts {header: "user-profile.ts"}
 @Component({
   selector: 'user-profile',
   template: `
     <h1>User profile</h1>
     <p>This is the user profile page</p>
   `,
-  styles: `h1 { font-size: 3em; } `,
+  styles: `
+    h1 {
+      font-size: 3em;
+    }
+  `,
 })
-export class UserProfile { /* Your component code goes here */ }
+export class UserProfile {
+  /* Your component code goes here */
+}
 ```
 
 ### Separating HTML and CSS into separate files
 
 You can define a component's HTML and CSS in separate files using `templateUrl` and `styleUrl`:
 
-```angular-ts
-// user-profile.ts
+```angular-ts {header: "user-profile.ts"}
 @Component({
   selector: 'user-profile',
   templateUrl: 'user-profile.html',
@@ -58,14 +63,12 @@ export class UserProfile {
 }
 ```
 
-```angular-html
-<!-- user-profile.html -->
+```angular-html {header: "user-profile.html"}
 <h1>User profile</h1>
 <p>This is the user profile page</p>
 ```
 
-```css
-/* user-profile.css */
+```css {header: "user-profile.css"}
 h1 {
   font-size: 3em;
 }
@@ -87,14 +90,14 @@ flowchart TD
 Here, the `UserProfile` component uses several other components to produce the final page.
 
 To import and use a component, you need to:
+
 1. In your component's TypeScript file, add an `import` statement for the component you want to use.
 2. In your `@Component` decorator, add an entry to the `imports` array for the component you want to use.
 3. In your component's template, add an element that matches the selector of the component you want to use.
 
 Here's an example of a `UserProfile` component importing a `ProfilePhoto` component:
 
-```angular-ts
-// user-profile.ts
+```angular-ts {header: "user-profile.ts"}
 import {ProfilePhoto} from 'profile-photo.ts';
 
 @Component({

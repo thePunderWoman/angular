@@ -20,6 +20,7 @@ import type {HttpHandler} from './backend';
 
 import {HttpRequest} from './request';
 import {HttpEvent} from './response';
+import {xsrfInterceptorFn} from './xsrf';
 
 /**
  * Intercepts and handles an `HttpRequest` or `HttpResponse`.
@@ -187,33 +188,36 @@ export function chainedInterceptorFn(
  * A multi-provider token that represents the array of registered
  * `HttpInterceptor` objects.
  *
+ * @see [HTTP Guide](guide/http/interceptors)
+ *
  * @publicApi
  */
 export const HTTP_INTERCEPTORS = new InjectionToken<readonly HttpInterceptor[]>(
-  typeof ngDevMode !== undefined && ngDevMode ? 'HTTP_INTERCEPTORS' : '',
+  typeof ngDevMode !== 'undefined' && ngDevMode ? 'HTTP_INTERCEPTORS' : '',
 );
 
 /**
  * A multi-provided token of `HttpInterceptorFn`s.
  */
 export const HTTP_INTERCEPTOR_FNS = new InjectionToken<readonly HttpInterceptorFn[]>(
-  typeof ngDevMode !== undefined && ngDevMode ? 'HTTP_INTERCEPTOR_FNS' : '',
-  {factory: () => []},
+  typeof ngDevMode !== 'undefined' && ngDevMode ? 'HTTP_INTERCEPTOR_FNS' : '',
+  {factory: () => [xsrfInterceptorFn]},
 );
 
 /**
  * A multi-provided token of `HttpInterceptorFn`s that are only set in root.
  */
 export const HTTP_ROOT_INTERCEPTOR_FNS = new InjectionToken<readonly HttpInterceptorFn[]>(
-  typeof ngDevMode !== undefined && ngDevMode ? 'HTTP_ROOT_INTERCEPTOR_FNS' : '',
+  typeof ngDevMode !== 'undefined' && ngDevMode ? 'HTTP_ROOT_INTERCEPTOR_FNS' : '',
 );
 
 // TODO(atscott): We need a larger discussion about stability and what should contribute to stability.
 // Should the whole interceptor chain contribute to stability or just the backend request #55075?
 // Should HttpClient contribute to stability automatically at all?
 export const REQUESTS_CONTRIBUTE_TO_STABILITY = new InjectionToken<boolean>(
-  typeof ngDevMode !== undefined && ngDevMode ? 'REQUESTS_CONTRIBUTE_TO_STABILITY' : '',
-  {providedIn: 'root', factory: () => true},
+  typeof ngDevMode !== 'undefined' && ngDevMode ? 'REQUESTS_CONTRIBUTE_TO_STABILITY' : '',
+  // Providing a factory implies that the token is provided in root by default
+  {factory: () => true},
 );
 
 /**

@@ -18,11 +18,13 @@ import {Reference} from '../../imports';
 import {
   DirectiveMeta,
   flattenInheritedDirectiveMetadata,
+  ForeignComponentMeta,
   HostDirectivesResolver,
   MetadataReader,
   MetaKind,
   NgModuleMeta,
   PipeMeta,
+  createForeignComponentMatcher,
 } from '../../metadata';
 import {ClassDeclaration} from '../../reflection';
 import {ComponentScopeKind, ComponentScopeReader, SelectorlessScope} from './api';
@@ -36,6 +38,11 @@ export interface TypeCheckScope {
    * that are in the compilation scope of the declaring NgModule.
    */
   matcher: DirectiveMatcher<DirectiveMeta> | null;
+
+  /**
+   * A `SelectorlessMatcher` instance that contains matched foreign components.
+   */
+  foreignMatcher: SelectorlessMatcher<ForeignComponentMeta> | null;
 
   /**
    * All of the directives available in the compilation scope of the declaring NgModule.
@@ -100,6 +107,7 @@ export class TypeCheckScopeRegistry {
     if (scope === null) {
       return {
         matcher: null,
+        foreignMatcher: null,
         directives,
         pipes,
         schemas: [],
@@ -152,8 +160,12 @@ export class TypeCheckScopeRegistry {
       }
     }
 
+    const foreignMatcher =
+      hostMeta !== null ? createForeignComponentMatcher(hostMeta.foreignImports) : null;
+
     const typeCheckScope: TypeCheckScope = {
       matcher,
+      foreignMatcher,
       directives,
       pipes,
       schemas: scope.schemas,
@@ -185,8 +197,12 @@ export class TypeCheckScopeRegistry {
   private applyExplicitlyDeferredFlag<T extends DirectiveMeta | PipeMeta>(
     meta: T,
     isExplicitlyDeferred: boolean,
+    deferredBlocks?: Set<string> | null,
   ): T {
-    return isExplicitlyDeferred === true ? {...meta, isExplicitlyDeferred} : meta;
+    if (isExplicitlyDeferred === true) {
+      return {...meta, isExplicitlyDeferred, deferredBlocks: deferredBlocks ?? null};
+    }
+    return meta;
   }
 
   private getSelectorMatcher(
@@ -201,8 +217,12 @@ export class TypeCheckScopeRegistry {
           continue;
         }
 
-        // Carry over the `isExplicitlyDeferred` flag from the dependency info.
-        const directiveMeta = this.applyExplicitlyDeferredFlag(extMeta, meta.isExplicitlyDeferred);
+        // Carry over the `isExplicitlyDeferred` flag and `deferredBlocks` from the dependency info.
+        const directiveMeta = this.applyExplicitlyDeferredFlag(
+          extMeta,
+          meta.isExplicitlyDeferred,
+          meta.deferredBlocks,
+        );
         matcher.addSelectables(
           CssSelector.parse(meta.selector),
           this.combineWithHostDirectives(directiveMeta),

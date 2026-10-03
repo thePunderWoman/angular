@@ -6,10 +6,11 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {CommonModule, SlicePipe} from '../../index';
+import {ChangeDetectionStrategy} from '@angular/compiler';
 import {Component} from '@angular/core';
-import {TestBed, waitForAsync} from '@angular/core/testing';
+import {TestBed} from '@angular/core/testing';
 import {expect} from '@angular/private/testing/matchers';
+import {SlicePipe} from '../../index';
 
 describe('SlicePipe', () => {
   let list: number[];
@@ -93,43 +94,40 @@ describe('SlicePipe', () => {
     @Component({
       selector: 'test-comp',
       template: '{{(data | slice:1).join(",") }}',
-      standalone: false,
+      imports: [SlicePipe],
+      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class TestComp {
       data: any;
     }
 
-    beforeEach(() => {
-      TestBed.configureTestingModule({declarations: [TestComp], imports: [CommonModule]});
-    });
-
-    it('should work with mutable arrays', waitForAsync(() => {
+    it('should work with mutable arrays', async () => {
       const fixture = TestBed.createComponent(TestComp);
       const mutable: number[] = [1, 2];
       fixture.componentInstance.data = mutable;
-      fixture.changeDetectorRef.markForCheck();
-      fixture.detectChanges();
+      await fixture.whenStable();
       expect(fixture.nativeElement).toHaveText('2');
 
       mutable.push(3);
       fixture.changeDetectorRef.markForCheck();
-      fixture.detectChanges();
+      await fixture.whenStable();
       expect(fixture.nativeElement).toHaveText('2,3');
-    }));
+    });
   });
 
-  it('should be available as a standalone pipe', () => {
+  it('should be available as a standalone pipe', async () => {
     @Component({
       selector: 'test-component',
       imports: [SlicePipe],
       template: '{{ title | slice:0:5 }}',
+      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class TestComponent {
       title = 'Hello World!';
     }
 
     const fixture = TestBed.createComponent(TestComponent);
-    fixture.detectChanges();
+    await fixture.whenStable();
 
     const content = fixture.nativeElement.textContent;
     expect(content).toBe('Hello');

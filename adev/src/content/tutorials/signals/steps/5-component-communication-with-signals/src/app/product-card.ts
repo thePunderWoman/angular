@@ -1,6 +1,5 @@
-import {Component, ChangeDetectionStrategy} from '@angular/core';
-
 // TODO: Import input from @angular/core
+import {Component} from '@angular/core';
 
 @Component({
   selector: 'product-card',
@@ -12,7 +11,6 @@ import {Component, ChangeDetectionStrategy} from '@angular/core';
       <p class="status">Status: Available</p>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProductCard {
   // TODO: Create signal inputs for name, price, and available
