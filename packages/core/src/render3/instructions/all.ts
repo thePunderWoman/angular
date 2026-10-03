@@ -32,11 +32,14 @@ export * from './attribute';
 export * from './animation';
 export * from './change_detection';
 export * from './component_instance';
+export * from './control';
 export * from './control_flow';
+export * from './boundary';
 export * from './di';
 export * from './di_attr';
 export * from './element';
 export * from './element_container';
+export * from './foreign_component';
 export {
   ɵgetUnknownElementStrictMode,
   ɵgetUnknownPropertyStrictMode,
@@ -62,3 +65,4 @@ export * from './two_way';
 export * from './let_declaration';
 export * from './attach_source_locations';
 export * from './value_interpolation';
+export * from './arrow_function';

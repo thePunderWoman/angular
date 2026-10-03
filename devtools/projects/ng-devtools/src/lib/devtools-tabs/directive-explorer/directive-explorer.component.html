@@ -1,7 +1,12 @@
-<as-split unit="percent" [direction]="splitDirection()" [gutterSize]="9">
-  <as-split-area #directiveForestSplitArea size="60">
+<as-split
+  unit="percent"
+  [ngResponsiveSplit]="tabSplitConfig"
+  direction="horizontal"
+  [gutterSize]="9"
+>
+  <as-split-area size="60">
     <as-split
-      [ngResponsiveSplit]="responsiveSplitConfig"
+      [ngResponsiveSplit]="forestSplitConfig"
       (directionChange)="onResponsiveSplitDirChange($event)"
       direction="vertical"
       [gutterSize]="9"
@@ -18,6 +23,7 @@
           [forest]="forest()"
           [currentSelectedElement]="currentSelectedElement()!"
           [showCommentNodes]="showCommentNodes()"
+          [cdData]="cdData() ?? undefined"
         />
         @if (parents()) {
           <ng-breadcrumbs
@@ -30,8 +36,8 @@
       </as-split-area>
       @if (signalsOpen() && signalGraph.element()) {
         <as-split-area [size]="signalGraphSplitSize()">
-          <ng-signals-tab
-            [preselectedNodeId]="preselectedSignalNodeId()"
+          <ng-signal-graph-pane
+            [externallySelectedNodeId]="externallySelectedSignalNodeId()"
             (close)="signalsOpen.set(false)"
           />
         </as-split-area>
@@ -41,7 +47,7 @@
   <as-split-area size="40" minSize="25" class="prop-split">
     <div class="property-tab-wrapper">
       @if (currentSelectedElement(); as currentSelectedElement) {
-        <ng-property-tab
+        <ng-property-pane
           [currentSelectedElement]="currentSelectedElement"
           (showSignalGraph)="showSignalGraph($event)"
           (inspect)="inspect($event)"
@@ -51,14 +57,5 @@
         <p class="no-selected-element">No selected element</p>
       }
     </div>
-    @if (isHydrationEnabled) {
-      <div class="hydration">
-        <mat-slide-toggle
-          [(ngModel)]="showHydrationNodeHighlights"
-          (change)="showHydrationNodeHighlights() ? hightlightHydrationNodes() : removeHydrationNodesHightlights()"
-          >Show hydration overlays</mat-slide-toggle
-        >
-      </div>
-    }
   </as-split-area>
 </as-split>

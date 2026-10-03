@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {ɵWritable as Writable} from '@angular/core';
+import {untracked, ɵWritable as Writable} from '@angular/core';
 
 import {AsyncValidatorFn, ValidatorFn} from '../directives/validators';
 
@@ -16,6 +16,7 @@ import {
   assertAllValuesPresent,
   assertControlPresent,
   FormResetEvent,
+  hasOwnControl,
   pickAsyncValidators,
   pickValidators,
   ɵRawValue,
@@ -180,6 +181,9 @@ export type ɵOptionalKeys<T> = {
  * Notice that `c.value.one` has type `string|null|undefined`. This is because calling `c.reset({})`
  * without providing the optional key `one` will cause it to become `null`.
  *
+ * @see [Grouping form controls](guide/forms/reactive-forms#grouping-form-controls)
+ * @see [FormGroup and FormRecord](guide/forms/typed-forms#formgroup-and-formrecord)
+ *
  * @publicApi
  */
 export class FormGroup<
@@ -242,7 +246,8 @@ export class FormGroup<
   ): AbstractControl<any>;
 
   registerControl<K extends string & keyof TControl>(name: K, control: TControl[K]): TControl[K] {
-    if (this.controls[name]) return (this.controls as any)[name];
+    const existingControl = this._find(name as string);
+    if (existingControl) return existingControl as TControl[K];
     this.controls[name] = control;
     control.setParent(this as FormGroup);
     control._registerOnCollectionChange(this._onCollectionChange);
@@ -319,8 +324,8 @@ export class FormGroup<
    * removed. When false, no events are emitted.
    */
   removeControl(name: string, options: {emitEvent?: boolean} = {}): void {
-    if ((this.controls as any)[name])
-      (this.controls as any)[name]._registerOnCollectionChange(() => {});
+    const existingControl = this._find(name);
+    if (existingControl) existingControl._registerOnCollectionChange(() => {});
     delete (this.controls as any)[name];
     this.updateValueAndValidity({emitEvent: options.emitEvent});
     this._onCollectionChange();
@@ -361,7 +366,8 @@ export class FormGroup<
       emitEvent?: boolean;
     } = {},
   ): void {
-    if (this.controls[name]) this.controls[name]._registerOnCollectionChange(() => {});
+    const existingControl = this._find(name as string);
+    if (existingControl) existingControl._registerOnCollectionChange(() => {});
     delete this.controls[name];
     if (control) this.registerControl(name, control);
     this.updateValueAndValidity({emitEvent: options.emitEvent});
@@ -382,7 +388,7 @@ export class FormGroup<
   contains(this: FormGroup<{[key: string]: AbstractControl<any>}>, controlName: string): boolean;
 
   contains<K extends string & keyof TControl>(controlName: K): boolean {
-    return this.controls.hasOwnProperty(controlName) && this.controls[controlName].enabled;
+    return this._find(controlName)?.enabled === true;
   }
 
   /**
@@ -427,15 +433,17 @@ export class FormGroup<
       emitEvent?: boolean;
     } = {},
   ): void {
-    assertAllValuesPresent(this, true, value);
-    (Object.keys(value) as Array<keyof TControl>).forEach((name) => {
-      assertControlPresent(this, true, name as any);
-      (this.controls as any)[name].setValue((value as any)[name], {
-        onlySelf: true,
-        emitEvent: options.emitEvent,
+    untracked(() => {
+      assertAllValuesPresent(this, true, value);
+      (Object.keys(value) as Array<keyof TControl>).forEach((name) => {
+        assertControlPresent(this, true, name as any);
+        (this.controls as any)[name].setValue((value as any)[name], {
+          onlySelf: true,
+          emitEvent: options.emitEvent,
+        });
       });
+      this.updateValueAndValidity(options);
     });
-    this.updateValueAndValidity(options);
   }
 
   /**
@@ -482,11 +490,9 @@ export class FormGroup<
     // `undefined` as a value.
     if (value == null /* both `null` and `undefined` */) return;
     (Object.keys(value) as Array<keyof TControl>).forEach((name) => {
-      // The compiler cannot see through the uninstantiated conditional type of `this.controls`, so
-      // `as any` is required.
-      const control = (this.controls as any)[name];
-      if (control) {
-        control.patchValue(
+      const existingControl = this._find(name as string);
+      if (existingControl) {
+        existingControl.patchValue(
           /* Guaranteed to be present, due to the outer forEach. */ value[
             name as keyof ɵFormGroupValue<TControl>
           ]!,
@@ -556,13 +562,10 @@ export class FormGroup<
    */
   override reset(
     value: ɵTypedOrUntyped<TControl, ɵFormGroupArgumentValue<TControl>, any> = {},
-    options: {onlySelf?: boolean; emitEvent?: boolean} = {},
+    options: {onlySelf?: boolean; emitEvent?: boolean; overwriteDefaultValue?: boolean} = {},
   ): void {
     this._forEachChild((control: AbstractControl, name) => {
-      control.reset(value ? (value as any)[name] : null, {
-        onlySelf: true,
-        emitEvent: options.emitEvent,
-      });
+      control.reset(value ? (value as any)[name] : null, {...options, onlySelf: true});
     });
     this._updatePristine(options, this);
     this._updateTouched(options, this);
@@ -662,7 +665,7 @@ export class FormGroup<
 
   /** @internal */
   override _find(name: string | number): AbstractControl | null {
-    return this.controls.hasOwnProperty(name as string)
+    return hasOwnControl(this.controls, name as string)
       ? (this.controls as any)[name as keyof TControl]
       : null;
   }
@@ -709,6 +712,8 @@ export const UntypedFormGroup: UntypedFormGroupCtor = FormGroup;
  * @description
  * Asserts that the given control is an instance of `FormGroup`
  *
+ * @see [Utility functions for narrowing form control types](guide/forms/reactive-forms#utility-functions-for-narrowing-form-control-types)
+ *
  * @publicApi
  */
 export const isFormGroup = (control: unknown): control is FormGroup => control instanceof FormGroup;
@@ -729,6 +734,8 @@ export const isFormGroup = (control: unknown): control is FormGroup => control i
  * numbers.addControl('bob', new FormControl('415-234-567'));
  * numbers.removeControl('bill');
  * ```
+ *
+ * @see [FormGroup and FormRecord](guide/forms/typed-forms#formgroup-and-formrecord)
  *
  * @publicApi
  */
@@ -826,6 +833,8 @@ export interface FormRecord<TControl> {
 /**
  * @description
  * Asserts that the given control is an instance of `FormRecord`
+ *
+ * @see [Utility functions for narrowing form control types](guide/forms/reactive-forms#utility-functions-for-narrowing-form-control-types)
  *
  * @publicApi
  */

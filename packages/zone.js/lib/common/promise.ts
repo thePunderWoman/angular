@@ -34,7 +34,7 @@ export function patchPromise(Zone: ZoneType): void {
     api.onUnhandledError = (e: any) => {
       if (api.showUncaughtError()) {
         const rejection = e && e.rejection;
-        if (rejection) {
+        if (rejection && e.zone && e.task) {
           console.error(
             'Unhandled Promise rejection:',
             rejection instanceof Error ? rejection.message : rejection,
@@ -160,8 +160,8 @@ export function patchPromise(Zone: ZoneType): void {
         if (
           state !== REJECTED &&
           value instanceof ZoneAwarePromise &&
-          value.hasOwnProperty(symbolState) &&
-          value.hasOwnProperty(symbolValue) &&
+          Object.hasOwn(value, symbolState) &&
+          Object.hasOwn(value, symbolValue) &&
           (value as any)[symbolState] !== UNRESOLVED
         ) {
           clearRejectedNoCatch(value);
@@ -212,7 +212,7 @@ export function patchPromise(Zone: ZoneType): void {
             }
           }
 
-          for (let i = 0; i < queue.length; ) {
+          for (let i = 0; i < queue.length;) {
             scheduleResolveOrReject(promise, queue[i++], queue[i++], queue[i++], queue[i++]);
           }
           if (queue.length == 0 && state == REJECTED) {
@@ -627,6 +627,11 @@ export function patchPromise(Zone: ZoneType): void {
 
     if (NativePromise) {
       patchThen(NativePromise);
+      // TODO(atscott): Investigate generic to propagate any unknown properties
+      const nativeTry = (NativePromise as any)['try'];
+      if (nativeTry && typeof nativeTry === 'function') {
+        (ZoneAwarePromise as any)['try'] = nativeTry;
+      }
       patchMethod(global, 'fetch', (delegate) => zoneify(delegate));
     }
 

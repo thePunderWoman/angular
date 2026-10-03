@@ -41,7 +41,6 @@ import {onViewportWrapper} from './dom_triggers';
 import {onIdle} from './idle_scheduler';
 import {
   DEFER_BLOCK_STATE,
-  DeferBlockBehavior,
   DeferBlockState,
   DeferBlockTrigger,
   DeferDependenciesLoadingState,
@@ -56,11 +55,11 @@ import {
 } from './interfaces';
 import {DEHYDRATED_BLOCK_REGISTRY, DehydratedBlockRegistry} from './registry';
 import {
-  DEFER_BLOCK_CONFIG,
   DEFER_BLOCK_DEPENDENCY_INTERCEPTOR,
   renderDeferBlockState,
   renderDeferStateAfterResourceLoading,
   renderPlaceholder,
+  shouldTriggerDeferBlock,
 } from './rendering';
 import {onTimer} from './timer_scheduler';
 import {
@@ -106,7 +105,6 @@ export function scheduleDelayedTrigger(
  */
 export function scheduleDelayedPrefetching(
   scheduleFn: (callback: VoidFunction, injector: Injector) => VoidFunction,
-  trigger: DeferBlockTrigger,
 ) {
   if (typeof ngServerMode !== 'undefined' && ngServerMode) return;
 
@@ -223,10 +221,12 @@ export function triggerResourceLoading(
   // Start downloading of defer block dependencies.
   tDetails.loadingPromise = Promise.allSettled(dependenciesFn()).then((results) => {
     let failed = false;
+    let failedReason: Error | null = null;
     const directiveDefs: DirectiveDefList = [];
     const pipeDefs: PipeDefList = [];
 
-    for (const result of results) {
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
       if (result.status === 'fulfilled') {
         const dependency = result.value;
         const directiveDef = getComponentDef(dependency) || getDirectiveDef(dependency);
@@ -240,6 +240,8 @@ export function triggerResourceLoading(
         }
       } else {
         failed = true;
+        failedReason =
+          result.reason instanceof Error ? result.reason : new Error(String(result.reason));
         break;
       }
     }
@@ -249,13 +251,31 @@ export function triggerResourceLoading(
 
       if (tDetails.errorTmplIndex === null) {
         const templateLocation = ngDevMode ? getTemplateLocationDetails(lView) : '';
-        const error = new RuntimeError(
-          RuntimeErrorCode.DEFER_LOADING_FAILED,
-          ngDevMode &&
+        let errorMsg = '';
+
+        if (ngDevMode) {
+          errorMsg =
             'Loading dependencies for `@defer` block failed, ' +
-              `but no \`@error\` block was configured${templateLocation}. ` +
-              'Consider using the `@error` block to render an error state.',
-        );
+            `but no \`@error\` block was configured${templateLocation}. ` +
+            'Consider using the `@error` block to render an error state.';
+
+          const depsFn = tDetails.dependencyResolverFn;
+          const errorReason = failedReason?.message;
+
+          if (depsFn) {
+            errorMsg +=
+              `\n\nAngular tried to invoke the following dependency function (compiler-generated):\n` +
+              `\`\`\`\n${depsFn.toString()}\n\`\`\``;
+          }
+
+          if (errorReason) {
+            errorMsg += depsFn
+              ? `\n\nbut it resulted in the following error:\n\n${errorReason}`
+              : `\n\nThe loading resulted in the following error:\n\n${errorReason}`;
+          }
+        }
+
+        const error = new RuntimeError(RuntimeErrorCode.DEFER_LOADING_FAILED, errorMsg);
         handleUncaughtError(lView, error);
       }
     } else {
@@ -290,24 +310,6 @@ export function triggerResourceLoading(
     tDetails.loadingPromise = null;
     removeTask();
   });
-}
-
-/**
- * Defines whether we should proceed with triggering a given defer block.
- */
-function shouldTriggerDeferBlock(triggerType: TriggerType, lView: LView): boolean {
-  // prevents triggering regular triggers when on the server.
-  if (triggerType === TriggerType.Regular && typeof ngServerMode !== 'undefined' && ngServerMode) {
-    return false;
-  }
-
-  // prevents triggering in the case of a test run with manual defer block configuration.
-  const injector = lView[INJECTOR];
-  const config = injector.get(DEFER_BLOCK_CONFIG, null, {optional: true});
-  if (config?.behavior === DeferBlockBehavior.Manual) {
-    return false;
-  }
-  return true;
 }
 
 /**
@@ -496,13 +498,34 @@ export async function triggerHydrationForBlockQueue(
     replayQueuedEventsFn(hydrationQueue);
   }
 
+  // `cleanupHydratedDeferBlocks` -> `cleanupDehydratedViews` walks all LViews
+  // registered with ApplicationRef and removes dehydrated views that aren't
+  // associated with a defer block. This is only safe once the app is stable.
+  // There may still be other pending tasks that need one of those views before
+  // they get a chance to hydrate it.
+  //
+  // This block's task is removed above, but other tasks may still be pending.
+  // Wait for those before treating any remaining dehydrated views as orphaned.
+  //
+  // Don't wait if there are no other pending tasks. Calling `whenStable()`
+  // creates another subscription to the stability signal, which can move this
+  // cleanup to a later microtask than callers already waiting on
+  // `appRef.whenStable()`. Keeping this path synchronous preserves the existing
+  // behavior when the app is already stable.
+  const appRef = injector.get(ApplicationRef);
+  // Read the block before waiting, so it is looked up at the same point as before.
+  const lastDeferBlock = dehydratedBlockRegistry.get(lastBlockName);
+  if (pendingTasks.hasPendingTasks) {
+    await appRef.whenStable();
+
+    // The app can be destroyed while we wait. The bootstrap cleanup checks this too.
+    if (appRef.destroyed) {
+      return;
+    }
+  }
+
   // Cleanup after hydration of all affected defer blocks.
-  cleanupHydratedDeferBlocks(
-    dehydratedBlockRegistry.get(lastBlockName),
-    hydrationQueue,
-    dehydratedBlockRegistry,
-    injector.get(ApplicationRef),
-  );
+  cleanupHydratedDeferBlocks(lastDeferBlock, hydrationQueue, dehydratedBlockRegistry, appRef);
 }
 
 export function deferBlockHasErrored(deferBlock: DehydratedDeferBlock): boolean {
@@ -539,7 +562,7 @@ function cleanupRemainingHydrationQueue(
   dehydratedBlockRegistry: DehydratedBlockRegistry,
 ) {
   const blocksBeingHydrated = dehydratedBlockRegistry.hydrating;
-  for (const dehydratedBlockId in hydrationQueue) {
+  for (const dehydratedBlockId of hydrationQueue) {
     blocksBeingHydrated.get(dehydratedBlockId)?.reject();
   }
   dehydratedBlockRegistry.cleanup(hydrationQueue);
@@ -682,6 +705,9 @@ export function processAndInitTriggers(
           timerElements.push(elementTrigger);
         }
         if (blockSummary.hydrate.viewport) {
+          if (typeof blockSummary.hydrate.viewport !== 'boolean') {
+            elementTrigger.intersectionObserverOptions = blockSummary.hydrate.viewport;
+          }
           viewportElements.push(elementTrigger);
         }
       }
@@ -711,6 +737,7 @@ function setViewportTriggers(injector: Injector, elementTriggers: ElementTrigger
         elementTrigger.el,
         () => triggerHydrationFromBlockName(injector, elementTrigger.blockName),
         injector,
+        elementTrigger.intersectionObserverOptions,
       );
       registry.addCleanupFn(elementTrigger.blockName, cleanupFn);
     }

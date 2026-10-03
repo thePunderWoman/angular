@@ -6,20 +6,11 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 import {ɵprovideFakePlatformNavigation} from '@angular/common/testing';
-import {
-  APP_ID,
-  createPlatformFactory,
-  NgModule,
-  StaticProvider,
-  ɵprovideZonelessChangeDetectionInternal as provideZonelessChangeDetectionInternal,
-  ɵinternalProvideZoneChangeDetection as internalProvideZoneChangeDetection,
-  PlatformRef,
-} from '@angular/core';
+import {APP_ID, createPlatformFactory, NgModule, StaticProvider, PlatformRef} from '@angular/core';
 import {TestComponentRenderer} from '@angular/core/testing';
-import {BrowserModule, platformBrowser} from '../../index';
+// g3-only import {BrowserModule, platformBrowser} from '@angular/platform-browser';
+import {BrowserModule, platformBrowser} from '../../index'; // 3p-only
 import {DOMTestComponentRenderer} from './dom_test_component_renderer';
-
-const ZONELESS_BY_DEFAULT = true;
 
 /**
  * Platform for testing

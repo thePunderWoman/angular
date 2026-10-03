@@ -10,31 +10,36 @@ import type {
   TmplAstBoundAttribute,
   TmplAstBoundEvent,
   TmplAstBoundText,
+  TmplAstComponent,
   TmplAstContent,
   TmplAstDeferredBlock,
   TmplAstDeferredBlockError,
   TmplAstDeferredBlockLoading,
   TmplAstDeferredBlockPlaceholder,
   TmplAstDeferredTrigger,
+  TmplAstDirective,
   TmplAstElement,
-  TmplAstIfBlockBranch,
   TmplAstForLoopBlock,
   TmplAstForLoopBlockEmpty,
   TmplAstIcu,
   TmplAstIfBlock,
+  TmplAstIfBlockBranch,
+  TmplAstLetDeclaration,
   TmplAstNode,
   TmplAstRecursiveVisitor,
   TmplAstReference,
   TmplAstSwitchBlock,
   TmplAstSwitchBlockCase,
+  TmplAstSwitchBlockCaseGroup,
+  TmplAstSwitchExhaustiveCheck,
   TmplAstTemplate,
   TmplAstText,
   TmplAstTextAttribute,
-  TmplAstVariable,
   TmplAstUnknownBlock,
-  TmplAstLetDeclaration,
-  TmplAstComponent,
-  TmplAstDirective,
+  TmplAstVariable,
+  TmplAstContentBlock,
+  TmplAstBoundaryBlock,
+  TmplAstBoundaryErrorBlock,
 } from '@angular/compiler';
 
 /**
@@ -78,6 +83,7 @@ export class TemplateAstVisitor implements TmplAstRecursiveVisitor {
   visitUnknownBlock(block: TmplAstUnknownBlock): void {}
   visitSwitchBlock(block: TmplAstSwitchBlock): void {}
   visitSwitchBlockCase(block: TmplAstSwitchBlockCase): void {}
+  visitSwitchBlockCaseGroup(block: TmplAstSwitchBlockCaseGroup): void {}
   visitForLoopBlock(block: TmplAstForLoopBlock): void {}
   visitForLoopBlockEmpty(block: TmplAstForLoopBlockEmpty): void {}
   visitIfBlock(block: TmplAstIfBlock): void {}
@@ -85,6 +91,10 @@ export class TemplateAstVisitor implements TmplAstRecursiveVisitor {
   visitLetDeclaration(decl: TmplAstLetDeclaration): void {}
   visitComponent(component: TmplAstComponent): void {}
   visitDirective(directive: TmplAstDirective): void {}
+  visitSwitchExhaustiveCheck(block: TmplAstSwitchExhaustiveCheck): void {}
+  visitContentBlock(block: TmplAstContentBlock): void {}
+  visitBoundaryBlock(block: TmplAstBoundaryBlock): void {}
+  visitBoundaryErrorBlock(block: TmplAstBoundaryErrorBlock): void {}
 
   /**
    * Visits all the provided nodes in order using this Visitor's visit methods.

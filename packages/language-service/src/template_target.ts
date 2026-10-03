@@ -17,12 +17,16 @@ import {
   PropertyRead,
   RecursiveAstVisitor,
   SafeCall,
+  ThisReceiver,
+  TmplAstBoundaryBlock,
+  TmplAstBoundaryErrorBlock,
   TmplAstBoundAttribute,
   TmplAstBoundDeferredTrigger,
   TmplAstBoundEvent,
   TmplAstBoundText,
   TmplAstComponent,
   TmplAstContent,
+  TmplAstContentBlock,
   TmplAstDeferredBlock,
   TmplAstDeferredBlockError,
   TmplAstDeferredBlockLoading,
@@ -41,16 +45,18 @@ import {
   TmplAstReference,
   TmplAstSwitchBlock,
   TmplAstSwitchBlockCase,
+  TmplAstSwitchBlockCaseGroup,
+  TmplAstSwitchExhaustiveCheck,
   TmplAstTemplate,
   TmplAstText,
   TmplAstTextAttribute,
   TmplAstUnknownBlock,
   TmplAstVariable,
+  TmplAstViewportDeferredTrigger,
   tmplAstVisitAll,
   TmplAstVisitor,
 } from '@angular/compiler';
-import {NgCompiler} from '@angular/compiler-cli/src/ngtsc/core';
-import {findFirstMatchingNode} from '@angular/compiler-cli/src/ngtsc/typecheck/src/comments';
+import {findFirstMatchingNode} from '@angular/compiler-cli/private/hybrid_analysis';
 import tss from 'typescript';
 
 import {
@@ -58,7 +64,6 @@ import {
   isTemplateNodeWithKeyAndValue,
   isWithin,
   isWithinKeyValue,
-  TypeCheckInfo,
 } from './utils';
 
 /**
@@ -406,20 +411,14 @@ interface TcbNodesInfoForTemplate {
  *
  */
 export function getTcbNodesOfTemplateAtPosition(
-  typeCheckInfo: TypeCheckInfo,
+  templateNodes: TmplAstNode[],
   position: number,
-  compiler: NgCompiler,
+  tcb: tss.Node,
 ): TcbNodesInfoForTemplate | null {
-  const target = getTargetAtPosition(typeCheckInfo.nodes, position);
+  const target = getTargetAtPosition(templateNodes, position);
   if (target === null) {
     return null;
   }
-
-  const tcb = compiler.getTemplateTypeChecker().getTypeCheckBlock(typeCheckInfo.declaration);
-  if (tcb === null) {
-    return null;
-  }
-
   const tcbNodes: (tss.Node | null)[] = [];
   if (target.context.kind === TargetNodeKind.RawExpression) {
     const targetNode = target.context.node;
@@ -590,6 +589,10 @@ class TemplateTargetVisitor implements TmplAstVisitor {
     this.visitAll(content.children);
   }
 
+  visitContentBlock(block: TmplAstContentBlock) {
+    this.visitAll(block.children);
+  }
+
   visitVariable(variable: TmplAstVariable) {
     // Variable has no template nodes or expression nodes.
   }
@@ -650,25 +653,38 @@ class TemplateTargetVisitor implements TmplAstVisitor {
   visitDeferredTrigger(trigger: TmplAstDeferredTrigger) {
     if (trigger instanceof TmplAstBoundDeferredTrigger) {
       this.visitBinding(trigger.value);
+    } else if (trigger instanceof TmplAstViewportDeferredTrigger && trigger.options !== null) {
+      this.visitBinding(trigger.options);
     }
   }
 
   visitSwitchBlock(block: TmplAstSwitchBlock) {
     this.visitBinding(block.expression);
-    this.visitAll(block.cases);
+    this.visitAll(block.groups);
     this.visitAll(block.unknownBlocks);
+    if (block.exhaustiveCheck) {
+      this.visit(block.exhaustiveCheck);
+    }
   }
 
   visitSwitchBlockCase(block: TmplAstSwitchBlockCase) {
     block.expression && this.visitBinding(block.expression);
+  }
+
+  visitSwitchBlockCaseGroup(block: TmplAstSwitchBlockCaseGroup) {
+    this.visitAll(block.cases);
     this.visitAll(block.children);
+  }
+
+  visitSwitchExhaustiveCheck(block: TmplAstSwitchExhaustiveCheck) {
+    block.expression && this.visitBinding(block.expression);
   }
 
   visitForLoopBlock(block: TmplAstForLoopBlock) {
     this.visit(block.item);
     this.visitAll(block.contextVariables);
     this.visitBinding(block.expression);
-    this.visitBinding(block.trackBy);
+    block.trackBy && this.visitBinding(block.trackBy);
     this.visitAll(block.children);
     block.empty && this.visit(block.empty);
   }
@@ -684,6 +700,17 @@ class TemplateTargetVisitor implements TmplAstVisitor {
   visitIfBlockBranch(block: TmplAstIfBlockBranch) {
     block.expression && this.visitBinding(block.expression);
     block.expressionAlias && this.visit(block.expressionAlias);
+    this.visitAll(block.children);
+  }
+
+  visitBoundaryBlock(block: TmplAstBoundaryBlock) {
+    this.visitAll(block.children);
+    this.visitAll(block.errorBlocks);
+  }
+
+  visitBoundaryErrorBlock(block: TmplAstBoundaryErrorBlock) {
+    this.visitAll(block.contextVariables);
+    block.expression && this.visitBinding(block.expression);
     this.visitAll(block.children);
   }
 
@@ -720,7 +747,11 @@ class ExpressionVisitor extends RecursiveAstVisitor {
     }
     // The third condition is to account for the implicit receiver, which should
     // not be visited.
-    if (isWithin(this.position, node.sourceSpan) && !(node instanceof ImplicitReceiver)) {
+    if (
+      isWithin(this.position, node.sourceSpan) &&
+      !(node instanceof ImplicitReceiver) &&
+      !(node instanceof ThisReceiver)
+    ) {
       path.push(node);
       node.visit(this, path);
     }

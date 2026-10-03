@@ -9,12 +9,15 @@
 import {h} from 'preact';
 import {RawHtml} from './raw-html';
 import {codeToHtml} from '../../../shared/shiki.mjs';
-import {get} from 'http';
 import {getHighlighterInstance} from '../shiki/shiki.mjs';
+import {getSymbolsAsApiEntries} from '../symbol-context.mjs';
 
 /** Component to render a header of the CLI page. */
 export function HighlightTypeScript(props: {code: string}) {
-  const result = codeToHtml(getHighlighterInstance(), props.code, 'typescript');
+  const result = codeToHtml(getHighlighterInstance(), props.code, {
+    language: 'typescript',
+    apiEntries: getSymbolsAsApiEntries(),
+  });
   const withScrollTrack = result.replace(/^(<pre class="shiki)/, '$1 docs-mini-scroll-track');
 
   return <RawHtml value={withScrollTrack} className="docs-code" />;

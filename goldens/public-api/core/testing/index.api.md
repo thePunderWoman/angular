@@ -4,32 +4,20 @@
 
 ```ts
 
+import * as _angular_core from '@angular/core';
 import { Observable } from 'rxjs';
 import { Subject } from 'rxjs';
 import { Subscription } from 'rxjs';
 
 // @public
-export class ComponentFixture<T> {
+export class ComponentFixture<T> extends AbstractFixture<any> {
     constructor(componentRef: ComponentRef<T>);
-    // @deprecated
-    autoDetectChanges(autoDetect: boolean): void;
-    autoDetectChanges(): void;
-    changeDetectorRef: ChangeDetectorRef;
-    checkNoChanges(): void;
     componentInstance: T;
     // (undocumented)
     componentRef: ComponentRef<T>;
-    debugElement: DebugElement;
-    destroy(): void;
-    detectChanges(checkNoChanges?: boolean): void;
-    elementRef: ElementRef;
     getDeferBlocks(): Promise<DeferBlockFixture[]>;
-    isStable(): boolean;
-    nativeElement: any;
     // (undocumented)
     ngZone: NgZone | null;
-    whenRenderingDone(): Promise<any>;
-    whenStable(): Promise<any>;
 }
 
 // @public (undocumented)
@@ -57,6 +45,13 @@ export enum DeferBlockState {
     Error = 3,
     Loading = 1,
     Placeholder = 0
+}
+
+// @public
+export class DirectiveFixture<T> extends AbstractFixture<Element> {
+    constructor(hostRef: ComponentRef<unknown>, directiveInstance: T);
+    readonly directiveInstance: T;
+    onDestroy(callback: () => void): void;
 }
 
 // @public
@@ -116,9 +111,12 @@ export interface TestBed {
     // (undocumented)
     createComponent<T>(component: Type<T>, options?: TestComponentOptions): ComponentFixture<T>;
     // (undocumented)
+    createDirective<T>(directive: Type<T>, options?: TestDirectiveOptions): DirectiveFixture<T>;
+    // (undocumented)
     execute(tokens: any[], fn: Function, context?: any): any;
     // @deprecated
     flushEffects(): void;
+    getLastFixture<T = unknown>(): ComponentFixture<T>;
     initTestEnvironment(ngModule: Type<any> | Type<any>[], platform: PlatformRef, options?: TestEnvironmentOptions): void;
     // (undocumented)
     inject<T>(token: ProviderToken<T>, notFoundValue: undefined, options: InjectOptions & {
@@ -189,6 +187,13 @@ export class TestComponentRenderer {
     insertRootElement(rootElementId: string, tagName?: string): void;
     // (undocumented)
     removeAllRootElements?(): void;
+}
+
+// @public
+export interface TestDirectiveOptions {
+    bindings?: Binding[];
+    // (undocumented)
+    tagName?: string;
 }
 
 // @public (undocumented)

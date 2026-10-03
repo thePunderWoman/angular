@@ -1,9 +1,9 @@
-<dialog #searchDialog>
+<dialog #searchDialog id="docsSearchDialog">
   <div class="docs-search-container" (docsClickOutside)="closeSearchDialog()">
     <docs-text-field
       [autofocus]="true"
       [hideIcon]="true"
-      [formControl]="searchControl"
+      [formField]="searchForm"
       [resetLabel]="'Clear the search'"
       class="docs-search-input"
       placeholder="Search docs"
@@ -23,18 +23,20 @@
                   <!-- Icon -->
                   <span class="docs-search-result-icon" aria-hidden="true">
                     <i role="presentation" class="material-symbols-outlined docs-icon-small">
-                      {{ result.type === 'code' ? 'code' : 'description'}}
+                      {{ result.type === 'code' ? 'code' : 'description' }}
                     </i>
                   </span>
 
-                  <!-- Page title -->
-                  <span [innerHtml]="result.labelHtml"></span>
-                  @if (result.package) {
-                    <span
-                      [innerHTML]="result.package"
-                      class="docs-search-result__label__package"
-                    ></span>
-                  }
+                  <!-- Page title and package badge -->
+                  <span class="docs-search-result__label__text">
+                    <span [innerHtml]="result.labelHtml"></span>
+                    @if (result.package) {
+                      <span
+                        [innerHTML]="result.package"
+                        class="docs-search-result__label__package"
+                      ></span>
+                    }
+                  </span>
                 </p>
 
                 @if (result.subLabelHtml) {
@@ -59,16 +61,26 @@
           </li>
         }
       </ul>
-    } @else if (history.hasItems() && !this.searchControl.value.length) {
+    } @else if (history.hasItems() && !this.searchForm().value().length) {
       <docs-search-history />
     } @else {
       <div class="docs-search-results docs-mini-scroll-track">
-        @if (!resultsResource.hasValue()) {
+        @if (emptyState() === 'start') {
           <div class="docs-search-results__start-typing">
+            <img
+              src="assets/images/angie/magnifying-glass.svg"
+              class="docs-search-angie"
+              aria-hidden="true"
+            />
             <span>Start typing to see results</span>
           </div>
-        } @else if (searchResults().length === 0) {
+        } @else {
           <div class="docs-search-results__no-results">
+            <img
+              src="assets/images/angie/question.svg"
+              class="docs-search-angie"
+              aria-hidden="true"
+            />
             <span>No results found</span>
           </div>
         }

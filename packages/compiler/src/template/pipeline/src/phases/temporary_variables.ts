@@ -23,6 +23,10 @@ export function generateTemporaryVariables(job: CompilationJob): void {
   for (const unit of job.units) {
     unit.create.prepend(generateTemporaries(unit.create) as Array<ir.StatementOp<ir.CreateOp>>);
     unit.update.prepend(generateTemporaries(unit.update) as Array<ir.StatementOp<ir.UpdateOp>>);
+
+    for (const expr of unit.functions) {
+      expr.ops.prepend(generateTemporaries(expr.ops) as Array<ir.StatementOp<ir.UpdateOp>>);
+    }
   }
 }
 
@@ -50,7 +54,6 @@ function generateTemporaries(
     // read for the final time.
     let count = 0;
     const assigned = new Set<ir.XrefId>();
-    const released = new Set<ir.XrefId>();
     const defs = new Map<ir.XrefId, string>();
     ir.visitExpressionsInOp(op, (expr, flag) => {
       if (flag & ir.VisitorContextFlag.InChildOperation) {
@@ -66,7 +69,6 @@ function generateTemporaries(
         assignName(defs, expr);
       } else if (expr instanceof ir.ReadTemporaryExpr) {
         if (finalReads.get(expr.xref) === expr) {
-          released.add(expr.xref);
           count--;
         }
         assignName(defs, expr);

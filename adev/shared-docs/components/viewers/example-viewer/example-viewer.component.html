@@ -1,20 +1,17 @@
 <div class="docs-example-viewer" role="group">
   <header class="docs-example-viewer-actions">
     @if (showCode()) {
-      @if (view() === CodeExampleViewMode.SNIPPET) {
-        <span>{{ exampleMetadata()?.title }}</span>
-      }
-
-      @if (view() === CodeExampleViewMode.MULTI_FILE) {
-        <mat-tab-group #codeTabs animationDuration="0ms" mat-stretch-tabs="false">
-          @for (tab of tabs(); track tab) {
-            <mat-tab [label]="tab.name" />
-          }
-        </mat-tab-group>
-      }
-    } @else {
-      <!-- Title placeholder -->
-      <span aria-hidden="true">&nbsp;</span>
+      <mat-tab-group
+        #codeTabs
+        animationDuration="0ms"
+        mat-stretch-tabs="false"
+        [selectedIndex]="selectedTabIndex()"
+        (selectedTabChange)="onTabIndexChange($event.index)"
+      >
+        @for (tab of tabs(); track tab) {
+          <mat-tab [label]="tab.name" />
+        }
+      </mat-tab-group>
     }
 
     <div class="docs-example-viewer-icons">
@@ -22,13 +19,18 @@
         type="button"
         role="switch"
         class="docs-example-code-toggle"
+        [class.docs-example-code-toggle__show]="!showCode()"
         [attr.aria-checked]="showCode()"
         [attr.aria-label]="showCode() ? 'Hide code' : 'Show code'"
-        (click)="showCode.set(!showCode())"
+        (click)="toggleCodeVisibility()"
         [matTooltip]="showCode() ? 'Hide code' : 'Show code'"
         matTooltipPosition="above"
       >
-        <docs-icon>{{showCode() ? 'code_off' : 'code'}}</docs-icon>
+        @if (!showCode()) {
+          <span class="docs-example-show-code"><docs-icon>code</docs-icon> Show Code</span>
+        } @else {
+          <docs-icon>code_off</docs-icon>
+        }
       </button>
       <button
         type="button"
@@ -86,7 +88,7 @@
                 fill="none"
               >
                 <path
-                  fill="var(--gray-400)"
+                  fill="var(--quaternary-contrast)"
                   d="M3.4 22 2 20.6 8.6 14H4v-2h8v8h-2v-4.6L3.4 22ZM12 12V4h2v4.6L20.6 2 22 3.4 15.4 10H20v2h-8Z"
                 />
               </svg>
@@ -98,14 +100,10 @@
   </header>
 
   @if (showCode()) {
-    <div
-      class="docs-example-viewer-code-wrapper"
-      [class.docs-example-viewer-snippet]="view() === CodeExampleViewMode.SNIPPET"
-      [class.docs-example-viewer-multi-file]="view() === CodeExampleViewMode.MULTI_FILE"
-    >
+    <div class="docs-example-viewer-code-wrapper" [class.shell]="snippetCode()?.shell">
       <button docs-copy-source-code></button>
       @if (snippetCode()?.sanitizedContent; as content) {
-        <div [innerHTML]="content"></div>
+        <div class="docs-example-code-block" [innerHTML]="content"></div>
       }
     </div>
   }

@@ -12,6 +12,10 @@ import {NgtscTestEnvironment} from './env';
 
 const testFiles = loadStandardTestFiles();
 
+function cleanNewLines(contents: string) {
+  return contents.replace(/\s*\n\s*/g, ' ');
+}
+
 runInEachFileSystem(() => {
   describe('selectorless', () => {
     let env!: NgtscTestEnvironment;
@@ -292,7 +296,7 @@ runInEachFileSystem(() => {
       );
     });
 
-    it('should not allow a `deferredImports` array in a selectorless component', () => {
+    it('should not allow a `deferredImports` object in a selectorless component', () => {
       env.write(
         'test.ts',
         `
@@ -304,7 +308,7 @@ runInEachFileSystem(() => {
           @Component({
             template: '<Dep/>',
             // @ts-ignore
-            deferredImports: [Dep]
+            deferredImports: { block1: [Dep] }
           })
           export class Comp {}
         `,
@@ -1112,10 +1116,10 @@ runInEachFileSystem(() => {
       expect(jsContents).not.toContain('import { DepComp');
       expect(jsContents).not.toContain('import { DepDir');
       expect(jsContents).not.toContain('import { DepPipe');
-      expect(jsContents).toContain(
-        'const Comp_Defer_1_DepsFn = () => [import("./dep-comp").then(m => m.DepComp), ' +
-          'import("./dep-dir").then(m => m.DepDir), ' +
-          'import("./dep-pipe").then(m => m.DepPipe)];',
+      expect(cleanNewLines(jsContents)).toContain(
+        'const Comp_Defer_1_DepsFn = () => [/* @ts-ignore */ import("./dep-comp").then(m => m.DepComp), ' +
+          '/* @ts-ignore */ import("./dep-dir").then(m => m.DepDir), ' +
+          '/* @ts-ignore */ import("./dep-pipe").then(m => m.DepPipe)];',
       );
       expect(jsContents).toContain('ɵɵdefer(1, 0, Comp_Defer_1_DepsFn);');
     });

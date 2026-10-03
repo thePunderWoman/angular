@@ -9,7 +9,8 @@
 import {ɵgetDOM as getDOM} from '@angular/common';
 import {NgZone} from '@angular/core';
 import {DomEventsPlugin} from '../../../src/dom/events/dom_events';
-import {EventManager, EventManagerPlugin} from '../../../src/dom/events/event_manager';
+import {EventManager} from '../../../src/dom/events/event_manager';
+import {EventManagerPlugin} from '../../../src/dom/events/event_manager_plugin';
 
 import {TestBed} from '@angular/core/testing';
 import {isNode, createMouseEvent, el} from '@angular/private/testing';
@@ -59,7 +60,7 @@ import type {} from 'zone.js';
       const plugin = new FakeEventManagerPlugin(doc, ['dblclick']);
       const manager = new EventManager([plugin], new FakeNgZone());
       expect(() => manager.addEventListener(element, 'click', null!)).toThrowError(
-        'NG05101: No event manager plugin found for event click',
+        'NG05101: No event manager plugin found for event click. Find more at https://next.angular.dev/errors/NG05101',
       );
     });
 

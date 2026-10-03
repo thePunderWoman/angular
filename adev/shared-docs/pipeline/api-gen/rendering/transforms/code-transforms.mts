@@ -7,12 +7,12 @@
  */
 
 import {
+  DecoratorEntry,
   DocEntry,
   EntryType,
   FunctionSignatureMetadata,
   GenericEntry,
   MemberEntry,
-  DecoratorEntry,
   MemberTags,
   ParameterEntry,
   PropertyEntry,
@@ -34,16 +34,20 @@ import {
 } from '../entities/categorization.mjs';
 import {CodeLineRenderable} from '../entities/renderables.mjs';
 import {HasModuleName, HasRenderableToc} from '../entities/traits.mjs';
-import {getSymbolUrl} from '../symbol-context.mjs';
 import {
   getHighlighterInstance,
   insertParenthesesForDecoratorInShikiHtml,
   replaceKeywordFromShikiHtml,
 } from '../shiki/shiki.mjs';
+import {getSymbolsAsApiEntries, getSymbolUrl} from '../symbol-context.mjs';
 
-import {filterLifecycleMethods, mergeGettersAndSetters} from './member-transforms.mjs';
-import {formatJs} from './format-code.mjs';
 import {codeToHtml} from '../../../shared/shiki.mjs';
+import {formatJs} from './format-code.mjs';
+import {
+  filterLifecycleMethods,
+  filterMergedNamespaceMembers,
+  mergeGettersAndSetters,
+} from './member-transforms.mjs';
 
 const INDENT = '  ';
 const SPACE = ' ';
@@ -88,7 +92,11 @@ export async function addRenderableCodeToc<T extends DocEntry & HasModuleName>(
   let codeWithSyntaxHighlighting = codeToHtml(
     getHighlighterInstance(),
     formattedCode ?? metadata?.contents,
-    'typescript',
+    {
+      language: 'typescript',
+      apiEntries: getSymbolsAsApiEntries(),
+      removeWhitespace: false,
+    },
   );
 
   if (isDecoratorEntry(entry)) {
@@ -106,11 +114,6 @@ export async function addRenderableCodeToc<T extends DocEntry & HasModuleName>(
     );
     // }
   }
-
-  // Note: Don't expect enum value in signatures to be linked correctly
-  // as shiki already splits them into separate span blocks.
-  // Only the enum itself will recieve a link
-  codeWithSyntaxHighlighting = addApiLinksToHtml(codeWithSyntaxHighlighting);
 
   // shiki returns the lines wrapped by 2 node : 1 pre node, 1 code node.
   // As leveraging jsdom isn't trivial here, we rely on a regex to extract the line nodes
@@ -198,7 +201,10 @@ function mapDocEntryToCode(entry: DocEntry): CodeTableOfContentsData {
   }
 
   if (isInterfaceEntry(entry)) {
-    return getCodeTocData(mergeGettersAndSetters(entry.members), isDeprecated);
+    return getCodeTocData(
+      filterMergedNamespaceMembers(mergeGettersAndSetters(entry.members)),
+      isDeprecated,
+    );
   }
 
   if (isFunctionEntry(entry)) {
@@ -360,8 +366,115 @@ function getCodeLine(member: MemberEntry): string {
   return getPropertyCodeLine(member as PropertyEntry);
 }
 
+/** Type-string prefix that identifies a signal-based model (`model()` / `model.required()`). */
+const SIGNAL_MODEL_TYPE_PREFIXES = ['ModelSignal<'];
+
+export function isSignalModel(member: PropertyEntry): boolean {
+  return (
+    (member.memberTags.includes(MemberTags.Input) ||
+      member.memberTags.includes(MemberTags.Output)) &&
+    SIGNAL_MODEL_TYPE_PREFIXES.some((prefix) => member.type?.startsWith(prefix))
+  );
+}
+
+/** Type-string prefixes that identify a signal-based input (`input()` / `input.required()`). */
+const SIGNAL_INPUT_TYPE_PREFIXES = ['InputSignal<', 'InputSignalWithTransform<'];
+
+/**
+ * Type-string prefixes that identify a signal-based output (`output()`).
+ *
+ * Only `OutputEmitterRef` is listed: `outputFromObservable()` is typed as the
+ * broader `OutputRef` and isn't declared with an `output()` initializer.
+ */
+const SIGNAL_OUTPUT_TYPE_PREFIXES = ['OutputEmitterRef<'];
+
+/**
+ * Detects a signal input (`input()` / `input.required()`) purely by string
+ * comparison on the resolved property type, since `PropertyEntry` carries no
+ * explicit `isSignal` flag.
+ */
+export function isSignalInput(member: PropertyEntry): boolean {
+  return (
+    member.memberTags.includes(MemberTags.Input) &&
+    SIGNAL_INPUT_TYPE_PREFIXES.some((prefix) => member.type?.startsWith(prefix))
+  );
+}
+
+/**
+ * Detects a signal output (`output()`) purely by string comparison on the
+ * resolved property type, since `PropertyEntry` carries no explicit `isSignal` flag.
+ */
+export function isSignalOutput(member: PropertyEntry): boolean {
+  return (
+    member.memberTags.includes(MemberTags.Output) &&
+    SIGNAL_OUTPUT_TYPE_PREFIXES.some((prefix) => member.type?.startsWith(prefix))
+  );
+}
+
+/**
+ * Extracts the type arguments from a signal binding type, e.g. `T` from
+ * `InputSignal<T>`, `T, W` from `InputSignalWithTransform<T, W>` and `T` from
+ * `OutputEmitterRef<T>`.
+ */
+function getSignalTypeArguments(type: string): string {
+  const start = type.indexOf('<');
+  const end = type.lastIndexOf('>');
+  return start !== -1 && end !== -1 ? type.slice(start + 1, end).trim() : type;
+}
+
+/**
+ * Renders a signal binding using the initializer form the source actually uses,
+ * e.g. `readonly field = input.required<Field<T>>({alias: 'formField'});`.
+ */
+function getSignalBindingCodeLine(
+  member: PropertyEntry,
+  bindingTag: MemberTags,
+  initializer: string,
+  alias: string | undefined,
+): string {
+  // Preserve the other tags (e.g. `readonly`) but drop the binding tag so we don't
+  // emit the misleading `@Input(...)` / `@Output(...)` decorator prefix.
+  const otherTags = getTags({
+    ...member,
+    memberTags: member.memberTags.filter((tag) => tag !== bindingTag),
+  });
+  const prefix = otherTags.length ? `${otherTags.join(SPACE)}${SPACE}` : '';
+  const args = alias && alias !== member.name ? `{alias: '${alias}'}` : '';
+
+  return `${prefix}${member.name} = ${initializer}<${getSignalTypeArguments(member.type)}>(${args});`;
+}
+
 /** Map getter, setter and property entry to text */
-function getPropertyCodeLine(member: PropertyEntry): string {
+export function getPropertyCodeLine(member: PropertyEntry): string {
+  if (isSignalModel(member)) {
+    // A model is both an input and an output. We need to strip both tags so they aren't rendered as decorators.
+    const memberWithoutTags = {
+      ...member,
+      memberTags: member.memberTags.filter(
+        (t) => t !== MemberTags.Input && t !== MemberTags.Output,
+      ),
+    };
+    return getSignalBindingCodeLine(
+      memberWithoutTags,
+      MemberTags.Input, // getSignalBindingCodeLine expects a tag to filter out, but we've already done it
+      member.isRequiredInput ? 'model.required' : 'model',
+      member.inputAlias,
+    );
+  }
+
+  if (isSignalInput(member)) {
+    return getSignalBindingCodeLine(
+      member,
+      MemberTags.Input,
+      member.isRequiredInput ? 'input.required' : 'input',
+      member.inputAlias,
+    );
+  }
+
+  if (isSignalOutput(member)) {
+    return getSignalBindingCodeLine(member, MemberTags.Output, 'output', member.outputAlias);
+  }
+
   const isOptional = isOptionalMember(member);
   const tags = getTags(member);
 
@@ -474,6 +587,18 @@ export function printInitializerFunctionSignatureLine(
   return `function ${res}`;
 }
 
+export function formatExtendsClause(extendsValue: string | string[] | undefined): string {
+  if (!extendsValue) {
+    return '';
+  }
+
+  if (typeof extendsValue === 'string') {
+    return ` extends ${extendsValue}`;
+  }
+
+  return extendsValue.length > 0 ? ` extends ${extendsValue.join(', ')}` : '';
+}
+
 function appendPrefixAndSuffix(entry: DocEntry, codeTocData: CodeTableOfContentsData): void {
   const appendFirstAndLastLines = (
     data: CodeTableOfContentsData,
@@ -485,11 +610,11 @@ function appendPrefixAndSuffix(entry: DocEntry, codeTocData: CodeTableOfContents
 
   if (isClassEntry(entry) || isInterfaceEntry(entry)) {
     const generics = makeGenericsText(entry.generics);
-    const extendsStr = entry.extends ? ` extends ${entry.extends}` : '';
+    const extendsStr = formatExtendsClause(entry.extends);
     const implementsStr =
       entry.implements.length > 0 ? ` implements ${entry.implements.join(' ,')}` : '';
 
-    const signature = `${entry.name}${generics}${extendsStr}${implementsStr}`;
+    const signature = `${entry.name}${generics}${extendsStr}${implementsStr}`.replaceAll('\n', '');
     if (isClassEntry(entry)) {
       const abstractPrefix = entry.isAbstract ? 'abstract ' : '';
       appendFirstAndLastLines(codeTocData, `${abstractPrefix}class ${signature} {`, `\n}`);
@@ -584,5 +709,5 @@ export function makeGenericsText(generics: GenericEntry[] | undefined): string {
 }
 
 function isClassLikeDecorator(entry: DecoratorEntry): boolean {
-  return !!entry.members;
+  return !entry.signatures?.length;
 }

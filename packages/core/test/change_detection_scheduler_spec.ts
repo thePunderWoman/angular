@@ -46,6 +46,7 @@ import {
   tick,
 } from '../testing';
 
+import {ChangeDetectionStrategy} from '@angular/compiler';
 import {provideNoopAnimations} from '@angular/platform-browser/animations';
 import {isBrowser, isNode, withBody} from '@angular/private/testing';
 import {ChangeDetectionSchedulerImpl} from '../src/change_detection/scheduling/zoneless_scheduling_impl';
@@ -468,10 +469,7 @@ describe('Angular with zoneless enabled', () => {
     });
 
     it('executes render hooks when a new one is registered', async () => {
-      let resolveFn: Function;
-      let calledPromise = new Promise((resolve) => {
-        resolveFn = resolve;
-      });
+      const {promise: calledPromise, resolve: resolveFn} = Promise.withResolvers<void>();
       TestBed.runInInjectionContext(() => {
         afterNextRender(() => {
           resolveFn();
@@ -495,10 +493,7 @@ describe('Angular with zoneless enabled', () => {
       await fixture.whenStable();
       expect(checks).toBe(1);
 
-      let resolveFn: Function;
-      let calledPromise = new Promise((resolve) => {
-        resolveFn = resolve;
-      });
+      const {promise: calledPromise, resolve: resolveFn} = Promise.withResolvers<void>();
       TestBed.runInInjectionContext(() => {
         afterNextRender(() => {
           resolveFn();
@@ -555,6 +550,7 @@ describe('Angular with zoneless enabled', () => {
   it('change detects embedded view when attached to a host on ApplicationRef and declaration is marked for check', async () => {
     @Component({
       template: '<ng-template #template><div>{{thing}}</div></ng-template>',
+      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class DynamicCmp {
       @ViewChild('template') templateRef!: TemplateRef<{}>;
@@ -562,6 +558,7 @@ describe('Angular with zoneless enabled', () => {
     }
     @Component({
       template: '',
+      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Host {
       readonly vcr = inject(ViewContainerRef);
@@ -586,6 +583,7 @@ describe('Angular with zoneless enabled', () => {
   it('change detects embedded view when attached directly to ApplicationRef and declaration is marked for check', async () => {
     @Component({
       template: '<ng-template #template><div>{{thing}}</div></ng-template>',
+      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class DynamicCmp {
       @ViewChild('template') templateRef!: TemplateRef<{}>;

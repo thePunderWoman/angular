@@ -29,6 +29,12 @@ const INTERFACE_EXCEPTIONS = new Set<string>([
 const AOT_ONLY = new Set<string>([
   'ɵsetClassMetadata',
   'ɵsetClassMetadataAsync',
+  'Input',
+  'Output',
+  'ViewChild',
+  'ViewChildren',
+  'ContentChild',
+  'ContentChildren',
 
   // used in type-checking.
   'ɵINPUT_SIGNAL_BRAND_WRITE_TYPE',
@@ -51,6 +57,7 @@ const PARTIAL_ONLY = new Set<string>([
   'ɵɵngDeclareInjector',
   'ɵɵngDeclareNgModule',
   'ɵɵngDeclarePipe',
+  'ɵɵngDeclareService',
   'ɵɵFactoryTarget',
   'ChangeDetectionStrategy',
   'ViewEncapsulation',
@@ -75,7 +82,7 @@ describe('r3 jit environment', () => {
       )
       .forEach((sym) => {
         // Assert that angularCoreEnv has a reference to the runtime symbol.
-        expect(angularCoreEnv.hasOwnProperty(sym.name)).toBe(
+        expect(Object.hasOwn(angularCoreEnv, sym.name)).toBe(
           true,
           `Missing symbol ${sym.name} in render3/jit/environment`,
         );
